@@ -1,0 +1,19 @@
+{
+  "name": "betterncm",
+  "version": "1.0.0",
+  "description": "",
+  "engines": {
+    "node": ">=8.10"
+  },
+  "scripts": {
+    "start": "aiot server --watch --open-nuttx",
+    "build": "aiot build --enable-image-png8 --drop-console=true --enable-protobuf --enable-jsc",
+    "release": "aiot release --enable-protobuf --enable-jsc",
+    "watch": "aiot watch --open-nuttx",
+    "lint": "eslint --format codeframe --fix --ext .ux,.js src/"
+  },
+  "devDependencies": {
+    "@aiot-toolkit/jsc": "^1.0.3",
+    "aiot-toolkit": "^2.0.5"
+  }
+}
