@@ -81,7 +81,7 @@ export default {
 }
 
 .volume-progress {
-  color: #ff3a3a;
+  color: #3ae1ff;
   stroke-width: 30px;
   layer-color: rgba(255, 255, 255, 0.1);
 }

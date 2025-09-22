@@ -14,11 +14,44 @@
     },
     {
       "name": "system.audio"
+    },
+    {
+      "name": "system.request"
+    },
+    {
+      "name": "system.storage"
+    },
+    {
+      "name": "system.file"
+    },
+    {
+      "name": "system.device"
+    },
+    {
+      "name": "system.vibrator"
+    },
+    {
+      "name": "system.fetch"
+    },
+    {
+      "name": "system.prompt"
+    },
+    {
+      "name": "system.app"
     }
   ],
   "config": {
     "logLevel": "log",
-    "designWidth": "device-width"
+    "designWidth": "device-width",
+    "background": {
+      "features": [
+        "system.audio",
+        "system.request"
+      ]
+    }
+  },
+  "display": {
+    "backgroundColor": "#000000"
   },
   "router": {
     "entry": "pages/player",
@@ -31,13 +64,13 @@
       },
       "pages/list": {
         "component": "list"
+      },
+      "pages/search": {
+        "component": "search"
+      },
+      "pages/menu": {
+        "component": "menu"
       }
     }
-  },
-  "background": {
-    "features":[
-      "system.audio",
-      "system.request"
-    ]
   }
 }

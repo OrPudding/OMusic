@@ -1,150 +1,202 @@
 <template>
-  <div class="list-container">
-    <text class="title" onclick="goBack">返回</text>
-    <list class="list">
-      <list-item for="{{(index, item) in songList}}" class="item" onclick="play(item)" tid="id" type="song">
-        <text class="item-index">{{ index + 1 }}</text>
-        <div class="detail">
-          <text class="item-title">{{ item.name }}</text>
-          <text class="item-subtitle">{{ item.artists }}</text>
-        </div>
-      </list-item>
-    </list>
-  </div>
+	<div class="list-container">
+		<text class="title" onclick="goBack">播放列表</text>
+		<div class="list">
+			<div for="{{ songList }}" class="song-item">
+				<text class="item-index">{{$idx +1}}</text>
+				<div class="song-info" onclick="play($item.id)">
+					<text class="song-title">{{ $item.name }}</text>
+					<text class="song-artist">{{ $item.artists }}</text>
+				</div>
+				<text class="delete-btn" @click="deleteSong($item.id)">×</text>
+			</div>
+		</div>
+	</div>
 </template>
 
 <script>
 import router from "@system.router";
+import file from "@system.file";
 
 export default {
-  data: {
-    songList: [
-      {
-        id: 1,
-        name: "静止",
-        artists: "花儿乐队",
-        playUrl: "http://music.163.com/song/media/outer/url?id=357424.mp3",
-      },
-      {
-        id: 2,
-        name: "生活因你而火热",
-        artists: "新裤子",
-        playUrl: "http://music.163.com/song/media/outer/url?id=406737702.mp3",
-      },
-      {
-        id: 3,
-        name: "你要跳舞吗",
-        artists: "新裤子",
-        playUrl: "http://music.163.com/song/media/outer/url?id=408055928.mp3",
-      },
-    ],
-  },
+	data: {
+		songList: [],
+		historyFileUri: 'internal://files/play_history.json',
+	},
 
-  play(item) {
-    router.replace({
-      uri: "/pages/player",
-      params: {
-        songId: item.id,
-      },
+  onInit() {
+    // --- 使用 file 模块读取播放历史 ---
+    file.readText({
+        uri: this.historyFileUri,
+        success: (data) => {
+            console.log("[列表页] 从文件加载历史记录:", data.text || "空数据");
+            try {
+                // 解析JSON并过滤掉可能存在的null或undefined等无效条目
+                this.songList = JSON.parse(data.text || "[]").filter(item => !!item);
+            } catch (e) {
+                console.error("[列表页] 播放历史解析失败:", e);
+                this.songList = [];
+            }
+        },
+        fail: (data, code) => {
+            // 错误码 301 代表文件不存在，是正常情况
+            if (code === 301) {
+                console.log("[列表页] 历史记录文件不存在，列表为空。");
+            } else {
+                console.error(`[列表页] 读取历史记录文件失败, code=${code}`);
+            }
+            this.songList = [];
+        }
     });
-  },
+},
 
-  goBack() {
-    router.back();
-  },
+
+deleteSong(songId) {
+    // 1. 先读取文件中的完整历史记录
+    file.readText({
+        uri: this.historyFileUri,
+        success: (data) => {
+            try {
+                let history = JSON.parse(data.text || "[]");
+
+                // 2. 过滤掉要删除的歌曲
+                const newHistory = history.filter(item => item?.id !== songId);
+
+                // 检查是否有歌曲被实际删除
+                if (newHistory.length === history.length) {
+                    console.warn("要删除的歌曲未在列表中找到, ID:", songId);
+                    return; // 如果没有找到匹配项，则无需写入文件
+                }
+
+                // 3. 将新的历史记录写回文件
+                file.writeText({
+                    uri: this.historyFileUri,
+                    text: JSON.stringify(newHistory, null, 2),
+                    success: () => {
+                        // 4. 更新当前页面的 songList 以立即刷新UI
+                        this.songList = newHistory;
+                        console.log("删除成功并已更新文件, ID:", songId);
+                    },
+                    fail: (data, code) => {
+                        console.error(`[列表页] 删除后写入文件失败, code=${code}`);
+                    }
+                });
+            } catch (e) {
+                console.error("[列表页] 删除操作时解析数据错误:", e);
+            }
+        },
+        fail: (data, code) => {
+            console.error(`[列表页] 删除操作时读取文件失败, code=${code}`);
+        }
+    });
+},
+
+
+	play(index) {
+		router.replace({
+			uri: "/pages/player",
+			params: {
+				currentIndex: index,
+			},
+		});
+	},
+
+	goBack() {
+		router.back();
+	},
 };
 </script>
 
 <style>
 .list-container {
-  width: 100%;
-  height: 100%;
-  padding: 40px;
-  flex-direction: column;
-  align-items: center;
-  background-color: black;
+	width: 100%;
+	height: 100%;
+	flex-direction: column;
+	align-items: center;
+	background-color: black;
 }
 
 .title {
-  font-size: 40px;
-  text-align: center;
-  color: #ff3a3a;
+	font-size: 28px;
+	padding: 10px;
+	text-align: center;
+	color: #fff;
 }
 
+.delete-btn {
+	width: 63px;
+	height: 63px;
+	color: #ff4444;
+	background-color: rgba(255, 255, 255, 0.08);
+	border-radius: 36px;
+	font-size: 50px;
+	text-align: center;
+}
+
+/* 新增列表样式 */
 .list {
-  width: 360px;
-  margin-top: 10px;
-  height: 300px;
+	flex-direction: column;
+	padding-bottom: 60px;
 }
 
-.item {
-  display: flex;
-  width: 100%;
-  height: 100px;
-  padding-bottom: 8px;
+.song-item {
+	padding: 25px;
+	width: 300px;
+	margin: 5px;
+	background-color: rgba(255, 255, 255, 0.06);
+	border-radius: 36px;
+	justify-content: space-between;
 }
 
 .item-index {
-  width: 60px;
-  height: 100%;
-  text-align: center;
-  color: white;
+	width: 60px;
+	height: 100%;
+	text-align: center;
+	color: rgba(255, 255, 255, 0.6);
 }
 
-.detail {
-  flex: 1;
-  height: 100%;
-  flex-direction: column;
+.song-info {
+	flex-direction: column;
 }
 
-.item-title {
-  width: 100%;
-  font-size: 34px;
-  height: 56px;
-  line-height: 56px;
-  color: #ffffff;
-  lines: 1;
-  text-overflow: ellipsis;
+.song-title {
+	font-size: 26px;
+	color: #fff;
 }
 
-.item-subtitle {
-  width: 100%;
-  font-size: 28px;
-  height: 44px;
-  line-height: 44px;
-  color: rgba(255, 255, 255, 0.6);
-  lines: 1;
-  text-overflow: ellipsis;
+.song-artist {
+	font-size: 22px;
+	color: #888;
 }
 @media (shape: pill-shaped) or (max-width: 106) {
-  .list-container {
-    padding: 10px;
-  }
-  .list {
-    width: 100%;
-    margin-top: 10px;
-  }
-  .title {
-    font-size: 28px;
-  }
+	.list-container {
+		padding: 10px;
+	}
+	.list {
+		width: 100%;
+		margin-top: 10px;
+	}
+	.title {
+		font-size: 28px;
+	}
 
-  .item {
-    display: flex;
-    width: 100%;
-    height: 100px;
-    padding-bottom: 8px;
-  }
+	.item {
+		display: flex;
+		width: 100%;
+		height: 100px;
+		padding-bottom: 8px;
+	}
 
-  .item-index {
-    width: 40px;
-    height: 100%;
-    text-align: center;
-  }
-  .item-title {
-    font-size: 22px;
-  }
-  .item-subtitle {
-    font-size: 20px;
-  }
+	.item-index {
+		width: 40px;
+		height: 100%;
+		text-align: center;
+	}
+	.item-title {
+		font-size: 22px;
+	}
+	.item-subtitle {
+		font-size: 20px;
+	}
 }
 </style>

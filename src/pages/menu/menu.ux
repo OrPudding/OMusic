@@ -1,0 +1,138 @@
+<template>
+  <div class="menu-container">
+    <text class="title">主菜单</text>
+    <scroll class="menu-list" bounces="true">
+      <div class="menu-item" onclick="goToPlayer">
+        <text class="item-text">正在播放</text>
+      </div>
+      <div class="menu-item" onclick="goToList">
+        <text class="item-text">播放列表</text>
+      </div>
+      <div class="menu-item" onclick="goToSearch">
+        <text class="item-text">搜索</text>
+      </div>
+      <div class="menu-item" onclick="goToLike">
+        <text class="item-text">我的收藏</text>
+      </div>
+      <div class="menu-item" onclick="goToSongList">
+        <text class="item-text">我的歌单</text>
+      </div>
+      <div class="menu-item" onclick="goToUser">
+        <text class="item-text">个人中心</text>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import router from "@system.router";
+
+export default {
+  private: {
+    likeList: []
+  },
+
+  goToList() {
+    router.replace({
+      uri: "/pages/list"
+    });
+  },
+
+  goToPlayer() {
+    router.replace({
+      uri: "/pages/player"
+    });
+  },
+
+  goToVolume() {
+    router.replace({
+      uri: "/pages/volume"
+    });
+  },
+
+  goToSearch() {
+    router.replace({
+      uri: "/pages/search"
+    });
+  },
+  goToLike() {
+    router.replace({
+      uri: "/pages/like"
+    });
+  },
+
+  goToSongList() {
+    router.replace({
+      uri: "/pages/songlist",
+      params: this.likeList
+    });
+  },
+  goToUser() {
+    router.replace({
+      uri: "/pages/user"
+    });
+  },
+};
+</script>
+
+<style>
+.menu-container {
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  background-color: black;
+}
+
+.title {
+	font-size: 36px;
+	padding: 10px;
+	text-align: center;
+  font-weight: bold;
+	color: #fff;
+}
+
+.menu-list {
+  width: 360px;
+  flex-direction: column;
+}
+
+.menu-item {
+  width: 100%;
+  height: 80px;
+  background-color: rgba(255, 255, 255, 0.06);
+  margin-bottom: 20px;
+  border-radius: 36px;
+  justify-content: center;
+  align-items: center;
+}
+
+.item-text {
+  font-size: 32px;
+  color: #ffffff;
+}
+
+@media (shape: pill-shaped) or (max-width: 106) {
+  .menu-container {
+    padding: 10px;
+  }
+  
+  .menu-list {
+    width: 100%;
+  }
+  
+  .title {
+    font-size: 28px;
+    margin-top: 20px;
+  }
+  
+  .menu-item {
+    height: 60px;
+    margin-bottom: 10px;
+  }
+  
+  .item-text {
+    font-size: 24px;
+  }
+}
+</style>

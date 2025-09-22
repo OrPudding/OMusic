@@ -1,0 +1,245 @@
+<import
+	name="input-method"
+	src="../../components/InputMethod/InputMethod.ux"
+></import>
+<template>
+	<scroll class="page" scroll-y="true" bounces="true">
+        <div class="header">
+    <text class="title">搜索</text>
+		<text class="text" @click="changeState">{{ textValue }}_</text>
+        </div>
+		<input-method
+			hide="{{ hide }}"
+			keyboardtype="{{ keyboardtype }}"
+			maxlength="5"
+			vibratemode="{{ vibratemode }}"
+			screentype="{{ screentype }}"
+			@visibility-change="onVisibilityChange"
+            @delete="onDelete"
+			@complete="onComplete"
+		></input-method>
+		<!-- 新增搜索结果列表 -->
+		<div class="result-list" show="{{ hide }}">
+			<block for="{{ songList }}">
+				<div class="song-item" onclick="playSong($item.id, $item.name, $item.artists)">
+					<text class="song-title">{{ $item.name }}</text>
+					<text class="song-artist">
+						{{ $item.artists.map((a) => a.name).join(", ") }}
+					</text>
+				</div>
+			</block>
+		</div>
+	</scroll>
+</template>
+
+<script>
+import fetch from "@system.fetch";
+import router from "@system.router";
+import file from "@system.file";
+
+
+export default {
+	private: {
+		historyFileUri: 'internal://files/play_history.json',
+		textValue: "",
+		songList: [], // 新增歌曲列表存储
+		searchParams: {
+			keywords: "killkiss",
+			limit: 30,
+			offset: 0,
+			type: 1,
+		},
+		hide: false,
+		keyboardtype: "QWERTY", //QWERTY, T9
+		vibratemode: "short",
+		screentype: "circle", //pill-shaped, rect, circle
+	},
+	onVisibilityChange(evt) {
+		// 仅当hide=true时才触发搜索
+		if (this.hide) {
+			this.handleSearch(evt);
+		}
+	},
+    changeState() {
+        this.hide = !this.hide;
+    },
+    onDelete() {
+        this.textValue = this.textValue.slice(0, -1);
+        console.log("删除字符");
+    },
+	onComplete(evt) {
+		this.textValue += evt.detail.content;
+		console.log("返回字符:" + JSON.stringify(evt));
+	},
+	// 新增搜索处理方法
+	handleSearch() {
+		this.searchParams.keywords = this.textValue;
+		this.fetchSearchResults();
+	},
+
+	fetchSearchResults() {
+		const apiUrl = `https://163api.qijieya.cn/search?keywords=${encodeURIComponent(
+			this.searchParams.keywords
+		)}&limit=5`;
+
+		fetch.fetch({
+			url: apiUrl,
+			responseType: "text",
+			success: (response) => {
+				// 移除了不必要的调试输出
+				try {
+					const result = JSON.parse(response.data);
+					if (result.code === 200 && result.result && result.result.songs) {
+						// 提取歌曲的id、name和artist字段
+						this.songList = result.result.songs.map((song) => ({
+							id: song.id,
+							name: song.name,
+							artists: song.artists || [],
+						}));
+					} else {
+						console.log("响应中未找到歌曲");
+						this.songList = [];
+					}
+				} catch (error) {
+					console.error("解析响应数据失败:", error);
+					this.songList = [];
+				}
+			},
+			fail: (data, code) => {
+				// 保留必要的错误处理日志
+				console.log(`处理失败，错误信息 = ${data}`);
+				console.log(`处理失败，错误代码 = ${code}`);
+				this.songList = [];
+			},
+		});
+	},
+
+	playSong(songId, name, artists) {
+    // --- 使用 file 模块更新播放历史 ---
+    // 1. 先读取现有历史
+    file.readText({
+        uri: this.historyFileUri,
+        success: (data) => {
+            // 文件存在，解析并更新
+            let history = [];
+            try {
+                history = JSON.parse(data.text || '[]');
+            } catch (e) {
+                console.error("解析历史记录失败，将创建新的历史记录。");
+                history = [];
+            }
+            this.updateAndSaveHistory(history, songId, name, artists);
+        },
+        fail: () => {
+            // 文件不存在或读取失败，直接创建新的历史记录
+            console.log("无法读取历史记录（可能首次播放），将创建新文件。");
+            this.updateAndSaveHistory([], songId, name, artists);
+        }
+    });
+},
+
+// --- 新增一个辅助方法来处理更新和保存逻辑 ---
+updateAndSaveHistory(history, songId, name, artists) {
+    // 2. 更新历史记录数组
+    // 移除已存在的相同歌曲，避免重复
+    const existingIndex = history.findIndex(item => item.id === songId);
+    if (existingIndex > -1) {
+        history.splice(existingIndex, 1);
+    }
+
+    // 在数组开头添加新歌曲
+    history.unshift({
+        id: songId,
+        name: name,
+        artists: artists.map(a => a.name).join('/')
+    });
+
+    // 限制最多保存50条记录
+    if (history.length > 50) {
+        history = history.slice(0, 50);
+    }
+
+    // 3. 将更新后的数组写回文件
+    file.writeText({
+        uri: this.historyFileUri,
+        text: JSON.stringify(history, null, 2), // 使用格式化JSON，方便调试
+        success: () => {
+            console.log("[播放器] 播放历史已成功保存到文件。");
+            // 4. 保存成功后才跳转页面
+            this.navigateToPlayer();
+        },
+        fail: (data, code) => {
+            console.error(`[播放器] 保存历史记录失败, code = ${code}`);
+            // 即使保存失败，也应该继续播放，所以仍然跳转
+            this.navigateToPlayer();
+        }
+    });
+},
+
+// --- 新增一个辅助方法来处理跳转逻辑 ---
+navigateToPlayer() {
+    router.replace({
+        uri: 'pages/player',
+        params: {
+            // 直接让播放器页面从文件加载最新的列表，而不是通过参数传递
+            // 这样可以确保数据一致性
+        }
+    });
+}
+
+
+
+}
+</script>
+
+<style>
+.page {
+    flex-direction: column;
+	width: 466px;
+	height: 466px;
+	background-color: black;
+}
+.header {
+    flex-direction: column;
+    padding-bottom:10px;
+}
+.title {
+    font-size: 28px;
+    padding: 10px;
+    text-align: center;
+    color: #fff;
+}
+.text {
+    border-radius: 25px;
+    margin-left: 96px;
+	width: 60%;
+	height: 80px;
+	text-align: center;
+	color: white;
+    border: 3px solid rgba(255, 255, 255, 0.06);
+	background-color: rgba(255, 255, 255, 0.03);
+}
+/* 新增列表样式 */
+.result-list {
+	flex-direction: column;
+	padding-bottom:60px;
+}
+
+.song-item {
+    padding:15px;
+	margin: 5px 60px;
+	background-color: rgba(255, 255, 255, 0.06);
+	border-radius: 36px;
+	flex-direction: column;
+}
+
+.song-title {
+	font-size: 26px;
+	color: #fff;
+}
+
+.song-artist {
+	font-size: 22px;
+	color: #888;
+}
+</style>

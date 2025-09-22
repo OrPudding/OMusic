@@ -1,248 +1,637 @@
 <template>
-  <div class="demo-page">
-    <!-- 歌曲信息 -->
-    <div class="song">
-      <marquee class="song-name" scrollamount="{{36}}">
-        {{ currSong.name || "未知" }}
-      </marquee>
-      <marquee class="singer-name" scrollamount="{{36}}">
-        {{ currSong.artists || "未知" }}
-      </marquee>
-    </div>
-    <!-- 播放控制按钮 -->
-    <div class="controls">
-      <image class="icon" src="/common/icon/prev.png" onclick="change(-1)" />
-      <image class="icon" if="{{isPlaying}}" src="/common/icon/pause.png" onclick="playOrPause" />
-      <image class="icon" else src="/common/icon/play.png" onclick="playOrPause" />
-      <image class="icon" src="/common/icon/next.png" onclick="change(1)" />
-    </div>
-            <!-- 播放进度条 -->
-            <slider class="play-progress" min="0" max="{{currSong.duration}}" step="1" value="{{ playDuration }}" onchange="onSliderChange"></slider>
-    <!-- 底部操作按钮 -->
-    <div class="footer">
-      <image class="icon" src="/common/icon/volume.png" onclick="goToVolume" />
-      <image class="icon" src="/common/icon/play-list.png" onclick="goToList" />
-    </div>
+	<div class="demo-page">
+		<!-- 歌曲信息 -->
+		<div class="song" onclick="startDownload(currSong)">
+			<marquee class="song-name" scrollamount="{{ 36 }}">
+				{{ currSong.name || "未知" }}
+			</marquee>
+			<marquee class="singer-name" scrollamount="{{ 36 }}">
+				{{ currSong.artists || "未知" }}
+			</marquee>
+		</div>
+		<!-- 播放控制按钮 -->
+		<div class="controls" show="{{ !expend }}">
+			<image class="icon" src="/common/icon/prev.png" onclick="change(-1)" />
+			<image
+				class="icon"
+				if="{{ isPlaying }}"
+				src="/common/icon/pause.png"
+				onclick="playOrPause"
+			/>
+			<image
+				class="icon"
+				else
+				src="/common/icon/play.png"
+				onclick="playOrPause"
+			/>
+			<image class="icon" src="/common/icon/next.png" onclick="change(1)" />
+		</div>
+<!-- template -->
+<div class="lyrics-container" onclick="expendLryrics">
+  <!-- 歌词显示 -->
+  <text class="lyric-line secondary-lyric" show="{{ expend }}">{{ getLyricLine(-1) }}</text>
+  <div class="current-lyric-wrapper">
+    <text class="lyric-line current-lyric">{{ getLyricLine(0) }}</text>
+    <!-- 针对多语言歌词，显示额外信息 -->
+    <text if="{{ getLyricExtraLine() }}" class="lyric-line extra-lyric">{{ getLyricExtraLine() }}</text>
   </div>
+  <text class="lyric-line secondary-lyric" show="{{ expend }}">{{ getLyricLine(1) }}</text>
+</div>
+
+    <!-- 播放进度显示 -->
+		<div class="progress" show="{{ !expend }}">
+			<text class="play-time">
+				{{ second2time(playDuration) }}/{{ second2time(currSong.duration) }}
+			</text>
+			<slider
+				class="play-progress"
+				min="0"
+				max="{{ currSong.duration }}"
+				step="1"
+				value="{{ playDuration }}"
+				onchange="onSliderChange"
+			></slider>
+		</div>
+		<!-- 底部操作按钮 -->
+		<div class="footer" show="{{ !expend }}">
+			<image class="icon" src="/common/icon/volume.png" onclick="goToVolume" />
+			<image class="icon" src="/common/icon/play-list.png" onclick="goToMenu" />
+		</div>
+	</div>
 </template>
+
 
 <script>
 import router from "@system.router";
-import audio, { duration } from "@system.audio";
+import fetch from "@system.fetch";
+import request from "@system.request";
+import audio from "@system.audio";
+import file from "@system.file";
 
 export default {
-  data: {
-    // 当前歌曲索引
-    index: 0,
-    // 当前播放的歌曲信息
-    currSong: null,
-    // 需要播放的歌曲列表
-    songList: [
-      {
-        id: 0,
-        name: "KiLLKiSS",
-        artists: "Ave Mujica",
-        playUrl: "/common/2653641752.mp3",
-        duration: 208
-      },
-      {
-        id: 1,
-        name: "栞",
-        artists: "MyGO!!!!!",
-        playUrl: "/common/2060083093.mp3",
-        duration: 266
-      }
-    ],
-    isPlaying: false,
-    playDuration: 0,
-  },
+    private: {
+        musicDir: 'internal://files/music/',
+        lyricDir: 'internal://files/lyrics/',
+        historyFileUri: 'internal://files/play_history.json',
+        currSong: null,
+        playList: [],
+        isPlaying: false,
+        playDuration: 0,
+        lyrics: [],
+        currentLyricIndex: 0,
+        lyricType: 'chinese',
+        expend: false
+    },
 
-  onInit() {
-    this.currSong = this.songList[this.index];
-    // 音频开始播放事件
-    audio.onplay = () => {
-      this.isPlaying = true;
-    };
-    // 音频暂停播放事件
-    audio.onpause = () => {
-      this.isPlaying = false;
-    };
-    // 音频停止播放事件
-    audio.onstop = () => {
-      this.isPlaying = false;
-    };
-    // 音频播放随时间更新事件
-    audio.ontimeupdate = () => {
-      this.playDuration = audio.currentTime;
-      this.initialSliderValue = audio.currentTime;
-    };
-    // 音频播放结束事件
-    audio.onended = () => {
-      this.change(1);
-    };
-    // 音频加载完成事件
-    audio.onloadeddata = () => {
-      // 获取音频时长
-      this.info.duration = audio.duration;
-    };
-  },
+    protected: {
+        currentIndex: 0,
+    },
 
-  onReady() {
-    if (this.songId) {
-      this.index = this.songList.findIndex((item) => item.id === this.songId);
-      this.currSong = this.songList[this.index];
-    }
-    setTimeout(this.playCurrsong, 1000);
-  },
+    // =================================================================
+    // 一、生命周期函数 (Lifecycle Hooks)
+    // =================================================================
 
-  playCurrsong() {
-    audio.stop();
-    audio.src = this.currSong.playUrl;
-    audio.play();
-  },
+    onInit() {
+        this.ensureMusicDirectoryExists();
+        this.ensureLyricDirectoryExists();
 
-  playOrPause() {
-    if (this.isPlaying) {
-      audio.pause();
-    } else {
-      audio.play();
-    }
-  },
+        file.readText({
+            uri: this.historyFileUri,
+            success: (data) => {
+                console.log("[播放器] 从文件加载历史记录:", data.text || "空数据");
+                try {
+                    this.playList = JSON.parse(data.text || "[]");
+                } catch (e) {
+                    console.error("[播放器] 解析历史记录JSON失败:", e);
+                    this.playList = [];
+                }
+                this.playCurrent();
+            },
+            fail: (data, code) => {
+                if (code === 301) {
+                    console.log("[播放器] 历史记录文件不存在，初始化为空列表。");
+                } else {
+                    console.error("[播放器] 读取历史记录文件失败:", `code=${code}`);
+                }
+                this.playList = [];
+                this.playCurrent();
+            },
+        });
 
-  change(dir) {
-    this.index = (this.index + dir + this.songList.length) % this.songList.length;
-    this.currSong = this.songList[this.index];
-    this.playCurrsong();
-  },
+        audio.onplay = () => { this.isPlaying = true; };
+        audio.onpause = () => { this.isPlaying = false; };
+        audio.onstop = () => { this.isPlaying = false; };
+        audio.ontimeupdate = () => {
+            this.playDuration = audio.currentTime;
+            this.initialSliderValue = audio.currentTime;
+            this.updateLyric();
+        };
+        audio.onended = () => { this.change(1); };
+        audio.onloadeddata = () => {};
+    },
 
-  goToVolume() {
-    router.push({
-      uri: "/pages/volume"
-    });
-  },
+    onReady() {
+        if (this.songId) {
+            this.currentIndex = this.playList.findIndex(item => item.id === this.songId);
+            this.currSong = this.playList[this.currentIndex];
+        }
+        setTimeout(this.playCurrent, 1000);
+    },
 
-  goToList() {
-    router.push({
-      uri: "/pages/list"
-    });
-  },
-  
-  // 添加 slider 的 change 事件处理函数
-  onSliderChange(e) {
-    audio.currentTime = e.progress
-    this.showCurrent()
-    this.setLyric()
-  },
-  
-  // 时间转换函数：将时间字符串转换为秒数
-  time2second(time) {
-    if (!time) return 0;
-    const parts = time.split(':');
-    if (parts.length === 3) {
-      // 时:分:秒格式
-      return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    } else if (parts.length === 2) {
-      // 分:秒格式
-      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    } else {
-      // 只有秒
-      return parseInt(parts[0]);
-    }
-  },
-  
-  // 时间转换函数：将秒数转换为时间字符串
-  second2time(second) {
-    if (isNaN(second) || second < 0) return '00:00';
-    const sec = Math.floor(second % 60);
-    const min = Math.floor((second / 60) % 60);
-    const hour = Math.floor(second / 3600);
-    
-    if (hour > 0) {
-      return `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-    } else {
-      return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-    }
-  },
-  
-  // 显示当前时间的函数
-  showCurrent() {
-    // 这里可以添加更新界面显示的逻辑
-    console.log('当前播放时间:', this.current);
-  },
-  
-  // 设置歌词的函数
-  setLyric() {
-    // 这里可以添加歌词处理的逻辑
-    console.log('设置歌词');
-  }
+    // =================================================================
+    // 二、核心播放控制 (Core Playback Control)
+    // =================================================================
+
+    playCurrent() {
+        if (!this.playList || this.playList.length === 0 || !this.playList[this.currentIndex]) {
+            console.error("[播放器] 播放列表为空或当前索引无效。");
+            audio.stop();
+            this.currSong = null;
+            return;
+        }
+
+        const song = this.playList[this.currentIndex];
+        this.currSong = song;
+
+        if (song.downloadState === 'downloaded' && song.localUri) {
+            file.access({
+                uri: song.localUri,
+                success: () => {
+                    console.log(`[播放器] 播放本地文件: ${song.localUri}`);
+                    audio.stop();
+                    audio.src = song.localUri;
+                    audio.play();
+                    this.fetchLyric(song.id);
+                },
+                fail: (data, code) => {
+                    console.error(`[播放器] 本地文件验证失败 (code=${code})，转为在线播放。`);
+                    this.updateSongInList(song.id, { downloadState: 'none', localUri: null, localLyricUri: null });
+                    this.playOnline(song);
+                }
+            });
+        } else {
+            console.log("[播放器] 执行在线播放。");
+            this.playOnline(song);
+        }
+    },
+
+    playOnline(song) {
+        fetch.fetch({
+            url: `https://163api.qijieya.cn/song/url/v1?id=${song.id}&level=higher`,
+            success: (res ) => {
+                if (res.data?.data?.[0]?.url) {
+                    const { url, time } = res.data.data[0];
+                    this.currSong = { ...song, playUrl: url, duration: Math.floor(time / 1000) };
+                    console.log("获取到在线播放链接:", url);
+                    audio.stop();
+                    audio.src = url;
+                    audio.play();
+                    this.fetchLyric(song.id);
+                } else {
+                    console.error("无效的API响应，无法获取播放链接:", JSON.stringify(res));
+                }
+            },
+            fail: (err) => {
+                console.error("请求在线播放链接API失败:", err);
+            },
+        });
+    },
+
+    playOrPause() {
+        if (this.isPlaying) {
+            audio.pause();
+        } else {
+            audio.play();
+        }
+    },
+
+    change(dir) {
+        this.currentIndex = (this.currentIndex + dir + this.playList.length) % this.playList.length;
+        this.currSong = this.playList[this.currentIndex];
+        this.playCurrent();
+    },
+
+    // =================================================================
+    // 三、UI交互与路由 (UI Interaction & Routing)
+    // =================================================================
+
+    onSliderChange(e) {
+        audio.currentTime = e.progress;
+        this.updateLyric();
+    },
+
+    expendLryrics() {
+        this.expend = !this.expend;
+    },
+
+    goToVolume() { router.push({ uri: "/pages/volume" }); },
+    goToList() { router.push({ uri: "/pages/list" }); },
+    goToMenu() { router.push({ uri: "/pages/menu" }); },
+
+    // =================================================================
+    // 四、下载功能 (Download Feature)
+    // =================================================================
+
+    async startDownload(song) {
+        if (!song || !song.id) {
+            console.error("无效的歌曲对象，无法开始下载。");
+            return;
+        }
+        if (song.downloadState === 'downloading' || song.downloadState === 'downloaded') {
+            console.log(`歌曲状态为 [${song.downloadState}]，无需下载。`);
+            return;
+        }
+
+        this.updateSongInList(song.id, { downloadState: 'downloading' });
+
+        try {
+            const [songUrl, lyricData] = await Promise.all([
+                this.getSongPlayUrl(song.id),
+                this.getLyricData(song.id)
+            ]);
+
+            if (!songUrl) throw new Error('无法获取歌曲下载链接');
+
+            const lyricFilePath = `${this.lyricDir}${song.id}.json`;
+            await this.saveLyricFile(lyricFilePath, lyricData);
+
+            request.download({
+                url: songUrl,
+                filename: `${song.id}.mp3`,
+                success: (task) => this.listenDownloadComplete(task.token, song, lyricFilePath),
+                fail: (data, code) => { throw new Error(`下载任务创建失败, code=${code}`); }
+            });
+        } catch (error) {
+            console.error("下载流程失败:", error.message);
+            this.updateSongInList(song.id, { downloadState: 'failed' });
+            file.delete({ uri: `${this.lyricDir}${song.id}.json` });
+        }
+    },
+
+    listenDownloadComplete(token, song, lyricPath) {
+        request.onDownloadComplete({
+            token: token,
+            success: (result) => {
+                const finalUri = `${this.musicDir}${song.id}.mp3`;
+                file.move({
+                    srcUri: result.uri,
+                    dstUri: finalUri,
+                    success: () => {
+                        console.log(`文件已成功移动到: ${finalUri}`);
+                        this.updateSongInList(song.id, {
+                            downloadState: 'downloaded',
+                            localUri: finalUri,
+                            localLyricUri: lyricPath
+                        });
+                    },
+                    fail: (data, code) => {
+                        console.error(`移动下载文件失败, code=${code}`);
+                        this.updateSongInList(song.id, { downloadState: 'failed' });
+                        file.delete({ uri: result.uri });
+                        file.delete({ uri: lyricPath });
+                    }
+                });
+            },
+            fail: (data, code) => {
+                console.error(`下载任务执行失败, token=${token}, code=${code}`);
+                this.updateSongInList(song.id, { downloadState: 'failed' });
+                file.delete({ uri: lyricPath });
+            }
+        });
+    },
+
+    // =================================================================
+    // 五、歌词处理 (Lyrics Handling)
+    // =================================================================
+
+    fetchLyric(songId) {
+        this.lyrics = [];
+        this.currentLyricIndex = 0;
+        this.lyricType = 'chinese';
+        const song = this.playList.find(s => s.id === songId);
+
+        if (song && song.localLyricUri) {
+            file.readText({
+                uri: song.localLyricUri,
+                success: (data) => {
+                    try {
+                        this.processAndMergeLyrics(JSON.parse(data.text));
+                    } catch (e) {
+                        this.fetchLyricOnline(songId);
+                    }
+                },
+                fail: () => this.fetchLyricOnline(songId)
+            });
+        } else {
+            this.fetchLyricOnline(songId);
+        }
+    },
+
+    fetchLyricOnline(songId) {
+        fetch.fetch({
+            url: `https://163api.qijieya.cn/lyric?id=${songId}`,
+            success: (res ) => this.processAndMergeLyrics(res.data),
+            fail: (err) => {
+                console.error("歌词API请求失败:", err);
+                this.lyrics = [{ time: 0, text: '歌词加载失败' }];
+            }
+        });
+    },
+
+    processAndMergeLyrics(data) {
+        if (data && data.lrc && data.lrc.lyric) {
+            const original = this.parseLyric(data.lrc.lyric);
+            const translation = data.tlyric?.lyric ? this.parseLyric(data.tlyric.lyric) : null;
+            const romaji = data.romalrc?.lyric ? this.parseLyric(data.romalrc.lyric) : null;
+            this.mergeLyrics(original, translation, romaji);
+        } else {
+            this.lyrics = [{ time: 0, text: '暂无歌词' }];
+        }
+    },
+
+    parseLyric(lrcString) {
+        const lines = lrcString.split('\n');
+        const result = [];
+        const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+        for (const line of lines) {
+            const match = timeRegex.exec(line);
+            if (match) {
+                const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseInt(match[3].padEnd(3, '0')) / 1000;
+                const text = line.replace(timeRegex, '').trim();
+                if (text) result.push({ time, text });
+            }
+        }
+        return result;
+    },
+
+    mergeLyrics(original, translation, romaji) {
+        const createMap = (arr) => new Map(arr.map(item => [item.time.toFixed(3), item.text]));
+        if (romaji && translation) {
+            this.lyricType = 'japanese';
+            const transMap = createMap(translation);
+            const romaMap = createMap(romaji);
+            this.lyrics = original.map(line => ({
+                time: line.time,
+                original: line.text,
+                translation: transMap.get(line.time.toFixed(3)) || '',
+                romaji: romaMap.get(line.time.toFixed(3)) || ''
+            }));
+        } else if (translation) {
+            this.lyricType = 'english';
+            const transMap = createMap(translation);
+            this.lyrics = original.map(line => ({
+                time: line.time,
+                original: line.text,
+                translation: transMap.get(line.time.toFixed(3)) || ''
+            }));
+        } else {
+            this.lyricType = 'chinese';
+            this.lyrics = original.map(line => ({ time: line.time, original: line.text }));
+        }
+        if (this.lyrics.length === 0) this.lyrics = [{ time: 0, text: '暂无歌词' }];
+    },
+
+    updateLyric() {
+        if (!this.lyrics || this.lyrics.length === 0) return;
+        const currentTime = this.playDuration;
+        let newIndex = this.lyrics.findIndex(line => line.time > currentTime);
+        if (newIndex === -1) newIndex = this.lyrics.length;
+        const finalIndex = Math.max(0, newIndex - 1);
+        if (finalIndex !== this.currentLyricIndex) {
+            this.currentLyricIndex = finalIndex;
+        }
+    },
+
+    getLyricLine(offset) {
+        const index = this.currentLyricIndex + offset;
+        if (!this.lyrics || index < 0 || index >= this.lyrics.length) return '';
+        const line = this.lyrics[index];
+        return line.original || line.text || '';
+    },
+
+    getLyricExtraLine() {
+        if (!this.lyrics || this.lyrics.length === 0 || this.currentLyricIndex >= this.lyrics.length) return '';
+        const line = this.lyrics[this.currentLyricIndex];
+        if (this.lyricType !== 'chinese') return line.translation || '';
+        return '';
+    },
+
+    // =================================================================
+    // 六、文件与数据持久化 (File & Data Persistence)
+    // =================================================================
+
+    updateSongInList(songId, newState) {
+        let songFound = false;
+        this.playList = this.playList.map(song => {
+            if (song.id === songId) {
+                songFound = true;
+                return { ...song, ...newState };
+            }
+            return song;
+        });
+
+        if (songFound) {
+            file.writeText({
+                uri: this.historyFileUri,
+                text: JSON.stringify(this.playList, null, 2),
+                success: () => console.log("播放历史文件已同步更新。"),
+                fail: (data, code) => console.error(`同步更新播放历史文件失败, code=${code}`)
+            });
+        } else {
+            console.warn("未在当前列表中找到要更新的歌曲, ID:", songId);
+        }
+    },
+
+    ensureMusicDirectoryExists() {
+        file.mkdir({
+            uri: this.musicDir,
+            success: () => console.log("音乐目录已确认存在:", this.musicDir),
+            fail: (data, code) => console.warn("创建音乐目录时发生错误（可能已存在）:", code)
+        });
+    },
+
+    ensureLyricDirectoryExists() {
+        file.mkdir({
+            uri: this.lyricDir,
+            success: () => console.log("歌词目录已确认存在:", this.lyricDir),
+            fail: (data, code) => console.warn("创建歌词目录时发生错误（可能已存在）:", code)
+        });
+    },
+
+    saveLyricFile(lyricPath, lyricData) {
+        return new Promise((resolve, reject) => {
+            if (!lyricData) {
+                resolve();
+                return;
+            }
+            file.writeText({
+                uri: lyricPath,
+                text: JSON.stringify(lyricData),
+                success: () => resolve(),
+                fail: (data, code) => reject(new Error(`保存歌词文件失败, code=${code}`))
+            });
+        });
+    },
+
+    // =================================================================
+    // 七、网络请求封装 (Network Request Wrappers)
+    // =================================================================
+
+    getSongPlayUrl(songId) {
+        return new Promise((resolve) => {
+            fetch.fetch({
+                url: `https://163api.qijieya.cn/song/url/v1?id=${songId}&level=exhigh`,
+                success: (res ) => resolve(res.data?.data?.[0]?.url || null),
+                fail: () => resolve(null)
+            });
+        });
+    },
+
+    getLyricData(songId) {
+        return new Promise((resolve) => {
+            fetch.fetch({
+                url: `https://163api.qijieya.cn/lyric?id=${songId}`,
+                success: (res ) => resolve(res.data || null),
+                fail: () => resolve(null)
+            });
+        });
+    },
+
+    // =================================================================
+    // 八、工具函数 (Utility Functions)
+    // =================================================================
+
+    second2time(second) {
+        if (isNaN(second) || second < 0) return "00:00";
+        const sec = Math.floor(second % 60);
+        const min = Math.floor((second / 60) % 60);
+        const hour = Math.floor(second / 3600);
+        const pad = (num) => num.toString().padStart(2, "0");
+        return hour > 0 ? `${pad(hour)}:${pad(min)}:${pad(sec)}` : `${pad(min)}:${pad(sec)}`;
+    },
 };
 </script>
 
+
 <style>
 .demo-page {
-  width: 100%;
-  height: 100%;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: #000;
+	width: 466px;
+	height: 466px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background-color: #000;
 }
 
 .play-button {
-  width: 200px;
+	width: 200px;
 }
 
-.play-progress {
-  /* 添加 slider 特有的样式 */
-  selected-color: #3ae1ff;
-  block-color: #ffffff;
-  padding-left: 0px;
-  padding-right: 0px;
-  margin: 0 20px;
-}
+/* <style> */
+/* ... 已有样式 ... */
 
-.song {
-  width: 320px;
-  height: 160px;
+.lyrics-container {
+  width: 100%;
+  height: 120px;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
-.song-name {
-  width: 320px;
-  font-size: 42px;
-  color: #ffffff;
-  lines: 1;
-  text-overflow: ellipsis;
+.lyric-line {
+  width: 100%;
   text-align: center;
+  lines: 1; /* 允许最多显示两行，以防文本过长 */
+  text-overflow: ellipsis;
+}
+
+.secondary-lyric {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.5);
+  height: 35px; /* 预留空间 */
+}
+
+.current-lyric-wrapper {
+  flex-direction: column;
+  align-items: center;
+}
+
+.current-lyric {
+  font-size: 26px;
+  color: #3ae1ff; /* 高亮颜色 */
+  font-weight: bold;
+}
+
+.extra-lyric {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+
+.progress {
+	height: 60px;
+	width: 320px;
+	flex-direction: column;
+	align-items: center;
+}
+
+.play-time {
+	text-align: left;
+	color: #ffffff;
+	font-size: 22px;
+	margin: 5px;
+}
+
+.play-progress {
+	/* 添加 slider 特有的样式 */
+	selected-color: #3ae1ff;
+	block-color: #ffffff;
+	padding-left: 0px;
+	padding-right: 0px;
+	margin: 0 20px;
+}
+
+.song {
+	width: 320px;
+	height: 120px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+.song-name {
+	width: 320px;
+	font-size: 32px;
+	color: #ffffff;
+	lines: 1;
+	text-overflow: ellipsis;
+	text-align: center;
 }
 
 .singer-name {
-  width: 300px;
-  font-size: 26px;
-  color: rgba(255, 255, 255, 0.8);
-  lines: 1;
-  text-overflow: ellipsis;
-  text-align: center;
+	width: 300px;
+	font-size: 24px;
+	color: rgba(255, 255, 255, 0.8);
+	lines: 1;
+	text-overflow: ellipsis;
+	text-align: center;
 }
 
 .controls {
-  width: 360px;
-  height: 160px;
-  justify-content: space-between;
-  align-items: center;
+	width: 360px;
+	justify-content: space-between;
+	align-items: center;
 }
 
 .icon {
-  width: 64px;
-  height: 64px;
+	width: 48px;
+	height: 48px;
 }
 
 .footer {
-  width: 320px;
-  height: 160px;
-  justify-content: space-around;
-  align-items: center;
+	height: 80px;
+	width: 320px;
+	justify-content: space-around;
+	align-items: center;
 }
 </style>
