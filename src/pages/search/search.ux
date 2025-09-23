@@ -7,6 +7,9 @@
         <div class="header">
     <text class="title">搜索</text>
 		<text class="text" @click="changeState">{{ textValue }}_</text>
+		<scroll class="history-scroll" scroll-x="true" if="{{ searchHistory.length > 0 }}" bounces="true">
+			<text for="{{ searchHistory }}" class="history-tag" onclick="() => searchFromHistory($item)">{{ $item }}</text>
+		</scroll>
         </div>
 		<input-method
 			hide="{{ hide }}"
@@ -36,11 +39,12 @@
 import fetch from "@system.fetch";
 import router from "@system.router";
 import file from "@system.file";
+import prompt from "@system.prompt";
 
 
 export default {
 	private: {
-		historyFileUri: 'internal://files/play_history.json',
+		listFileUri: 'internal://files/play_list.json',
 		textValue: "",
 		songList: [], // 新增歌曲列表存储
 		searchParams: {
@@ -49,11 +53,16 @@ export default {
 			offset: 0,
 			type: 1,
 		},
+		searchHistoryFileUri: 'internal://files/search_history.json',
+        searchHistory: [],
 		hide: false,
 		keyboardtype: "QWERTY", //QWERTY, T9
 		vibratemode: "short",
 		screentype: "circle", //pill-shaped, rect, circle
 	},
+	onInit() {
+        this.loadSearchHistory();
+    },
 	onVisibilityChange(evt) {
 		// 仅当hide=true时才触发搜索
 		if (this.hide) {
@@ -71,8 +80,40 @@ export default {
 		this.textValue += evt.detail.content;
 		console.log("返回字符:" + JSON.stringify(evt));
 	},
+	loadSearchHistory() {
+        file.readText({
+            uri: this.searchHistoryFileUri,
+            success: (data) => {
+                try { this.searchHistory = JSON.parse(data.text || "[]"); } catch (e) { this.searchHistory = []; }
+            },
+            fail: () => { this.searchHistory = []; }
+        });
+    },
+    saveSearchHistory() {
+        file.writeText({
+            uri: this.searchHistoryFileUri,
+            text: JSON.stringify(this.searchHistory, null, 2),
+        });
+    },
+    addAndSaveHistory(keyword) {
+        if (!keyword) return;
+        const index = this.searchHistory.indexOf(keyword);
+        if (index > -1) {
+            this.searchHistory.splice(index, 1);
+        }
+        this.searchHistory.unshift(keyword);
+        if (this.searchHistory.length > 10) {
+            this.searchHistory = this.searchHistory.slice(0, 10);
+        }
+        this.saveSearchHistory();
+    },
+    searchFromHistory(keyword) {
+        this.textValue = keyword;
+        this.handleSearch();
+    },
 	// 新增搜索处理方法
 	handleSearch() {
+		this.addAndSaveHistory(this.textValue.trim());
 		this.searchParams.keywords = this.textValue;
 		this.fetchSearchResults();
 	},
@@ -80,7 +121,7 @@ export default {
 	fetchSearchResults() {
 		const apiUrl = `https://163api.qijieya.cn/search?keywords=${encodeURIComponent(
 			this.searchParams.keywords
-		)}&limit=5`;
+		)}&limit=10`;
 
 		fetch.fetch({
 			url: apiUrl,
@@ -118,17 +159,17 @@ export default {
     // --- 使用 file 模块更新播放历史 ---
     // 1. 先读取现有历史
     file.readText({
-        uri: this.historyFileUri,
+        uri: this.listFileUri,
         success: (data) => {
             // 文件存在，解析并更新
-            let history = [];
+            let list = [];
             try {
-                history = JSON.parse(data.text || '[]');
+                list = JSON.parse(data.text || '[]');
             } catch (e) {
                 console.error("解析历史记录失败，将创建新的历史记录。");
-                history = [];
+                list = [];
             }
-            this.updateAndSaveHistory(history, songId, name, artists);
+            this.updateAndSaveHistory(list, songId, name, artists);
         },
         fail: () => {
             // 文件不存在或读取失败，直接创建新的历史记录
@@ -139,30 +180,30 @@ export default {
 },
 
 // --- 新增一个辅助方法来处理更新和保存逻辑 ---
-updateAndSaveHistory(history, songId, name, artists) {
+updateAndSaveHistory(list, songId, name, artists) {
     // 2. 更新历史记录数组
     // 移除已存在的相同歌曲，避免重复
-    const existingIndex = history.findIndex(item => item.id === songId);
+    const existingIndex = list.findIndex(item => item.id === songId);
     if (existingIndex > -1) {
-        history.splice(existingIndex, 1);
+        list.splice(existingIndex, 1);
     }
 
     // 在数组开头添加新歌曲
-    history.unshift({
+    list.unshift({
         id: songId,
         name: name,
         artists: artists.map(a => a.name).join('/')
     });
 
     // 限制最多保存50条记录
-    if (history.length > 50) {
-        history = history.slice(0, 50);
+    if (list.length > 50) {
+        list = list.slice(0, 50);
     }
 
     // 3. 将更新后的数组写回文件
     file.writeText({
-        uri: this.historyFileUri,
-        text: JSON.stringify(history, null, 2), // 使用格式化JSON，方便调试
+        uri: this.listFileUri,
+        text: JSON.stringify(list, null, 2), // 使用格式化JSON，方便调试
         success: () => {
             console.log("[播放器] 播放历史已成功保存到文件。");
             // 4. 保存成功后才跳转页面
@@ -178,11 +219,10 @@ updateAndSaveHistory(history, songId, name, artists) {
 
 // --- 新增一个辅助方法来处理跳转逻辑 ---
 navigateToPlayer() {
-    router.replace({
+    router.push({
         uri: 'pages/player',
         params: {
-            // 直接让播放器页面从文件加载最新的列表，而不是通过参数传递
-            // 这样可以确保数据一致性
+            currentIndex: 0,
         }
     });
 }
@@ -204,8 +244,9 @@ navigateToPlayer() {
     padding-bottom:10px;
 }
 .title {
-    font-size: 28px;
+    font-size: 32px;
     padding: 10px;
+	font-weight: bold;
     text-align: center;
     color: #fff;
 }
@@ -241,5 +282,20 @@ navigateToPlayer() {
 .song-artist {
 	font-size: 22px;
 	color: #888;
+}
+
+.history-scroll {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 10px;
+}
+.history-tag {
+    padding: 8px 20px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+    margin-right: 15px;
+    font-size: 22px;
+    color: #eee;
+    lines: 1;
 }
 </style>

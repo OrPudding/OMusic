@@ -1,113 +1,195 @@
 <template>
-	<div class="list-container">
-		<text class="title" onclick="goBack">播放列表</text>
-		<div class="list">
-			<div for="{{ songList }}" class="song-item">
-				<text class="item-index">{{$idx +1}}</text>
-				<div class="song-info" onclick="play($item.id)">
-					<text class="song-title">{{ $item.name }}</text>
-					<text class="song-artist">{{ $item.artists }}</text>
-				</div>
-				<text class="delete-btn" @click="deleteSong($item.id)">×</text>
-			</div>
-		</div>
-	</div>
+    <div class="list-container">
+        <!-- 1. 标题根据 listType 动态变化 -->
+        <text class="title" onclick="goBack">{{ pageTitle }}</text>
+        <div class="list">
+            <!-- 2. 循环 songList，并将整个 $item 对象传递给事件处理器 -->
+            <div for="{{ songList }}" class="song-item">
+                <text class="item-index">{{$idx + 1}}</text>
+                <div class="song-info" onclick="play($item.id)">
+                    <text class="song-title">{{ $item.name }}</text>
+                    <text class="song-artist">{{ $item.artists }}</text>
+                </div>
+                <text class="delete-btn" onclick="deleteSong($item)">×</text>
+            </div>
+        </div>
+    </div>
 </template>
+
 
 <script>
 import router from "@system.router";
 import file from "@system.file";
+import prompt from "@system.prompt";
 
 export default {
-	data: {
-		songList: [],
-		historyFileUri: 'internal://files/play_history.json',
-	},
+    protected: {
+        // 1. 列表类型总开关，可由外部传入。默认为 'playlist'
+        listType: 'playlist', // 'playlist', 'downloadlist', 'songlist'
+        songlistId: null, // 为 'songlist' 类型预留的歌单ID
+    },
 
-  onInit() {
-    // --- 使用 file 模块读取播放历史 ---
-    file.readText({
-        uri: this.historyFileUri,
-        success: (data) => {
-            console.log("[列表页] 从文件加载历史记录:", data.text || "空数据");
-            try {
-                // 解析JSON并过滤掉可能存在的null或undefined等无效条目
-                this.songList = JSON.parse(data.text || "[]").filter(item => !!item);
-            } catch (e) {
-                console.error("[列表页] 播放历史解析失败:", e);
-                this.songList = [];
-            }
-        },
-        fail: (data, code) => {
-            // 错误码 301 代表文件不存在，是正常情况
-            if (code === 301) {
-                console.log("[列表页] 历史记录文件不存在，列表为空。");
-            } else {
-                console.error(`[列表页] 读取历史记录文件失败, code=${code}`);
-            }
-            this.songList = [];
+    private: {
+        songList: [],
+        pageTitle: "播放列表", // 页面标题
+        // 文件路径
+        listFileUri: 'internal://files/play_list.json',
+        downloadedFileUri: 'internal://files/downloaded_songs.json',
+    },
+
+    onInit() {
+        this.updatePageTitle();
+        this.loadData();
+    },
+
+    onShow() {
+        // 每次返回页面时都重新加载数据，确保同步
+        this.loadData();
+    },
+
+    // 2. 根据 listType 更新页面标题
+    updatePageTitle() {
+        switch (this.listType) {
+            case 'downloadlist':
+                this.pageTitle = "已下载";
+                break;
+            case 'songlist':
+                this.pageTitle = "歌单详情"; // 未来可以动态显示歌单名
+                break;
+            case 'playlist':
+            default:
+                this.pageTitle = "播放列表";
+                break;
         }
-    });
-},
+    },
 
-
-deleteSong(songId) {
-    // 1. 先读取文件中的完整历史记录
-    file.readText({
-        uri: this.historyFileUri,
-        success: (data) => {
-            try {
-                let history = JSON.parse(data.text || "[]");
-
-                // 2. 过滤掉要删除的歌曲
-                const newHistory = history.filter(item => item?.id !== songId);
-
-                // 检查是否有歌曲被实际删除
-                if (newHistory.length === history.length) {
-                    console.warn("要删除的歌曲未在列表中找到, ID:", songId);
-                    return; // 如果没有找到匹配项，则无需写入文件
-                }
-
-                // 3. 将新的历史记录写回文件
-                file.writeText({
-                    uri: this.historyFileUri,
-                    text: JSON.stringify(newHistory, null, 2),
-                    success: () => {
-                        // 4. 更新当前页面的 songList 以立即刷新UI
-                        this.songList = newHistory;
-                        console.log("删除成功并已更新文件, ID:", songId);
-                    },
-                    fail: (data, code) => {
-                        console.error(`[列表页] 删除后写入文件失败, code=${code}`);
-                    }
-                });
-            } catch (e) {
-                console.error("[列表页] 删除操作时解析数据错误:", e);
-            }
-        },
-        fail: (data, code) => {
-            console.error(`[列表页] 删除操作时读取文件失败, code=${code}`);
+    // 3. 根据 listType 加载不同的数据源
+    loadData() {
+        switch (this.listType) {
+            case 'downloadlist':
+                this.loadDownloadedList();
+                break;
+            case 'songlist':
+                // 预留歌单加载逻辑
+                console.log("加载歌单功能待实现，ID:", this.songlistId);
+                this.songList = []; // 暂时清空
+                break;
+            case 'playlist':
+            default:
+                this.loadPlayList();
+                break;
         }
-    });
-},
+    },
 
+    loadPlayList() {
+        file.readText({
+            uri: this.listFileUri,
+            success: (data) => {
+                try {
+                    this.songList = JSON.parse(data.text || "[]").filter(item => !!item);
+                } catch (e) { this.songList = []; }
+            },
+            fail: () => { this.songList = []; }
+        });
+    },
 
-	play(index) {
-		router.replace({
-			uri: "/pages/player",
-			params: {
-				currentIndex: index,
-			},
-		});
-	},
+    loadDownloadedList() {
+        file.readText({
+            uri: this.downloadedFileUri,
+            success: (data) => {
+                try {
+                    const downloadedSongs = JSON.parse(data.text || "{}");
+                    // 将对象转换为数组并赋值给 songList
+                    this.songList = Object.values(downloadedSongs).filter(item => !!item);
+                } catch (e) { this.songList = []; }
+            },
+            fail: () => { this.songList = []; }
+        });
+    },
 
-	goBack() {
-		router.back();
-	},
+    // 4. 根据 listType 执行不同的删除操作
+    deleteSong(songToDelete) {
+        switch (this.listType) {
+            case 'downloadlist':
+                // "彻底删除"：删除本地文件和所有记录
+                this.deleteFromDownloaded(songToDelete);
+                break;
+            case 'songlist':
+                // 预留：未来可能是从歌单中移除（需要API调用）
+                prompt.showToast({ message: '此功能待实现' });
+                break;
+            case 'playlist':
+            default:
+                // "仅移除"：只从播放列表中移除
+                this.deleteFromPlayList(songToDelete.id);
+                break;
+        }
+    },
+
+    // 删除逻辑：仅从播放列表移除
+    deleteFromPlayList(songId) {
+        const index = this.songList.findIndex(item => item.id === songId);
+        if (index > -1) {
+            this.songList.splice(index, 1);
+            this.savePlayList(); // 保存更新后的播放列表
+            prompt.showToast({ message: '已从播放列表移除' });
+        }
+    },
+
+    // 删除逻辑：彻底删除已下载的歌曲
+    deleteFromDownloaded(songToDelete) {
+        // a. 从UI上立即移除
+        const index = this.songList.findIndex(item => item.id === songToDelete.id);
+        if (index > -1) {
+            this.songList.splice(index, 1);
+        }
+        
+        // b. 通知播放器页面执行物理文件删除和记录清理
+        prompt.showToast({ message: '正在清理本地文件...', duration: 1500 });
+        router.replace({
+            uri: "/pages/player",
+            params: {
+                action: 'delete',
+                songToDelete: JSON.stringify(songToDelete)
+            }
+        });
+    },
+
+    // 辅助函数：保存播放列表
+    savePlayList() {
+        file.writeText({
+            uri: this.listFileUri,
+            text: JSON.stringify(this.songList, null, 2),
+        });
+    },
+
+    // 5. 播放逻辑保持不变，但需要确保播放列表是最新的
+    play(songId) {
+        // 如果当前是下载列表，点击播放时，需要将整个下载列表设置为播放列表
+        if (this.listType === 'downloadlist') {
+            // 将当前的下载列表（this.songList）覆盖到 play_list.json
+            this.savePlayList();
+        }
+        
+        // 然后跳转到播放器，并传递要播放的 songId
+        router.replace({
+            uri: "/pages/player",
+            params: {
+                songId: songId,
+                // 将当前列表序列化为 JSON 字符串进行传递
+                playList: JSON.stringify(this.songList) 
+            },
+        });
+    },
+
+    goBack() {
+        router.back();
+    },
 };
 </script>
 
 <style>
+/* 样式部分无需修改，保持原样即可 */
 .list-container {
 	width: 100%;
 	height: 100%;
@@ -117,9 +199,10 @@ deleteSong(songId) {
 }
 
 .title {
-	font-size: 28px;
+	font-size: 32px;
 	padding: 10px;
 	text-align: center;
+  font-weight: bold;
 	color: #fff;
 }
 
@@ -133,7 +216,6 @@ deleteSong(songId) {
 	text-align: center;
 }
 
-/* 新增列表样式 */
 .list {
 	flex-direction: column;
 	padding-bottom: 60px;

@@ -10,7 +10,7 @@
 			</marquee>
 		</div>
 		<!-- 播放控制按钮 -->
-		<div class="controls" show="{{ !expend }}">
+		<div class="controls" if="{{ !expend }}">
 			<image class="icon" src="/common/icon/prev.png" onclick="change(-1)" />
 			<image
 				class="icon"
@@ -27,19 +27,23 @@
 			<image class="icon" src="/common/icon/next.png" onclick="change(1)" />
 		</div>
 <!-- template -->
-<div class="lyrics-container" onclick="expendLryrics">
+<div class="{{ expend ? 'lyrics-container-expended' : 'lyrics-container' }}" onclick="expendLryrics">
   <!-- 歌词显示 -->
-  <text class="lyric-line secondary-lyric" show="{{ expend }}">{{ getLyricLine(-1) }}</text>
+    <text class="lyric-line secondary-lyric" if="{{ expend }}">{{ getLyricLine(-2) }}</text>
+  <text class="lyric-line secondary-lyric" if="{{ expend || lyricType === 'chinese' }}">{{ getLyricLine(-1) }}</text>
   <div class="current-lyric-wrapper">
     <text class="lyric-line current-lyric">{{ getLyricLine(0) }}</text>
     <!-- 针对多语言歌词，显示额外信息 -->
     <text if="{{ getLyricExtraLine() }}" class="lyric-line extra-lyric">{{ getLyricExtraLine() }}</text>
   </div>
-  <text class="lyric-line secondary-lyric" show="{{ expend }}">{{ getLyricLine(1) }}</text>
+  <text class="lyric-line secondary-lyric" if="{{ expend || lyricType === 'chinese' }}">{{ getLyricLine(1) }}</text>
+  <text class="lyric-line secondary-lyric" if="{{ expend }}">{{ getLyricLine(2) }}</text>
+  <text class="lyric-line secondary-lyric" if="{{ expend }}">{{ getLyricLine(3) }}</text>
+  <text class="lyric-line secondary-lyric" if="{{ expend }}">{{ getLyricLine(4) }}</text>
 </div>
 
     <!-- 播放进度显示 -->
-		<div class="progress" show="{{ !expend }}">
+		<div class="progress" if="{{ !expend }}">
 			<text class="play-time">
 				{{ second2time(playDuration) }}/{{ second2time(currSong.duration) }}
 			</text>
@@ -53,13 +57,12 @@
 			></slider>
 		</div>
 		<!-- 底部操作按钮 -->
-		<div class="footer" show="{{ !expend }}">
+		<div class="footer" if="{{ !expend }}">
 			<image class="icon" src="/common/icon/volume.png" onclick="goToVolume" />
 			<image class="icon" src="/common/icon/play-list.png" onclick="goToMenu" />
 		</div>
 	</div>
 </template>
-
 
 <script>
 import router from "@system.router";
@@ -67,24 +70,40 @@ import fetch from "@system.fetch";
 import request from "@system.request";
 import audio from "@system.audio";
 import file from "@system.file";
+import prompt from '@system.prompt';
+import network from '@system.network'; // 1. 导入 network 模块
 
 export default {
     private: {
+        // 核心文件路径
         musicDir: 'internal://files/music/',
         lyricDir: 'internal://files/lyrics/',
-        historyFileUri: 'internal://files/play_history.json',
+        listFileUri: 'internal://files/play_list.json',
+        downloadedFileUri: 'internal://files/downloaded_songs.json',
+        queueFileUri: 'internal://files/download_queue.json',
+
+        // 播放状态
         currSong: null,
-        playList: [],
         isPlaying: false,
         playDuration: 0,
+
+        // 歌词相关
         lyrics: [],
         currentLyricIndex: 0,
         lyricType: 'chinese',
-        expend: false
+        expend: false,
+
+        // 下载与网络状态
+        downloadedSongs: {},
+        downloadQueue: [],
+        isDownloading: false,
+        currentNetworkType: 'none',
     },
 
     protected: {
+        playList: [],
         currentIndex: 0,
+        songId: null,
     },
 
     // =================================================================
@@ -92,50 +111,71 @@ export default {
     // =================================================================
 
     onInit() {
+        // 【关键修改】检查路由参数中是否直接传入了播放列表
+        if (this.playList && typeof this.playList === 'string') {
+            try {
+                // 如果传入了，直接解析并使用它，不再从文件加载
+                const parsedList = JSON.parse(this.playList);
+                if (Array.isArray(parsedList)) {
+                    this.playList = parsedList;
+                    console.log("[播放器] 已通过路由参数成功加载播放列表。");
+                }
+            } catch (e) {
+                console.error("[播放器] 解析路由传入的播放列表失败，将回退到文件加载。");
+                // 如果解析失败，作为备用方案，还是从文件加载
+                this.loadListAndResetStates();
+            }
+        } else {
+            // 如果没有通过路由参数传入，则维持原有的加载逻辑
+            this.loadListAndResetStates();
+        }
+
+        // 其他初始化逻辑保持不变
         this.ensureMusicDirectoryExists();
         this.ensureLyricDirectoryExists();
+        this.loadDownloadedSongs();
+        this.loadDownloadQueue();
+        this.subscribeNetworkChanges();
 
-        file.readText({
-            uri: this.historyFileUri,
-            success: (data) => {
-                console.log("[播放器] 从文件加载历史记录:", data.text || "空数据");
-                try {
-                    this.playList = JSON.parse(data.text || "[]");
-                } catch (e) {
-                    console.error("[播放器] 解析历史记录JSON失败:", e);
-                    this.playList = [];
-                }
-                this.playCurrent();
-            },
-            fail: (data, code) => {
-                if (code === 301) {
-                    console.log("[播放器] 历史记录文件不存在，初始化为空列表。");
-                } else {
-                    console.error("[播放器] 读取历史记录文件失败:", `code=${code}`);
-                }
-                this.playList = [];
-                this.playCurrent();
-            },
-        });
-
+        // 初始化音频播放器事件监听
         audio.onplay = () => { this.isPlaying = true; };
         audio.onpause = () => { this.isPlaying = false; };
         audio.onstop = () => { this.isPlaying = false; };
         audio.ontimeupdate = () => {
             this.playDuration = audio.currentTime;
-            this.initialSliderValue = audio.currentTime;
             this.updateLyric();
         };
         audio.onended = () => { this.change(1); };
-        audio.onloadeddata = () => {};
     },
 
     onReady() {
+        // 【关键修改】
+        console.log(`[播放器 onReady] 接收到的 songId: ${this.songId} (类型: ${typeof this.songId})`);
+        console.log(`[播放器 onReady] 播放列表的第一首歌ID: ${this.playList[0]?.id} (类型: ${typeof this.playList[0]?.id})`);
+
         if (this.songId) {
-            this.currentIndex = this.playList.findIndex(item => item.id === this.songId);
-            this.currSong = this.playList[this.currentIndex];
+            // 使用 '==' 进行类型宽松比较，防止数字和字符串不匹配的问题
+            this.currentIndex = this.playList.findIndex(item => item.id == this.songId);
+            
+            console.log(`[播放器 onReady] 查找 songId: ${this.songId}，找到的索引: ${this.currentIndex}`);
+
+            if (this.currentIndex === -1) {
+                console.warn(`[播放器] 在列表中未找到 ID 为 ${this.songId} 的歌曲，将从第一首开始播放。`);
+                prompt.showToast({ message: '找不到指定歌曲，已为您播放第一首' });
+                this.currentIndex = 0;
+            }
+        } else {
+            console.log("[播放器 onReady] 未接收到 songId，将播放第一首歌曲。");
+            this.currentIndex = 0;
         }
-        setTimeout(this.playCurrent, 1000);
+
+            this.playCurrent();
+            this.processDownloadQueue();
+    },
+
+    onDestroy() {
+        // 取消网络监听，防止内存泄漏
+        network.unsubscribe();
     },
 
     // =================================================================
@@ -151,63 +191,56 @@ export default {
         }
 
         const song = this.playList[this.currentIndex];
-        this.currSong = song;
+        const downloadedInfo = this.downloadedSongs[song.id];
 
-        if (song.downloadState === 'downloaded' && song.localUri) {
+        if (downloadedInfo && downloadedInfo.localUri) {
             file.access({
-                uri: song.localUri,
+                uri: downloadedInfo.localUri,
                 success: () => {
-                    console.log(`[播放器] 播放本地文件: ${song.localUri}`);
+                    console.log(`[播放器] 播放已下载的本地文件: ${downloadedInfo.localUri}`);
+                    this.currSong = { ...song, ...downloadedInfo };
                     audio.stop();
-                    audio.src = song.localUri;
+                    audio.src = this.currSong.localUri;
                     audio.play();
                     this.fetchLyric(song.id);
                 },
                 fail: (data, code) => {
-                    console.error(`[播放器] 本地文件验证失败 (code=${code})，转为在线播放。`);
-                    this.updateSongInList(song.id, { downloadState: 'none', localUri: null, localLyricUri: null });
+                    console.error(`[播放器] 本地文件验证失败 (code=${code})，将从下载记录中移除并转为在线播放。`);
+                    prompt.showToast({ message: '本地文件损坏，转为在线播放', duration: 2000 });
+                    delete this.downloadedSongs[song.id];
+                    this.saveDownloadedSongs();
+                    this.updateSongInList(song.id, { downloadState: 'none' });
                     this.playOnline(song);
                 }
             });
         } else {
-            console.log("[播放器] 执行在线播放。");
             this.playOnline(song);
         }
     },
 
     playOnline(song) {
+        console.log("[播放器] 执行在线播放。");
         fetch.fetch({
             url: `https://163api.qijieya.cn/song/url/v1?id=${song.id}&level=higher`,
             success: (res ) => {
                 if (res.data?.data?.[0]?.url) {
                     const { url, time } = res.data.data[0];
                     this.currSong = { ...song, playUrl: url, duration: Math.floor(time / 1000) };
-                    console.log("获取到在线播放链接:", url);
                     audio.stop();
                     audio.src = url;
                     audio.play();
                     this.fetchLyric(song.id);
                 } else {
-                    console.error("无效的API响应，无法获取播放链接:", JSON.stringify(res));
+                    prompt.showToast({ message: '获取播放链接失败', duration: 2000 });
                 }
             },
-            fail: (err) => {
-                console.error("请求在线播放链接API失败:", err);
-            },
+            fail: () => prompt.showToast({ message: '网络请求失败，无法播放', duration: 2000 }),
         });
     },
 
-    playOrPause() {
-        if (this.isPlaying) {
-            audio.pause();
-        } else {
-            audio.play();
-        }
-    },
-
+    playOrPause() { this.isPlaying ? audio.pause() : audio.play(); },
     change(dir) {
         this.currentIndex = (this.currentIndex + dir + this.playList.length) % this.playList.length;
-        this.currSong = this.playList[this.currentIndex];
         this.playCurrent();
     },
 
@@ -215,129 +248,148 @@ export default {
     // 三、UI交互与路由 (UI Interaction & Routing)
     // =================================================================
 
-    onSliderChange(e) {
-        audio.currentTime = e.progress;
-        this.updateLyric();
-    },
-
-    expendLryrics() {
-        this.expend = !this.expend;
-    },
-
+    onSliderChange(e) { audio.currentTime = e.progress; this.updateLyric(); },
+    expendLryrics() { this.expend = !this.expend; },
     goToVolume() { router.push({ uri: "/pages/volume" }); },
     goToList() { router.push({ uri: "/pages/list" }); },
     goToMenu() { router.push({ uri: "/pages/menu" }); },
 
     // =================================================================
-    // 四、下载功能 (Download Feature)
+    // 四、下载与删除功能 (Download & Delete Features)
     // =================================================================
 
     async startDownload(song) {
         if (!song || !song.id) {
-            console.error("无效的歌曲对象，无法开始下载。");
+            prompt.showToast({ message: '下载失败：歌曲信息无效', duration: 2000 });
             return;
         }
-        if (song.downloadState === 'downloading' || song.downloadState === 'downloaded') {
-            console.log(`歌曲状态为 [${song.downloadState}]，无需下载。`);
+        if (this.downloadedSongs[song.id]) {
+            prompt.showToast({ message: '这首歌曲已经下载过了', duration: 1500 });
+            this.updateSongInList(song.id, { downloadState: 'downloaded' });
+            return;
+        }
+        if (this.downloadQueue.some(item => item.id === song.id)) {
+            prompt.showToast({ message: '已在下载队列中', duration: 1500 });
             return;
         }
 
-        this.updateSongInList(song.id, { downloadState: 'downloading' });
-
+        this.downloadQueue.push(song);
         try {
-            const [songUrl, lyricData] = await Promise.all([
-                this.getSongPlayUrl(song.id),
-                this.getLyricData(song.id)
-            ]);
-
-            if (!songUrl) throw new Error('无法获取歌曲下载链接');
-
-            const lyricFilePath = `${this.lyricDir}${song.id}.json`;
-            await this.saveLyricFile(lyricFilePath, lyricData);
-
-            request.download({
-                url: songUrl,
-                filename: `${song.id}.mp3`,
-                success: (task) => this.listenDownloadComplete(task.token, song, lyricFilePath),
-                fail: (data, code) => { throw new Error(`下载任务创建失败, code=${code}`); }
-            });
+            await this.saveDownloadQueue();
+            prompt.showToast({ message: `已加入下载队列`, duration: 1500 });
+            this.updateSongInList(song.id, { downloadState: 'waiting' });
+            this.processDownloadQueue();
         } catch (error) {
-            console.error("下载流程失败:", error.message);
-            this.updateSongInList(song.id, { downloadState: 'failed' });
-            file.delete({ uri: `${this.lyricDir}${song.id}.json` });
+            prompt.showToast({ message: '加入队列失败，请重试', duration: 2000 });
+            this.downloadQueue.pop();
         }
     },
 
-    listenDownloadComplete(token, song, lyricPath) {
-        request.onDownloadComplete({
-            token: token,
-            success: (result) => {
-                const finalUri = `${this.musicDir}${song.id}.mp3`;
-                file.move({
-                    srcUri: result.uri,
-                    dstUri: finalUri,
-                    success: () => {
-                        console.log(`文件已成功移动到: ${finalUri}`);
-                        this.updateSongInList(song.id, {
-                            downloadState: 'downloaded',
-                            localUri: finalUri,
-                            localLyricUri: lyricPath
-                        });
-                    },
-                    fail: (data, code) => {
-                        console.error(`移动下载文件失败, code=${code}`);
-                        this.updateSongInList(song.id, { downloadState: 'failed' });
-                        file.delete({ uri: result.uri });
-                        file.delete({ uri: lyricPath });
-                    }
+    async processDownloadQueue() {
+        if (this.downloadQueue.length === 0 || this.isDownloading) return;
+
+        // 检查网络，仅提示，不中断
+        const networkType = this.currentNetworkType;
+        if (networkType === 'none') {
+            prompt.showToast({ message: '网络未连接，下载已暂停', duration: 2000 });
+            return;
+        }
+        if (networkType !== 'wifi') {
+            prompt.showToast({ message: `当前为${networkType}网络，下载将消耗流量`, duration: 2500 });
+        }
+
+        this.isDownloading = true;
+        const songToDownload = this.downloadQueue[0];
+        this.updateSongInList(songToDownload.id, { downloadState: 'downloading' });
+        prompt.showToast({ message: `开始下载: ${songToDownload.name}`, duration: 1500 });
+
+        try {
+            const [songInfo, lyricData] = await Promise.all([
+                this.getSongPlayUrl(songToDownload.id),
+                this.getLyricData(songToDownload.id)
+            ]);
+            if (!songInfo || !songInfo.url) throw new Error('无法获取下载链接');
+
+            const lyricFilePath = `${this.lyricDir}${songToDownload.id}.json`;
+            await this.saveLyricFile(lyricFilePath, lyricData);
+
+            const downloadedFile = await new Promise((resolve, reject) => {
+                request.download({
+                    url: songInfo.url,
+                    filename: `${songToDownload.id}.mp3`,
+                    success: (task) => request.onDownloadComplete({ token: task.token, success: resolve, fail: (d, c) => reject(new Error(`任务执行失败, code=${c}`)) }),
+                    fail: (d, c) => reject(new Error(`任务创建失败, code=${c}`))
                 });
-            },
-            fail: (data, code) => {
-                console.error(`下载任务执行失败, token=${token}, code=${code}`);
-                this.updateSongInList(song.id, { downloadState: 'failed' });
-                file.delete({ uri: lyricPath });
-            }
-        });
+            });
+
+            const finalUri = `${this.musicDir}${songToDownload.id}.mp3`;
+            await new Promise((resolve, reject) => file.move({ srcUri: downloadedFile.uri, dstUri: finalUri, success: resolve, fail: (d, c) => reject(new Error(`移动文件失败, code=${c}`)) }));
+
+            this.addSongToDownloadedList({ ...songToDownload, localUri: finalUri, localLyricUri: lyricFilePath, duration: songInfo.duration });
+            this.updateSongInList(songToDownload.id, { downloadState: 'downloaded' });
+            prompt.showToast({ message: `${songToDownload.name} 下载成功`, duration: 1500 });
+        } catch (error) {
+            prompt.showToast({ message: `${songToDownload.name} 下载失败`, duration: 2000 });
+            this.updateSongInList(songToDownload.id, { downloadState: 'failed' });
+            file.delete({ uri: `${this.lyricDir}${songToDownload.id}.json` });
+        } finally {
+            this.downloadQueue.shift();
+            this.isDownloading = false;
+            await this.saveDownloadQueue();
+            this.processDownloadQueue();
+        }
+    },
+
+    async deleteDownloadedSong(song) {
+        if (!song || !song.id) {
+            prompt.showToast({ message: '删除失败：歌曲信息无效', duration: 2000 });
+            return;
+        }
+        const downloadedInfo = this.downloadedSongs[song.id];
+        if (!downloadedInfo) {
+            this.updateSongInList(song.id, { downloadState: 'none' });
+            prompt.showToast({ message: '歌曲未下载或已被删除', duration: 1500 });
+            return;
+        }
+
+        prompt.showToast({ message: `正在删除 ${song.name}...`, duration: 1500 });
+        try {
+            if (downloadedInfo.localUri) await new Promise((res, rej) => file.delete({ uri: downloadedInfo.localUri, success: res, fail: (d, c) => c === 301 ? res() : rej(new Error(`删除歌曲失败, code=${c}`)) }));
+            if (downloadedInfo.localLyricUri) await new Promise((res, rej) => file.delete({ uri: downloadedInfo.localLyricUri, success: res, fail: (d, c) => c === 301 ? res() : rej(new Error(`删除歌词失败, code=${c}`)) }));
+            delete this.downloadedSongs[song.id];
+            await this.saveDownloadedSongs();
+            this.updateSongInList(song.id, { downloadState: 'none' });
+            prompt.showToast({ message: `${song.name} 已删除`, duration: 1500 });
+        } catch (error) {
+            prompt.showToast({ message: `删除失败: ${error.message}`, duration: 2000 });
+        }
     },
 
     // =================================================================
     // 五、歌词处理 (Lyrics Handling)
     // =================================================================
-
+    
     fetchLyric(songId) {
         this.lyrics = [];
         this.currentLyricIndex = 0;
-        this.lyricType = 'chinese';
-        const song = this.playList.find(s => s.id === songId);
-
-        if (song && song.localLyricUri) {
+        const downloadedInfo = this.downloadedSongs[songId];
+        if (downloadedInfo && downloadedInfo.localLyricUri) {
             file.readText({
-                uri: song.localLyricUri,
-                success: (data) => {
-                    try {
-                        this.processAndMergeLyrics(JSON.parse(data.text));
-                    } catch (e) {
-                        this.fetchLyricOnline(songId);
-                    }
-                },
+                uri: downloadedInfo.localLyricUri,
+                success: (data) => { try { this.processAndMergeLyrics(JSON.parse(data.text)); } catch (e) { this.fetchLyricOnline(songId); } },
                 fail: () => this.fetchLyricOnline(songId)
             });
         } else {
             this.fetchLyricOnline(songId);
         }
     },
-
     fetchLyricOnline(songId) {
         fetch.fetch({
             url: `https://163api.qijieya.cn/lyric?id=${songId}`,
             success: (res ) => this.processAndMergeLyrics(res.data),
-            fail: (err) => {
-                console.error("歌词API请求失败:", err);
-                this.lyrics = [{ time: 0, text: '歌词加载失败' }];
-            }
+            fail: () => { this.lyrics = [{ time: 0, text: '歌词加载失败' }]; }
         });
     },
-
     processAndMergeLyrics(data) {
         if (data && data.lrc && data.lrc.lyric) {
             const original = this.parseLyric(data.lrc.lyric);
@@ -348,7 +400,6 @@ export default {
             this.lyrics = [{ time: 0, text: '暂无歌词' }];
         }
     },
-
     parseLyric(lrcString) {
         const lines = lrcString.split('\n');
         const result = [];
@@ -363,137 +414,130 @@ export default {
         }
         return result;
     },
-
     mergeLyrics(original, translation, romaji) {
         const createMap = (arr) => new Map(arr.map(item => [item.time.toFixed(3), item.text]));
         if (romaji && translation) {
             this.lyricType = 'japanese';
             const transMap = createMap(translation);
             const romaMap = createMap(romaji);
-            this.lyrics = original.map(line => ({
-                time: line.time,
-                original: line.text,
-                translation: transMap.get(line.time.toFixed(3)) || '',
-                romaji: romaMap.get(line.time.toFixed(3)) || ''
-            }));
+            this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)) || '', romaji: romaMap.get(line.time.toFixed(3)) || '' }));
         } else if (translation) {
             this.lyricType = 'english';
             const transMap = createMap(translation);
-            this.lyrics = original.map(line => ({
-                time: line.time,
-                original: line.text,
-                translation: transMap.get(line.time.toFixed(3)) || ''
-            }));
+            this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)) || '' }));
         } else {
             this.lyricType = 'chinese';
             this.lyrics = original.map(line => ({ time: line.time, original: line.text }));
         }
         if (this.lyrics.length === 0) this.lyrics = [{ time: 0, text: '暂无歌词' }];
     },
-
     updateLyric() {
         if (!this.lyrics || this.lyrics.length === 0) return;
         const currentTime = this.playDuration;
         let newIndex = this.lyrics.findIndex(line => line.time > currentTime);
         if (newIndex === -1) newIndex = this.lyrics.length;
         const finalIndex = Math.max(0, newIndex - 1);
-        if (finalIndex !== this.currentLyricIndex) {
-            this.currentLyricIndex = finalIndex;
-        }
+        if (finalIndex !== this.currentLyricIndex) this.currentLyricIndex = finalIndex;
     },
-
     getLyricLine(offset) {
         const index = this.currentLyricIndex + offset;
         if (!this.lyrics || index < 0 || index >= this.lyrics.length) return '';
         const line = this.lyrics[index];
         return line.original || line.text || '';
     },
-
     getLyricExtraLine() {
         if (!this.lyrics || this.lyrics.length === 0 || this.currentLyricIndex >= this.lyrics.length) return '';
         const line = this.lyrics[this.currentLyricIndex];
-        if (this.lyricType !== 'chinese') return line.translation || '';
-        return '';
+        return this.lyricType !== 'chinese' ? (line.translation || '') : '';
     },
 
     // =================================================================
     // 六、文件与数据持久化 (File & Data Persistence)
     // =================================================================
 
+    loadListAndResetStates() {
+        file.readText({
+            uri: this.listFileUri,
+            success: (data) => {
+                try {
+                    let list = JSON.parse(data.text || "[]");
+                    let stateChanged = false;
+                    list = list.map(song => {
+                        if (song.downloadState === 'downloading') {
+                            stateChanged = true;
+                            return { ...song, downloadState: 'failed' };
+                        }
+                        return song;
+                    });
+                    this.playList = list;
+                    if (stateChanged) this.saveListFile();
+                } catch (e) { this.playList = []; }
+            },
+            fail: () => { this.playList = []; },
+        });
+    },
+    loadDownloadedSongs() {
+        file.readText({
+            uri: this.downloadedFileUri,
+            success: (data) => { try { this.downloadedSongs = JSON.parse(data.text || "{}"); } catch (e) { this.downloadedSongs = {}; } },
+            fail: () => { this.downloadedSongs = {}; }
+        });
+    },
+    loadDownloadQueue() {
+        file.readText({
+            uri: this.queueFileUri,
+            success: (data) => { try { this.downloadQueue = JSON.parse(data.text || "[]"); } catch (e) { this.downloadQueue = []; } },
+            fail: () => { this.downloadQueue = []; }
+        });
+    },
+    saveListFile() { file.writeText({ uri: this.listFileUri, text: JSON.stringify(this.playList, null, 2) }); },
+    saveDownloadedSongs() { return new Promise((resolve) => file.writeText({ uri: this.downloadedFileUri, text: JSON.stringify(this.downloadedSongs, null, 2), success: resolve, fail: resolve })); },
+    saveDownloadQueue() { return new Promise((resolve) => file.writeText({ uri: this.queueFileUri, text: JSON.stringify(this.downloadQueue, null, 2), success: resolve, fail: resolve })); },
+    addSongToDownloadedList(songInfo) { this.downloadedSongs[songInfo.id] = songInfo; this.saveDownloadedSongs(); },
     updateSongInList(songId, newState) {
         let songFound = false;
-        this.playList = this.playList.map(song => {
-            if (song.id === songId) {
-                songFound = true;
-                return { ...song, ...newState };
-            }
-            return song;
-        });
-
-        if (songFound) {
-            file.writeText({
-                uri: this.historyFileUri,
-                text: JSON.stringify(this.playList, null, 2),
-                success: () => console.log("播放历史文件已同步更新。"),
-                fail: (data, code) => console.error(`同步更新播放历史文件失败, code=${code}`)
-            });
-        } else {
-            console.warn("未在当前列表中找到要更新的歌曲, ID:", songId);
-        }
+        this.playList = this.playList.map(s => { if (s.id === songId) { songFound = true; return { ...s, ...newState }; } return s; });
+        if (songFound) this.saveListFile();
     },
-
-    ensureMusicDirectoryExists() {
-        file.mkdir({
-            uri: this.musicDir,
-            success: () => console.log("音乐目录已确认存在:", this.musicDir),
-            fail: (data, code) => console.warn("创建音乐目录时发生错误（可能已存在）:", code)
-        });
-    },
-
-    ensureLyricDirectoryExists() {
-        file.mkdir({
-            uri: this.lyricDir,
-            success: () => console.log("歌词目录已确认存在:", this.lyricDir),
-            fail: (data, code) => console.warn("创建歌词目录时发生错误（可能已存在）:", code)
-        });
-    },
-
+    ensureMusicDirectoryExists() { file.mkdir({ uri: this.musicDir }); },
+    ensureLyricDirectoryExists() { file.mkdir({ uri: this.lyricDir }); },
     saveLyricFile(lyricPath, lyricData) {
         return new Promise((resolve, reject) => {
-            if (!lyricData) {
-                resolve();
-                return;
-            }
-            file.writeText({
-                uri: lyricPath,
-                text: JSON.stringify(lyricData),
-                success: () => resolve(),
-                fail: (data, code) => reject(new Error(`保存歌词文件失败, code=${code}`))
-            });
+            if (!lyricData) return resolve();
+            file.writeText({ uri: lyricPath, text: JSON.stringify(lyricData), success: resolve, fail: (d, c) => reject(new Error(`保存歌词失败, code=${c}`)) });
         });
     },
 
     // =================================================================
-    // 七、网络请求封装 (Network Request Wrappers)
+    // 七、网络请求与监控 (Network Wrappers & Monitoring)
     // =================================================================
 
     getSongPlayUrl(songId) {
         return new Promise((resolve) => {
             fetch.fetch({
                 url: `https://163api.qijieya.cn/song/url/v1?id=${songId}&level=exhigh`,
-                success: (res ) => resolve(res.data?.data?.[0]?.url || null),
+                success: (res ) => {
+                    const songData = res.data?.data?.[0];
+                    resolve(songData && songData.url ? { url: songData.url, duration: Math.floor(songData.time / 1000) } : null);
+                },
                 fail: () => resolve(null)
             });
         });
     },
-
     getLyricData(songId) {
-        return new Promise((resolve) => {
-            fetch.fetch({
-                url: `https://163api.qijieya.cn/lyric?id=${songId}`,
-                success: (res ) => resolve(res.data || null),
-                fail: () => resolve(null)
-            });
+        return new Promise((resolve) => fetch.fetch({ url: `https://163api.qijieya.cn/lyric?id=${songId}`, success: (res ) => resolve(res.data || null), fail: () => resolve(null) }));
+    },
+    subscribeNetworkChanges() {
+        network.getType({ success: (data) => { this.currentNetworkType = data.type; } });
+        network.subscribe({
+            callback: (data) => {
+                const oldType = this.currentNetworkType;
+                this.currentNetworkType = data.type;
+                if (data.type !== 'none' && oldType === 'none') {
+                    console.log("[网络监控] 网络已恢复，尝试继续下载队列。");
+                    this.processDownloadQueue();
+                }
+            }
         });
     },
 
@@ -503,15 +547,13 @@ export default {
 
     second2time(second) {
         if (isNaN(second) || second < 0) return "00:00";
-        const sec = Math.floor(second % 60);
-        const min = Math.floor((second / 60) % 60);
+        const sec = Math.floor(second % 60).toString().padStart(2, "0");
+        const min = Math.floor((second / 60) % 60).toString().padStart(2, "0");
         const hour = Math.floor(second / 3600);
-        const pad = (num) => num.toString().padStart(2, "0");
-        return hour > 0 ? `${pad(hour)}:${pad(min)}:${pad(sec)}` : `${pad(min)}:${pad(sec)}`;
+        return hour > 0 ? `${hour.toString().padStart(2, "0")}:${min}:${sec}` : `${min}:${sec}`;
     },
 };
 </script>
-
 
 <style>
 .demo-page {
@@ -538,6 +580,15 @@ export default {
   align-items: center;
 }
 
+.lyrics-container-expended {
+  width: 100%;
+  height: 308px; /* 扩展高度以显示更多歌词 */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+
 .lyric-line {
   width: 100%;
   text-align: center;
@@ -546,7 +597,7 @@ export default {
 }
 
 .secondary-lyric {
-  font-size: 20px;
+  font-size: 22px;
   color: rgba(255, 255, 255, 0.5);
   height: 35px; /* 预留空间 */
 }
@@ -554,6 +605,7 @@ export default {
 .current-lyric-wrapper {
   flex-direction: column;
   align-items: center;
+  margin: 2px 0;
 }
 
 .current-lyric {
@@ -563,7 +615,7 @@ export default {
 }
 
 .extra-lyric {
-  font-size: 22px;
+  font-size: 24px;
   color: rgba(255, 255, 255, 0.8);
 }
 

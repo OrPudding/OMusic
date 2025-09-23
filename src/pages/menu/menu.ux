@@ -2,14 +2,14 @@
   <div class="menu-container">
     <text class="title">主菜单</text>
     <scroll class="menu-list" bounces="true">
-      <div class="menu-item" onclick="goToPlayer">
-        <text class="item-text">正在播放</text>
+      <div class="menu-item" onclick="goToSearch">
+        <text class="item-text">搜索</text>
+      </div>
+      <div class="menu-item" onclick="goToDownloadList">
+        <text class="item-text">已下载</text>
       </div>
       <div class="menu-item" onclick="goToList">
         <text class="item-text">播放列表</text>
-      </div>
-      <div class="menu-item" onclick="goToSearch">
-        <text class="item-text">搜索</text>
       </div>
       <div class="menu-item" onclick="goToLike">
         <text class="item-text">我的收藏</text>
@@ -34,7 +34,10 @@ export default {
 
   goToList() {
     router.replace({
-      uri: "/pages/list"
+      uri: "/pages/list",
+      params: {
+        listType: 'playlist'
+      }
     });
   },
 
@@ -55,6 +58,16 @@ export default {
       uri: "/pages/search"
     });
   },
+    // 跳转到“已下载列表”
+    goToDownloadList() {
+        router.push({
+            uri: '/pages/list',
+            params: {
+                listType: 'downloadlist'
+            }
+        });
+    },
+
   goToLike() {
     router.replace({
       uri: "/pages/like"
@@ -85,7 +98,7 @@ export default {
 }
 
 .title {
-	font-size: 36px;
+	font-size: 32px;
 	padding: 10px;
 	text-align: center;
   font-weight: bold;
@@ -94,14 +107,15 @@ export default {
 
 .menu-list {
   width: 360px;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .menu-item {
-  width: 100%;
+  width: 170px;
   height: 80px;
   background-color: rgba(255, 255, 255, 0.06);
-  margin-bottom: 20px;
+  margin: 10px 5px;
   border-radius: 36px;
   justify-content: center;
   align-items: center;

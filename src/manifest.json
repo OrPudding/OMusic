@@ -1,5 +1,5 @@
 {
-  "package": "com.vela.player",
+  "package": "com.orpu.omusic",
   "name": "BetterNCM",
   "versionName": "1.0.0",
   "versionCode": 1,
@@ -38,6 +38,9 @@
     },
     {
       "name": "system.app"
+    },
+    {
+      "name": "system.network"
     }
   ],
   "config": {
