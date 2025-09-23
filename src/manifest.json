@@ -1,10 +1,10 @@
 {
   "package": "com.orpu.omusic",
-  "name": "BetterNCM",
+  "name": "OMusic",
   "versionName": "1.0.0",
   "versionCode": 1,
   "minPlatformVersion": 1000,
-  "icon": "/common/logo.png",
+  "icon": "/common/icon.png",
   "deviceTypeList": [
     "watch"
   ],

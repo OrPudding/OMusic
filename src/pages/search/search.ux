@@ -39,7 +39,6 @@
 import fetch from "@system.fetch";
 import router from "@system.router";
 import file from "@system.file";
-import prompt from "@system.prompt";
 
 
 export default {
@@ -179,50 +178,52 @@ export default {
     });
 },
 
-// --- 新增一个辅助方法来处理更新和保存逻辑 ---
 updateAndSaveHistory(list, songId, name, artists) {
     // 2. 更新历史记录数组
-    // 移除已存在的相同歌曲，避免重复
-    const existingIndex = list.findIndex(item => item.id === songId);
+    const existingIndex = list.findIndex(item => item.id == songId); // 使用宽松比较
     if (existingIndex > -1) {
         list.splice(existingIndex, 1);
     }
 
-    // 在数组开头添加新歌曲
     list.unshift({
         id: songId,
         name: name,
-        artists: artists.map(a => a.name).join('/')
+        // 确保 artists 字段格式与 player 页面期望的一致
+        artists: artists.map(a => a.name).join('/') 
     });
 
-    // 限制最多保存50条记录
     if (list.length > 50) {
         list = list.slice(0, 50);
     }
 
+    // 【关键修改】将更新后的列表保存到组件的 data 中，以便传递
+    const updatedList = list;
+
     // 3. 将更新后的数组写回文件
     file.writeText({
         uri: this.listFileUri,
-        text: JSON.stringify(list, null, 2), // 使用格式化JSON，方便调试
+        text: JSON.stringify(updatedList, null, 2),
         success: () => {
-            console.log("[播放器] 播放历史已成功保存到文件。");
-            // 4. 保存成功后才跳转页面
-            this.navigateToPlayer();
+            console.log("[搜索页] 播放列表已成功保存到文件。");
+            // 4. 保存成功后，使用新列表和 songId 进行跳转
+            this.navigateToPlayer(songId, updatedList);
         },
         fail: (data, code) => {
-            console.error(`[播放器] 保存历史记录失败, code = ${code}`);
-            // 即使保存失败，也应该继续播放，所以仍然跳转
-            this.navigateToPlayer();
+            console.error(`[搜索页] 保存播放列表失败, code = ${code}`);
+            // 即使保存失败，也应该用新列表继续播放
+            this.navigateToPlayer(songId, updatedList);
         }
     });
 },
 
-// --- 新增一个辅助方法来处理跳转逻辑 ---
-navigateToPlayer() {
+// --- 修改这个辅助方法来处理跳转逻辑 ---
+navigateToPlayer(songId, playList) {
+    // 【关键修改】传递 songId 和序列化后的完整播放列表
     router.push({
         uri: 'pages/player',
         params: {
-            currentIndex: 0,
+            songId: songId,
+            playList: JSON.stringify(playList)
         }
     });
 }
