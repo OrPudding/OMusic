@@ -60,7 +60,7 @@ export default {
   },
     // 跳转到“已下载列表”
     goToDownloadList() {
-        router.push({
+        router.replace({
             uri: '/pages/list',
             params: {
                 listType: 'downloadlist'

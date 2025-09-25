@@ -327,9 +327,9 @@ export default {
 
             this.addSongToDownloadedList({ ...songToDownload, localUri: finalUri, localLyricUri: lyricFilePath, duration: songInfo.duration });
             this.updateSongInList(songToDownload.id, { downloadState: 'downloaded' });
-            prompt.showToast({ message: `${songToDownload.name} 下载成功`, duration: 1500 });
+            prompt.showToast({ message: `${songToDownload.name} 下载成功`, duration: 5000 });
         } catch (error) {
-            prompt.showToast({ message: `${songToDownload.name} 下载失败`, duration: 2000 });
+            prompt.showToast({ message: `${songToDownload.name} 下载失败`, duration: 5000 });
             this.updateSongInList(songToDownload.id, { downloadState: 'failed' });
             file.delete({ uri: `${this.lyricDir}${songToDownload.id}.json` });
         } finally {
@@ -515,7 +515,7 @@ export default {
     getSongPlayUrl(songId) {
         return new Promise((resolve) => {
             fetch.fetch({
-                url: `https://163api.qijieya.cn/song/url/v1?id=${songId}&level=exhigh`,
+                url: `https://163api.qijieya.cn/song/url/v1?id=${songId}&level=higher`,
                 success: (res ) => {
                     const songData = res.data?.data?.[0];
                     resolve(songData && songData.url ? { url: songData.url, duration: Math.floor(songData.time / 1000) } : null);

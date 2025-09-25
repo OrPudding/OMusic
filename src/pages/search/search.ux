@@ -219,7 +219,7 @@ updateAndSaveHistory(list, songId, name, artists) {
 // --- 修改这个辅助方法来处理跳转逻辑 ---
 navigateToPlayer(songId, playList) {
     // 【关键修改】传递 songId 和序列化后的完整播放列表
-    router.push({
+    router.replace({
         uri: 'pages/player',
         params: {
             songId: songId,
