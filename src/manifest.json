@@ -73,6 +73,9 @@
       },
       "pages/menu": {
         "component": "menu"
+      },
+      "pages/user": {
+        "component": "user"
       }
     }
   }

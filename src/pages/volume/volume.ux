@@ -8,48 +8,294 @@
       </div>
       <image class="action-icon" src="/common/icon/plus.png" onclick="changeVolume(1)"></image>
     </div>
+
+    <!-- 操作控制 -->
+    <div class="control-container">
+      <!-- 下载图标：根据 downloadState 动态显示 -->
+      <image class="icon" src="{{ downloadIcon }}" onclick="handleDownloadClick"></image>
+      <!-- 收藏图标 -->
+      <image class="icon" id="favoriteIcon" src="{{ favoriteIcon }}" onclick="toggleFavorite"></image>
+    </div>
+
     <!-- 返回播放页面 -->
     <div class="cancel-container">
       <image class="action-icon" src="/common/icon/cancel.png" onclick="goBack"></image>
     </div>
   </div>
 </template>
-
 <script>
 import router from "@system.router";
 import audio from "@system.audio";
+import file from "@system.file";
+import prompt from "@system.prompt";
+import fetch from "@system.fetch";
+import request from "@system.request";
+
+// --- 1. 常量与配置 ---
+const CONSTANTS = {
+    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=128000&id=',
+    API_LYRIC_URL: 'https://163api.qijieya.cn/lyric?id=',
+    DIR_MUSIC: 'internal://files/music/',
+    DIR_LYRICS: 'internal://files/lyrics/',
+    FILE_FAVORITES: 'internal://files/favorites.json',
+    FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
+};
+
+// --- 2. 文件服务封装 (无变化 ) ---
+const fileService = {
+    async readJson(uri, defaultValue = null) {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri, success: resolve, fail: reject }));
+            return JSON.parse(data.text);
+        } catch (e) {
+            return defaultValue;
+        }
+    },
+    async writeJson(uri, data) {
+        try {
+            await new Promise((resolve, reject) => file.writeText({ uri, text: JSON.stringify(data, null, 2), success: resolve, fail: reject }));
+            return true;
+        } catch (e) {
+            console.error(`[FileService] 写入JSON失败: ${uri}`, e);
+            return false;
+        }
+    },
+    async move(srcUri, dstUri) {
+        try {
+            await new Promise((resolve, reject) => file.move({ srcUri, dstUri, success: resolve, fail: reject }));
+            return true;
+        } catch (e) {
+            console.error(`[FileService] 移动文件失败: ${srcUri} -> ${dstUri}`, e);
+            return false;
+        }
+    },
+    async delete(uri) {
+        try {
+            await new Promise((resolve) => file.delete({ uri, success: resolve, fail: resolve }));
+        } catch (e) { /* 忽略错误 */ }
+    },
+    async ensureDirExists(uri) {
+        try {
+            await new Promise((resolve) => file.mkdir({ uri, success: resolve, fail: resolve }));
+        } catch (e) { /* 忽略错误 */ }
+    }
+};
 
 export default {
-  data: {
-    volume: 0,
-  },
+    private: {
+        volume: 0,
+        currentSong: null,
+        favorites: {},
+        isFavorited: false,
+        downloadedSongs: {},
+        downloadState: 'not_downloaded',
+        isDownloadingLocked: false,
+    },
+  
+    computed: {
+        downloadIcon() {
+            const icons = {
+                downloading: '/common/icon/downloading.png',
+                downloaded: '/common/icon/downloaded.png',
+                not_downloaded: '/common/icon/download.png',
+            };
+            return icons[this.downloadState] || icons.not_downloaded;
+        },
+        favoriteIcon() {
+            return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
+        }
+    },
 
-  onInit() {
-    this.volume = audio.volume * 100;
-  },
+    protected: {
+        currentSong: {}
+    },
 
-  changeVolume(dir) {
-    if (dir === -1) {
-      if (this.volume < 10) {
-        this.volume = 0;
-      } else {
-        this.volume -= 10;
-      }
-    } else {
-      if (this.volume > 90) {
-        this.volume = 100;
-      } else {
-        this.volume += 10;
-      }
-    }
-    audio.volume = this.volume / 100;
-  },
+    async onInit() {
+        this.volume = audio.volume * 100;
 
-  goBack() {
-    router.back();
-  },
+        // --- **关键修正 1: 健壮地解析参数** ---
+        // 循环解析，直到它成为一个对象，处理多重 stringify 的情况
+        let songData = this.currentSong;
+        while (typeof songData === 'string') {
+            try {
+                songData = JSON.parse(songData);
+            } catch (e) {
+                console.error("[Volume] 解析歌曲数据失败", e);
+                prompt.showToast({ message: '无法加载歌曲信息' });
+                router.back();
+                return;
+            }
+        }
+        this.currentSong = songData;
+        // --- 修正结束 ---
+
+        if (!this.currentSong || !this.currentSong.id) {
+            prompt.showToast({ message: '歌曲信息无效' });
+            router.back();
+            return;
+        }
+
+        await Promise.all([
+            fileService.ensureDirExists(CONSTANTS.DIR_MUSIC),
+            fileService.ensureDirExists(CONSTANTS.DIR_LYRICS),
+            this.loadInitialState(),
+        ]);
+    },
+
+    async loadInitialState() {
+        const [favorites, downloadedSongs] = await Promise.all([
+            fileService.readJson(CONSTANTS.FILE_FAVORITES, {}),
+            fileService.readJson(CONSTANTS.FILE_DOWNLOADED_SONGS, {}),
+        ]);
+        
+        this.favorites = favorites;
+        this.downloadedSongs = downloadedSongs;
+
+        this.updateFavoriteStatus();
+        this.updateDownloadStatus();
+    },
+
+    updateFavoriteStatus() {
+        if (this.currentSong) {
+            this.isFavorited = !!this.favorites[this.currentSong.id];
+        }
+    },
+
+    updateDownloadStatus() {
+        if (this.currentSong) {
+            this.downloadState = this.downloadedSongs[this.currentSong.id] 
+                ? 'downloaded' 
+                : 'not_downloaded';
+        }
+    },
+
+    changeVolume(direction) {
+        const newVolume = this.volume + (direction * 10);
+        this.volume = Math.max(0, Math.min(100, newVolume));
+        audio.volume = this.volume / 100;
+    },
+
+    async toggleFavorite() {
+        if (!this.currentSong) return;
+        const { id } = this.currentSong;
+
+        if (this.isFavorited) {
+            delete this.favorites[id];
+            prompt.showToast({ message: '已取消收藏' });
+        } else {
+            this.favorites[id] = this.currentSong;
+            prompt.showToast({ message: '已收藏' });
+        }
+        this.isFavorited = !this.isFavorited;
+        
+        await fileService.writeJson(CONSTANTS.FILE_FAVORITES, this.favorites);
+    },
+
+    goBack() {
+        router.back();
+    },
+
+    handleDownloadClick() {
+        if (!this.currentSong) {
+            prompt.showToast({ message: '歌曲信息无效' });
+            return;
+        }
+        if (this.downloadState === 'downloaded') {
+            prompt.showToast({ message: '歌曲已下载' });
+            return;
+        }
+        if (this.isDownloadingLocked) {
+            prompt.showToast({ message: '已有任务在下载中' });
+            return;
+        }
+        this.executeDownload();
+    },
+
+    async executeDownload() {
+        this.isDownloadingLocked = true;
+        this.downloadState = 'downloading';
+        const song = this.currentSong;
+        prompt.showToast({ message: `开始下载: ${song.name}` });
+
+        const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${song.id}.json`;
+        const songFilePath = `${CONSTANTS.DIR_MUSIC}${song.id}.mp3`;
+
+        try {
+            const [songInfo, lyricData] = await this.fetchSongAndLyric(song.id);
+            if (lyricData) {
+                await fileService.writeJson(lyricFilePath, lyricData);
+            }
+            const tempFileUri = await this.downloadFile(songInfo.url, `${song.id}.mp3`);
+            await fileService.move(tempFileUri, songFilePath);
+
+            this.downloadedSongs[song.id] = {
+                ...song,
+                localUri: songFilePath,
+                localLyricUri: lyricData ? lyricFilePath : null,
+                duration: songInfo.duration,
+            };
+            await fileService.writeJson(CONSTANTS.FILE_DOWNLOADED_SONGS, this.downloadedSongs);
+
+            this.downloadState = 'downloaded';
+            prompt.showToast({ message: `${song.name} 下载成功` });
+
+        } catch (error) {
+            prompt.showToast({ message: `下载失败: ${error.message}` });
+            this.downloadState = 'not_downloaded';
+            await fileService.delete(lyricFilePath);
+        } finally {
+            this.isDownloadingLocked = false;
+        }
+    },
+
+    async fetchSongAndLyric(songId) {
+        // --- **关键修正 2: 正确封装 fetch 的 Promise** ---
+        const fetchPromise = (url) => {
+            return new Promise((resolve, reject) => {
+                fetch.fetch({
+                    url,
+                    success: (data) => resolve(data), // 将 resolve 作为 success 回调
+                    fail: (data, code) => reject({data, code}) // 将 reject 作为 fail 回调
+                });
+            });
+        };
+
+        const [songRes, lyricRes] = await Promise.all([
+            fetchPromise(`${CONSTANTS.API_SONG_URL}${songId}`),
+            fetchPromise(`${CONSTANTS.API_LYRIC_URL}${songId}`).catch(() => null) // 歌词允许失败
+        ]);
+        // --- 修正结束 ---
+
+        const songData = songRes.data?.data?.[0];
+        if (!songData?.url) {
+            throw new Error('无法获取歌曲链接');
+        }
+
+        return [
+            { url: songData.url, duration: Math.floor(songData.time / 1000) },
+            lyricRes ? lyricRes.data : null
+        ];
+    },
+
+    downloadFile(url, filename) {
+        return new Promise((resolve, reject) => {
+            request.download({
+                url,
+                filename,
+                success: (task) => {
+                    request.onDownloadComplete({
+                        token: task.token,
+                        success: (data) => resolve(data.uri),
+                        fail: (data, code) => reject(new Error(`任务执行失败, code=${code}`)),
+                    });
+                },
+                fail: (data, code) => reject(new Error(`创建任务失败, code=${code}`)),
+            });
+        });
+    },
 };
 </script>
+
 
 <style>
 .volume {
@@ -57,12 +303,13 @@ export default {
   height: 100%;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
   background-color: #000;
 }
 
 .volume-bar-container {
-  width: 100%;
-  height: 140px;
+  width: 80%;
+  height: 80px;
   justify-content: space-around;
   align-items: center;
   background-color: #2a2a2a;
@@ -79,6 +326,16 @@ export default {
   width: 60px;
   height: 60px;
 }
+.control-container {
+  margin-top: 20px;
+  width: 80%;
+  justify-content: space-around;
+  align-items: center;
+}
+.icon {
+  width: 80px;
+  height: 80px;
+}
 
 .volume-progress {
   color: #3ae1ff;
@@ -93,50 +350,5 @@ export default {
   bottom: 18px;
   justify-content: center;
   align-items: center;
-  background-color: #2d2d2d;
-  border-radius: 50%;
-}
-@media (shape: pill-shaped) or (max-width: 106) {
-  .volume {
-    align-items: flex-start;
-  }
-  .volume-bar-container {
-    width: 100%;
-    height: 370px;
-    margin-top: 20px;
-    padding: 10px;
-    justify-content: space-around;
-    flex-direction: column;
-    align-items: center;
-    background-color: #2a2a2a;
-    border-radius: 200px;
-  }
-
-  .action-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 60px;
-  }
-
-  .volume-progress-container {
-    width: 95%;
-    height: 220px;
-  }
-
-  .volume-progress {
-    color: #ff3a3a;
-    stroke-width: 30px;
-    layer-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .cancel-container {
-    position: absolute;
-    width: 70px;
-    height: 70px;
-    justify-content: center;
-    align-items: center;
-    background-color: #2d2d2d;
-    border-radius: 50%;
-  }
 }
 </style>

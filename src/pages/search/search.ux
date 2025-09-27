@@ -5,7 +5,7 @@
 <template>
 	<scroll class="page" scroll-y="true" bounces="true">
         <div class="header">
-    <text class="title">搜索</text>
+    <text class="title">‹搜索</text>
 		<text class="text" @click="changeState">{{ textValue }}_</text>
 		<scroll class="history-scroll" scroll-x="true" if="{{ searchHistory.length > 0 }}" bounces="true">
 			<text for="{{ searchHistory }}" class="history-tag" onclick="() => searchFromHistory($item)">{{ $item }}</text>

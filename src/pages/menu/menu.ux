@@ -1,6 +1,7 @@
 <template>
   <div class="menu-container">
-    <text class="title">主菜单</text>
+    <text class="time-display">{{currentTime}}</text>
+    <text class="title" onclick="back">‹主菜单</text>
     <scroll class="menu-list" bounces="true">
       <div class="menu-item" onclick="goToSearch">
         <text class="item-text">搜索</text>
@@ -29,7 +30,27 @@ import router from "@system.router";
 
 export default {
   private: {
-    likeList: []
+    likeList: [],
+    currentTime: ''
+  },
+
+  onInit() {
+    this.updateTime();
+    // 每分钟更新一次时间
+    setInterval(() => {
+      this.updateTime();
+    }, 1000);
+  },
+
+  updateTime() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    this.currentTime = `${hours}:${minutes}`;
+  },
+
+  back() {
+    router.back();
   },
 
   goToList() {
@@ -58,7 +79,7 @@ export default {
       uri: "/pages/search"
     });
   },
-    // 跳转到“已下载列表”
+    // 跳转到"已下载列表"
     goToDownloadList() {
         router.replace({
             uri: '/pages/list',
@@ -70,14 +91,20 @@ export default {
 
   goToLike() {
     router.replace({
-      uri: "/pages/like"
+      uri: "/pages/list",
+      params: {
+        listType: 'favorites'
+      }
     });
   },
 
   goToSongList() {
     router.replace({
-      uri: "/pages/songlist",
-      params: this.likeList
+      uri: "/pages/list",
+      params: {
+        listType: 'songlist',
+        songlistId: 6658985814
+      }
     });
   },
   goToUser() {
@@ -99,10 +126,17 @@ export default {
 
 .title {
 	font-size: 32px;
-	padding: 10px;
+	padding: 5px;
 	text-align: center;
   font-weight: bold;
 	color: #fff;
+}
+
+.time-display {
+  font-size: 28px;
+  color: #ffffff;
+  padding: 5px;
+  text-align: center;
 }
 
 .menu-list {
@@ -138,6 +172,10 @@ export default {
   .title {
     font-size: 28px;
     margin-top: 20px;
+  }
+  
+  .time-display {
+    font-size: 24px;
   }
   
   .menu-item {

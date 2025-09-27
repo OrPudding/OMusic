@@ -1,10 +1,86 @@
 <script>
+import file from '@system.file';
+
+// 定义常量，确保与页面中的路径一致
+const FILE_PLAY_LIST = 'internal://files/play_list.json';
+
 export default {
+  /**
+   * 应用的 onCreate 生命周期，在应用冷启动时执行。
+   * 在这里，我们异步地调用状态清理函数。
+   */
   onCreate() {
-    console.log('app created')
+    console.info('App onCreate: 应用启动');
+    this.resetDownloadingStatusOnLaunch();
   },
+
   onDestroy() {
-    console.log('app destroyed')
+    console.info('App onDestroy: 应用销毁');
+  },
+
+  /**
+   * @description 在应用启动时，异步重置所有“正在下载”的状态。
+   * 这是为了处理因应用异常退出（如崩溃、被系统杀死）而导致的状态不一致问题。
+   * 此函数完全使用您提供的异步 file API。
+   */
+  resetDownloadingStatusOnLaunch() {
+    console.info('开始检查并重置下载状态...');
+
+    // 1. 异步读取播放列表文件
+    file.readText({
+      uri: FILE_PLAY_LIST,
+      success: (data) => {
+        // 文件读取成功
+        if (!data || !data.text) {
+          console.info('播放列表为空，无需重置。');
+          return;
+        }
+
+        try {
+          let playList = JSON.parse(data.text);
+          let statusChanged = false;
+
+          // 2. 遍历播放列表，查找悬空的 "downloading" 状态
+          playList = playList.map(song => {
+            if (song.downloadStatus === 'downloading') {
+              console.warn(`发现悬空下载任务: ${song.name} (ID: ${song.id})，状态将被重置。`);
+              // 将状态重置为 'failed'，以便用户可以重新下载
+              song.downloadStatus = 'failed';
+              statusChanged = true;
+            }
+            return song;
+          });
+
+          // 3. 如果有状态被修改，则异步将更新后的列表写回文件
+          if (statusChanged) {
+            console.info('正在将重置后的播放列表写回文件...');
+            file.writeText({
+              uri: FILE_PLAY_LIST,
+              text: JSON.stringify(playList, null, 2),
+              success: () => {
+                console.info('下载状态重置完成。');
+              },
+              fail: (errData, code) => {
+                console.error(`写回重置后的播放列表失败，错误码: ${code}`);
+              }
+            });
+          } else {
+            console.info('未发现悬空下载任务，无需重置。');
+          }
+        } catch (e) {
+          console.error('解析播放列表JSON时发生错误:', e);
+        }
+      },
+      fail: (data, code) => {
+        // 文件读取失败，通常是因为文件还不存在（如首次启动），这是正常情况。
+        if (code === 301) { // 301: 文件不存在
+          console.info('播放列表文件不存在，无需重置。');
+        } else {
+          console.error(`读取播放列表文件失败，错误码: ${code}`);
+        }
+      }
+    });
   }
-}
+};
+
 </script>
