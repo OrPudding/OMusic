@@ -157,8 +157,8 @@ export default {
         prompt.showToast({ message: '正在加载歌单...' });
 
         const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
-        const PAGE_LIMIT = 50;
-        const TOTAL_LIMIT = 200;
+        const PAGE_LIMIT = 10;
+        const TOTAL_LIMIT = 50;
         let offset = 0;
         let hasMore = true;
 
