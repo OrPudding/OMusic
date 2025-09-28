@@ -1,9 +1,9 @@
 <template>
-    <div class="list-container">
+    <scroll scroll-y="true" class="list-container" bounces="true">
         <!-- 1. 标题根据 listType 动态变化 -->
         <text class="time-display">{{currentTime}}</text>
         <text class="title" onclick="goBack">‹{{ pageTitle }}</text>
-        <scroll class="list" bounces="true">
+        <div class="list">
             <!-- 2. 循环 songList，并将整个 $item 对象传递给事件处理器 -->
             <div for="{{ songList }}" class="song-item">
                 <text class="item-index">{{$idx + 1}}</text>
@@ -13,9 +13,9 @@
                 </div>
                 <image class="delete-btn" src="/common/icon/cancel.png" onclick="deleteSong($item)"></image>
             </div>
-        </scroll>
+        </div>
         <!-- <text if="{{ listType === 'downloadlist' }}" class="clear-btn" onclick="clearDownloadQueue">清空队列</text> -->
-    </div>
+    </scroll>
 </template>
 <script>
 import router from "@system.router";
@@ -56,22 +56,32 @@ const fileService = {
             if (error.code !== 301) console.error(`[FileService] delete 失败: ${uri}`, error);
             return false;
         }
+    },
+    // 新增：确保目录存在
+    async ensureDirExists(uri) {
+        try {
+            await this._promisify(file.mkdir, { uri });
+        } catch (error) {
+            // 忽略目录已存在的错误
+        }
     }
 };
 
 
 export default {
     protected: {
-        listType: 'playlist', // 可由外部传入: 'playlist', 'downloadlist', 'songlist', 'favorites'
-        songlistId: null,     // 为 'songlist' 类型传入的歌单ID
+        listType: 'playlist',
+        songlistId: null,
     },
 
     private: {
         songList: [],
         pageTitle: "播放列表",
         currentTime: "00:00",
-        isLoading: false, // 防止重复加载
-        // 文件路径常量
+        isLoading: false,
+        // --- **核心修正 1: 新增歌单缓存目录** ---
+        songlistsDir: 'internal://files/songlists/',
+        // ---
         listFileUri: 'internal://files/play_list.json',
         downloadedFileUri: 'internal://files/downloaded_songs.json',
         favoritesFileUri: 'internal://files/favorites.json',
@@ -79,18 +89,19 @@ export default {
         lyricDir: 'internal://files/lyrics/',
     },
 
-    onInit() {
+    async onInit() {
+        // --- **核心修正 2: 确保歌单缓存目录存在** ---
+        await fileService.ensureDirExists(this.songlistsDir);
+        // ---
         this.updatePageTitle();
         this.loadData();
         this.updateTime();
-        // 设置定时器每秒更新时间
         setInterval(() => {
             this.updateTime();
         }, 1000);
     },
 
     onShow() {
-        // 每次页面显示时，如果不在加载中，则重新加载数据以同步状态
         if (!this.isLoading) {
             this.loadData();
         }
@@ -122,7 +133,7 @@ export default {
                 this.loadFavoritesList();
                 break;
             case 'songlist':
-                this.loadSonglist();
+                this.loadSonglistWithCache(); // 调用新的带缓存的方法
                 break;
             case 'playlist':
             default:
@@ -145,70 +156,98 @@ export default {
         this.songList = Object.values(favoriteSongs);
     },
 
-    async loadSonglist() {
+    // --- **核心修正 3: 实现带缓存的歌单加载逻辑** ---
+    async loadSonglistWithCache() {
         if (!this.songlistId) {
             prompt.showToast({ message: '未提供歌单ID' });
             return;
         }
         if (this.isLoading) return;
-
         this.isLoading = true;
-        this.songList = [];
-        prompt.showToast({ message: '正在加载歌单...' });
 
-        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
-        const PAGE_LIMIT = 10;
-        const TOTAL_LIMIT = 50;
-        let offset = 0;
-        let hasMore = true;
+        const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
 
+        // 1. 尝试从缓存加载并立即显示
+        const cachedList = await fileService.readJson(cacheFileUri, null);
+        if (cachedList && cachedList.length > 0) {
+            console.log("从缓存加载歌单:", this.songlistId);
+            this.songList = cachedList;
+        } else {
+            // 如果没有缓存，则显示加载提示
+            prompt.showToast({ message: '正在加载歌单...' });
+        }
+
+        // 2. 异步从网络获取最新数据
         try {
-            while (hasMore && this.songList.length < TOTAL_LIMIT ) {
-                const currentLimit = Math.min(PAGE_LIMIT, TOTAL_LIMIT - this.songList.length);
-                if (currentLimit <= 0) break;
-
-                const url = `${BASE_URL}?id=${this.songlistId}&limit=${currentLimit}&offset=${offset}`;
-                
-                const response = await new Promise((resolve, reject) => {
-                    fetch.fetch({ url, success: resolve, fail: (data, code) => reject({ data, code }) });
-                });
-
-                const songs = response.data?.songs;
-
-                if (songs && songs.length > 0) {
-                    const formattedSongs = songs.map(song => ({
-                        id: song.id,
-                        name: song.name,
-                        artists: song.ar.map(artist => artist.name).join(' / '),
-                    }));
-                    
-                    this.songList = [...this.songList, ...formattedSongs];
-
-                    if (songs.length < currentLimit) {
-                        hasMore = false;
-                    } else {
-                        offset += songs.length;
-                    }
-                } else {
-                    hasMore = false;
+            const newList = await this.fetchSonglistFromNetwork();
+            
+            // 3. 对比并更新
+            // 使用JSON.stringify进行简单的深比较，如果不同则更新UI和缓存
+            if (JSON.stringify(this.songList) !== JSON.stringify(newList)) {
+                console.log("歌单有更新，正在刷新UI并写入缓存。");
+                this.songList = newList;
+                await fileService.writeJson(cacheFileUri, newList);
+                // 如果之前没有缓存，加载成功后给出提示
+                if (!cachedList) {
+                    prompt.showToast({ message: `加载完成，共 ${newList.length} 首` });
                 }
-            }
-
-            if (this.songList.length > 0) {
-                const message = this.songList.length >= TOTAL_LIMIT ? `已加载前${TOTAL_LIMIT}首` : `加载完成，共 ${this.songList.length} 首`;
-                prompt.showToast({ message });
             } else {
-                prompt.showToast({ message: '歌单为空或加载失败' });
+                console.log("歌单无更新。");
             }
-
         } catch (error) {
-            console.error('加载歌单失败:', error);
-            prompt.showToast({ message: `加载失败: ${error.code || '网络错误'}` });
+            console.error('从网络加载歌单失败:', error);
+            // 只有在连缓存都没有的情况下，才提示加载失败
+            if (!cachedList) {
+                prompt.showToast({ message: `加载失败: ${error.code || '网络错误'}` });
+            }
         } finally {
             this.isLoading = false;
         }
     },
 
+    // 将网络请求部分独立成一个函数
+    async fetchSonglistFromNetwork() {
+        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
+        const PAGE_LIMIT = 10;
+        const TOTAL_LIMIT = 50;
+        let offset = 0;
+        let hasMore = true;
+        let allSongs = [];
+
+        while (hasMore && allSongs.length < TOTAL_LIMIT ) {
+            const currentLimit = Math.min(PAGE_LIMIT, TOTAL_LIMIT - allSongs.length);
+            if (currentLimit <= 0) break;
+
+            const url = `${BASE_URL}?id=${this.songlistId}&limit=${currentLimit}&offset=${offset}`;
+            
+            const response = await new Promise((resolve, reject) => {
+                fetch.fetch({ url, success: resolve, fail: (data, code) => reject({ data, code }) });
+            });
+
+            const songs = response.data?.songs;
+
+            if (songs && songs.length > 0) {
+                const formattedSongs = songs.map(song => ({
+                    id: song.id,
+                    name: song.name,
+                    artists: song.ar.map(artist => artist.name).join(' / '),
+                }));
+                allSongs.push(...formattedSongs);
+
+                if (songs.length < currentLimit) {
+                    hasMore = false;
+                } else {
+                    offset += songs.length;
+                }
+            } else {
+                hasMore = false;
+            }
+        }
+        return allSongs;
+    },
+    // --- 修正结束 ---
+
+    // (deleteSong, play, goBack 等其他函数保持不变)
     deleteSong(songToDelete) {
         switch (this.listType) {
             case 'downloadlist':
@@ -279,7 +318,6 @@ export default {
     },
 
     async play(songId) {
-        // 任何列表的播放都会覆盖当前的播放列表
         await this.savePlayList();
         
         router.replace({

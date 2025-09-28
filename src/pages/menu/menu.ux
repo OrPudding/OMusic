@@ -1,7 +1,9 @@
 <template>
   <div class="menu-container">
+    <div class="header" onclick="back">
     <text class="time-display">{{currentTime}}</text>
-    <text class="title" onclick="back">‹主菜单</text>
+    <text class="title">‹主菜单</text>
+    </div>
     <scroll class="menu-list" bounces="true">
       <div class="menu-item" onclick="goToSearch">
         <text class="item-text">搜索</text>
@@ -34,6 +36,11 @@ export default {
     currentTime: ''
   },
 
+onBackPress() {
+    this.back();
+    return true;
+  },
+
   onInit() {
     this.updateTime();
     // 每分钟更新一次时间
@@ -50,11 +57,11 @@ export default {
   },
 
   back() {
-    router.back();
+    router.replace({ uri: '/pages/player' });
   },
 
   goToList() {
-    router.replace({
+    router.push({
       uri: "/pages/list",
       params: {
         listType: 'playlist'
@@ -63,25 +70,25 @@ export default {
   },
 
   goToPlayer() {
-    router.replace({
+    router.push({
       uri: "/pages/player"
     });
   },
 
   goToVolume() {
-    router.replace({
+    router.push({
       uri: "/pages/volume"
     });
   },
 
   goToSearch() {
-    router.replace({
+    router.push({
       uri: "/pages/search"
     });
   },
     // 跳转到"已下载列表"
     goToDownloadList() {
-        router.replace({
+        router.push({
             uri: '/pages/list',
             params: {
                 listType: 'downloadlist'
@@ -90,7 +97,7 @@ export default {
     },
 
   goToLike() {
-    router.replace({
+    router.push({
       uri: "/pages/list",
       params: {
         listType: 'favorites'
@@ -99,7 +106,7 @@ export default {
   },
 
   goToSongList() {
-    router.replace({
+    router.push({
       uri: "/pages/list",
       params: {
         listType: 'songlist',
@@ -108,7 +115,7 @@ export default {
     });
   },
   goToUser() {
-    router.replace({
+    router.push({
       uri: "/pages/user"
     });
   },
@@ -122,6 +129,12 @@ export default {
   flex-direction: column;
   align-items: center;
   background-color: black;
+}
+.header {
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .title {
@@ -158,33 +171,5 @@ export default {
 .item-text {
   font-size: 32px;
   color: #ffffff;
-}
-
-@media (shape: pill-shaped) or (max-width: 106) {
-  .menu-container {
-    padding: 10px;
-  }
-  
-  .menu-list {
-    width: 100%;
-  }
-  
-  .title {
-    font-size: 28px;
-    margin-top: 20px;
-  }
-  
-  .time-display {
-    font-size: 24px;
-  }
-  
-  .menu-item {
-    height: 60px;
-    margin-bottom: 10px;
-  }
-  
-  .item-text {
-    font-size: 24px;
-  }
 }
 </style>

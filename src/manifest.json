@@ -76,6 +76,18 @@
       },
       "pages/user": {
         "component": "user"
+      },
+      "pages/setting": {
+        "component": "setting"
+      },
+      "pages/login": {
+        "component": "login"
+      },
+      "pages/about": {
+        "component": "about"
+      },
+      "pages/license": {
+        "component": "license"
       }
     }
   }
