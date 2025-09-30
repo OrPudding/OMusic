@@ -161,6 +161,7 @@ export default {
 
 .item-text {
   font-size: 32px;
+  font-weight: bold;
   color: #ffffff;
 }
 </style>

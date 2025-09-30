@@ -102,7 +102,7 @@
         width: 360px;
         flex-direction: column; /* 改为垂直排列，更适合此页面 */
         align-items: center;
-        margin-bottom: 60px;
+        padding-bottom: 60px;
     }
 
     .menu-item {
@@ -132,48 +132,30 @@
 </style>
 <script>
 import router from '@system.router';
-import prompt from '@system.prompt';
-import file from '@system.file'; // 引入 file 模块
+import file from '@system.file';
 
-const API_BASE = 'https://163api.qijieya.cn';
-const DEFAULT_AVATAR = '/common/icon/default_avatar.png';
-const PROFILE_FILE_URI = 'internal://files/user_profile.json'; // 定义用户信息文件路径
+const PROFILE_FILE_URI = 'internal://files/user_profile.json';
+const DEFAULT_AVATAR = '/common/icon/user.png'; // 默认头像路径
 
 export default {
     private: {
-        isLoggedIn: false,
         nickname: '未登录',
-        userId: '点击头像登录',
-        avatarUrl: DEFAULT_AVATAR,
+        userId: 'ID: ------',
+        avatarUrl: 'internal://files/avatars/user_avatar.png',
+        currentTime: "00:00",
     },
 
-    async onShow( ) {
-        // 1. 优先尝试从本地文件加载用户信息
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri: PROFILE_FILE_URI, success: resolve, fail: reject }));
-            const profile = JSON.parse(data.text);
-            if (profile && profile.userId) {
-                console.log("从本地文件加载用户信息成功。");
-                this.isLoggedIn = true;
-                this.nickname = profile.nickname;
-                this.userId = `ID: ${profile.userId}`;
-                this.avatarUrl = profile.avatarUrl || DEFAULT_AVATAR;
-                return; // 加载成功，直接返回，不再执行后续网络请求
-            }
-        } catch (e) {
-            // 文件不存在或解析失败，忽略错误，继续执行后续逻辑
-            console.log("本地用户信息不存在，将尝试通过网络获取。");
-        }
-
-        // 2. 如果本地没有，再通过网络检查Cookie登录状态
-        this.checkLoginStatusWithCookie();
-    },
-
-    onInit( ) {
+    onInit() {
+        this.loadUserProfile();
         this.updateTime();
         setInterval(() => {
             this.updateTime();
         }, 1000);
+    },
+
+    onShow() {
+        // 每次返回页面时都重新加载，以反映登录后的变化
+        this.loadUserProfile();
     },
 
     updateTime() {
@@ -183,54 +165,60 @@ export default {
         this.currentTime = `${hours}:${minutes}`;
     },
 
-    async checkLoginStatus() {
-        const request = this.$app.$def.requestService;
-        if (!request) {
-            console.error("无法获取全局 requestService");
-            return;
-        }
-
-        try {
-            const url = `${API_BASE}/login/status?timestamp=${Date.now()}`;
-            const response = await request.fetch({ url });
-            const profile = response.data?.data?.profile;
-
-            if (profile) {
-                this.isLoggedIn = true;
-                this.nickname = profile.nickname;
-                this.userId = `ID: ${profile.userId}`;
-                this.avatarUrl = profile.avatarUrl || DEFAULT_AVATAR;
-            } else {
-                this.isLoggedIn = false;
-                this.nickname = '未登录';
-                this.userId = '点击头像登录';
-                this.avatarUrl = DEFAULT_AVATAR;
+    /**
+     * **核心修改**: 加载用户配置文件的逻辑
+     */
+    loadUserProfile() {
+        file.readText({
+            uri: PROFILE_FILE_URI,
+            success: (data) => {
+                try {
+                    const profile = JSON.parse(data.text);
+                    if (profile && profile.userId) {
+                        this.nickname = profile.nickname;
+                        this.userId = `ID: ${profile.userId}`;
+                        // **关键**: 直接使用本地文件路径，如果不存在则使用默认头像
+                        this.avatarUrl = profile.avatarUrl || DEFAULT_AVATAR;
+                    } else {
+                        this.resetToDefault();
+                    }
+                } catch (e) {
+                    this.resetToDefault();
+                }
+            },
+            fail: () => {
+                // 文件不存在，显示未登录状态
+                this.resetToDefault();
             }
-        } catch (error) {
-            console.error("检查登录状态失败:", error);
-            this.isLoggedIn = false;
-            this.nickname = '状态获取失败';
-            this.userId = '请检查网络';
-            this.avatarUrl = DEFAULT_AVATAR;
-        }
+        });
+    },
+
+    /**
+     * 恢复到未登录的默认状态
+     */
+    resetToDefault() {
+        this.nickname = '未登录';
+        this.userId = 'ID: ------';
+        this.avatarUrl = DEFAULT_AVATAR;
     },
 
     handleProfileClick() {
-        if (!this.isLoggedIn) {
+        if (this.userId === 'ID: ------') {
             router.push({ uri: '/pages/login' });
         } else {
             prompt.showToast({ message: `已登录用户: ${this.nickname}` });
         }
     },
 
+    goToLogin() {
+        router.push({ uri: '/pages/login' });
+    },
     goToSettings() {
         router.push({ uri: '/pages/settings' });
     },
-
     goToAbout() {
         router.push({ uri: '/pages/about' });
     },
-
     goBack() {
         router.back();
     }

@@ -28,57 +28,17 @@ import router from "@system.router";
 import audio from "@system.audio";
 import file from "@system.file";
 import prompt from "@system.prompt";
-import fetch from "@system.fetch";
 import request from "@system.request";
+import fetch from "@system.fetch";
 
 // --- 1. 常量与配置 ---
 const CONSTANTS = {
-    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=128000&id=',
-    API_LYRIC_URL: 'https://163api.qijieya.cn/lyric?id=',
+    API_SONG_URL_BASE: 'https://163api.qijieya.cn/song/url', // **修改**: 基础URL
+    API_LYRIC_URL_BASE: 'https://163api.qijieya.cn/lyric',   // **修改**: 基础URL
     DIR_MUSIC: 'internal://files/music/',
     DIR_LYRICS: 'internal://files/lyrics/',
     FILE_FAVORITES: 'internal://files/favorites.json',
     FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
-};
-
-// --- 2. 文件服务封装 (无变化 ) ---
-const fileService = {
-    async readJson(uri, defaultValue = null) {
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri, success: resolve, fail: reject }));
-            return JSON.parse(data.text);
-        } catch (e) {
-            return defaultValue;
-        }
-    },
-    async writeJson(uri, data) {
-        try {
-            await new Promise((resolve, reject) => file.writeText({ uri, text: JSON.stringify(data, null, 2), success: resolve, fail: reject }));
-            return true;
-        } catch (e) {
-            console.error(`[FileService] 写入JSON失败: ${uri}`, e);
-            return false;
-        }
-    },
-    async move(srcUri, dstUri) {
-        try {
-            await new Promise((resolve, reject) => file.move({ srcUri, dstUri, success: resolve, fail: reject }));
-            return true;
-        } catch (e) {
-            console.error(`[FileService] 移动文件失败: ${srcUri} -> ${dstUri}`, e);
-            return false;
-        }
-    },
-    async delete(uri) {
-        try {
-            await new Promise((resolve) => file.delete({ uri, success: resolve, fail: resolve }));
-        } catch (e) { /* 忽略错误 */ }
-    },
-    async ensureDirExists(uri) {
-        try {
-            await new Promise((resolve) => file.mkdir({ uri, success: resolve, fail: resolve }));
-        } catch (e) { /* 忽略错误 */ }
-    }
 };
 
 export default {
@@ -93,7 +53,7 @@ export default {
     },
   
     computed: {
-        downloadIcon() {
+        downloadIcon( ) {
             const icons = {
                 downloading: '/common/icon/downloading.png',
                 downloaded: '/common/icon/downloaded.png',
@@ -110,63 +70,46 @@ export default {
         currentSong: {}
     },
 
-    async onInit() {
+    onInit() {
         this.volume = audio.volume * 100;
-
-        // --- **关键修正 1: 健壮地解析参数** ---
-        // 循环解析，直到它成为一个对象，处理多重 stringify 的情况
         let songData = this.currentSong;
         while (typeof songData === 'string') {
-            try {
-                songData = JSON.parse(songData);
-            } catch (e) {
-                console.error("[Volume] 解析歌曲数据失败", e);
+            try { songData = JSON.parse(songData); } catch (e) {
                 prompt.showToast({ message: '无法加载歌曲信息' });
                 router.back();
                 return;
             }
         }
         this.currentSong = songData;
-        // --- 修正结束 ---
-
         if (!this.currentSong || !this.currentSong.id) {
             prompt.showToast({ message: '歌曲信息无效' });
             router.back();
             return;
         }
-
-        await Promise.all([
-            fileService.ensureDirExists(CONSTANTS.DIR_MUSIC),
-            fileService.ensureDirExists(CONSTANTS.DIR_LYRICS),
-            this.loadInitialState(),
-        ]);
+        file.mkdir({ uri: CONSTANTS.DIR_MUSIC, complete: () => {
+            file.mkdir({ uri: CONSTANTS.DIR_LYRICS, complete: () => {
+                this.loadInitialState();
+            }});
+        }});
     },
 
-    async loadInitialState() {
-        const [favorites, downloadedSongs] = await Promise.all([
-            fileService.readJson(CONSTANTS.FILE_FAVORITES, {}),
-            fileService.readJson(CONSTANTS.FILE_DOWNLOADED_SONGS, {}),
-        ]);
-        
-        this.favorites = favorites;
-        this.downloadedSongs = downloadedSongs;
-
-        this.updateFavoriteStatus();
-        this.updateDownloadStatus();
+    loadInitialState() {
+        const readFavorites = new Promise(resolve => file.readText({ uri: CONSTANTS.FILE_FAVORITES, success: data => resolve(data.text), fail: () => resolve('{}') }));
+        const readDownloaded = new Promise(resolve => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: data => resolve(data.text), fail: () => resolve('{}') }));
+        Promise.all([readFavorites, readDownloaded]).then(([favoritesText, downloadedText]) => {
+            try { this.favorites = JSON.parse(favoritesText); } catch (e) { this.favorites = {}; }
+            try { this.downloadedSongs = JSON.parse(downloadedText); } catch (e) { this.downloadedSongs = {}; }
+            this.updateFavoriteStatus();
+            this.updateDownloadStatus();
+        });
     },
 
     updateFavoriteStatus() {
-        if (this.currentSong) {
-            this.isFavorited = !!this.favorites[this.currentSong.id];
-        }
+        if (this.currentSong) this.isFavorited = !!this.favorites[this.currentSong.id];
     },
 
     updateDownloadStatus() {
-        if (this.currentSong) {
-            this.downloadState = this.downloadedSongs[this.currentSong.id] 
-                ? 'downloaded' 
-                : 'not_downloaded';
-        }
+        if (this.currentSong) this.downloadState = this.downloadedSongs[this.currentSong.id] ? 'downloaded' : 'not_downloaded';
     },
 
     changeVolume(direction) {
@@ -175,10 +118,9 @@ export default {
         audio.volume = this.volume / 100;
     },
 
-    async toggleFavorite() {
+    toggleFavorite() {
         if (!this.currentSong) return;
         const { id } = this.currentSong;
-
         if (this.isFavorited) {
             delete this.favorites[id];
             prompt.showToast({ message: '已取消收藏' });
@@ -187,8 +129,7 @@ export default {
             prompt.showToast({ message: '已收藏' });
         }
         this.isFavorited = !this.isFavorited;
-        
-        await fileService.writeJson(CONSTANTS.FILE_FAVORITES, this.favorites);
+        file.writeText({ uri: CONSTANTS.FILE_FAVORITES, text: JSON.stringify(this.favorites, null, 2) });
     },
 
     goBack() {
@@ -196,106 +137,126 @@ export default {
     },
 
     handleDownloadClick() {
-        if (!this.currentSong) {
-            prompt.showToast({ message: '歌曲信息无效' });
-            return;
-        }
-        if (this.downloadState === 'downloaded') {
-            prompt.showToast({ message: '歌曲已下载' });
-            return;
-        }
-        if (this.isDownloadingLocked) {
-            prompt.showToast({ message: '已有任务在下载中' });
-            return;
-        }
+        if (!this.currentSong) { prompt.showToast({ message: '歌曲信息无效' }); return; }
+        if (this.downloadState === 'downloaded') { prompt.showToast({ message: '歌曲已下载' }); return; }
+        if (this.isDownloadingLocked) { prompt.showToast({ message: '已有任务在下载中' }); return; }
         this.executeDownload();
     },
 
-    async executeDownload() {
+    executeDownload() {
         this.isDownloadingLocked = true;
         this.downloadState = 'downloading';
         const song = this.currentSong;
         prompt.showToast({ message: `开始下载: ${song.name}` });
-
         const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${song.id}.json`;
         const songFilePath = `${CONSTANTS.DIR_MUSIC}${song.id}.mp3`;
-
-        try {
-            const [songInfo, lyricData] = await this.fetchSongAndLyric(song.id);
-            if (lyricData) {
-                await fileService.writeJson(lyricFilePath, lyricData);
-            }
-            const tempFileUri = await this.downloadFile(songInfo.url, `${song.id}.mp3`);
-            await fileService.move(tempFileUri, songFilePath);
-
-            this.downloadedSongs[song.id] = {
-                ...song,
-                localUri: songFilePath,
-                localLyricUri: lyricData ? lyricFilePath : null,
-                duration: songInfo.duration,
-            };
-            await fileService.writeJson(CONSTANTS.FILE_DOWNLOADED_SONGS, this.downloadedSongs);
-
-            this.downloadState = 'downloaded';
-            prompt.showToast({ message: `${song.name} 下载成功` });
-
-        } catch (error) {
-            prompt.showToast({ message: `下载失败: ${error.message}` });
-            this.downloadState = 'not_downloaded';
-            await fileService.delete(lyricFilePath);
-        } finally {
-            this.isDownloadingLocked = false;
-        }
-    },
-
-    async fetchSongAndLyric(songId) {
-        // --- **关键修正 2: 正确封装 fetch 的 Promise** ---
-        const fetchPromise = (url) => {
-            return new Promise((resolve, reject) => {
-                fetch.fetch({
-                    url,
-                    success: (data) => resolve(data), // 将 resolve 作为 success 回调
-                    fail: (data, code) => reject({data, code}) // 将 reject 作为 fail 回调
-                });
-            });
-        };
-
-        const [songRes, lyricRes] = await Promise.all([
-            fetchPromise(`${CONSTANTS.API_SONG_URL}${songId}`),
-            fetchPromise(`${CONSTANTS.API_LYRIC_URL}${songId}`).catch(() => null) // 歌词允许失败
-        ]);
-        // --- 修正结束 ---
-
-        const songData = songRes.data?.data?.[0];
-        if (!songData?.url) {
-            throw new Error('无法获取歌曲链接');
-        }
-
-        return [
-            { url: songData.url, duration: Math.floor(songData.time / 1000) },
-            lyricRes ? lyricRes.data : null
-        ];
-    },
-
-    downloadFile(url, filename) {
-        return new Promise((resolve, reject) => {
-            request.download({
-                url,
-                filename,
-                success: (task) => {
-                    request.onDownloadComplete({
-                        token: task.token,
-                        success: (data) => resolve(data.uri),
-                        fail: (data, code) => reject(new Error(`任务执行失败, code=${code}`)),
+        this.fetchSongAndLyric(song.id, (songInfo, lyricData) => {
+            if (!songInfo) { this.handleDownloadError('无法获取歌曲信息'); return; }
+            this.saveLyricFile(lyricFilePath, lyricData, () => {
+                this.downloadSongFile(songInfo.url, `${song.id}.mp3`, (tempFileUri) => {
+                    if (!tempFileUri) { this.handleDownloadError('歌曲下载失败'); file.delete({ uri: lyricFilePath }); return; }
+                    this.moveSongFile(tempFileUri, songFilePath, (success) => {
+                        if (!success) { this.handleDownloadError('文件处理失败'); file.delete({ uri: lyricFilePath }); return; }
+                        const downloadedInfo = { ...song, localUri: songFilePath, localLyricUri: lyricData ? lyricFilePath : null, duration: songInfo.duration };
+                        this.downloadedSongs[song.id] = downloadedInfo;
+                        file.writeText({
+                            uri: CONSTANTS.FILE_DOWNLOADED_SONGS,
+                            text: JSON.stringify(this.downloadedSongs, null, 2),
+                            complete: () => {
+                                this.downloadState = 'downloaded';
+                                this.isDownloadingLocked = false;
+                                prompt.showToast({ message: `${song.name} 下载成功` });
+                            }
+                        });
                     });
-                },
-                fail: (data, code) => reject(new Error(`创建任务失败, code=${code}`)),
+                });
             });
         });
     },
+
+    /**
+     * **核心测试方法**: 直接在 URL 中拼接 Cookie
+     */
+    fetchSongAndLyric(songId, callback) {
+        // 1. 这是你提供的 Cookie
+        const myCookie = "MUSIC_U=00B80A65849DDFBF4D402F6A25149E4333730205542048A9D695203044846659255FEAE40F658D5EC10C1DE5246779699869DA46B102D7DEBA3237C308F8A8AE9AB4964CF63F3CCF211056417882A762BAD1ACFA900E4478E9C03380851A29453168D2DCAD0E8F67D26F4174F388960CD741FC349952868E8CEEDB58F3B26BD917E316239723046D5A37B25BAB8DFD53B459CF68100DE7391AE8DBE46A61B7A3EA7ED0634804BC5A88A9FDFF3641D43DB98A2DF4C1FD5F2E444CC221FC14025C6B8C3496CA22E875F16646EF92E05E1B91D68D0921D9C4ACD531EBB129932A6C90939501DB291F518E540F33A0DC64E47875E7992C8B0FF866536E00F6347502CD7BA0CABFADD4EE7F4A11A9A8181F1D4BE5664485CFAD7BC9A8B02C8ED47355C690EC88554646D0AD61E668701A1C5FD7D189B9F7A62F6CC392C45FC09657CAB613281BB2A74CD4AD52EF85E245A3953310B5EF8F7217630F59FA1E4CCCD80492";
+        
+        // 2. 对 Cookie 进行 URL 编码
+        const encodedCookie = encodeURIComponent(myCookie);
+
+        // 3. 构造请求 URL
+        const songUrl = `${CONSTANTS.API_SONG_URL_BASE}?br=320000&id=${songId}&cookie=${encodedCookie}`;
+        const lyricUrl = `${CONSTANTS.API_LYRIC_URL_BASE}?id=${songId}&cookie=${encodedCookie}`;
+
+        console.log("正在使用URL拼接Cookie发起请求...");
+        prompt.showToast({ message: "正在使用Cookie加载..." });
+
+        const fetchPromise = (url) => new Promise((resolve, reject) => {
+            fetch.fetch({ url, responseType: 'text', success: resolve, fail: reject });
+        });
+
+        Promise.all([
+            fetchPromise(songUrl),
+            fetchPromise(lyricUrl).catch(() => null)
+        ]).then(([songRes, lyricRes]) => {
+            const songData = JSON.parse(songRes.data)?.data?.[0];
+            if (songData && songData.url) {
+                if (songData.freeTrialInfo === null) {
+                    prompt.showToast({ message: "Cookie有效！获取到完整音源！" });
+                } else {
+                    prompt.showToast({ message: "Cookie可能无效，获取到试听音源。" });
+                }
+                const songInfo = {
+                    url: songData.url,
+                    duration: Math.floor(songData.time / 1000)
+                };
+                callback(songInfo, lyricRes ? JSON.parse(lyricRes.data) : null);
+            } else {
+                console.error("解析歌曲URL失败:", songRes.data);
+                callback(null, null);
+            }
+        }).catch(error => {
+            console.error("fetchSongAndLyric 失败:", error);
+            callback(null, null);
+        });
+    },
+
+    saveLyricFile(path, data, callback) {
+        if (!data) { callback(); return; }
+        file.writeText({ uri: path, text: JSON.stringify(data, null, 2), complete: callback });
+    },
+
+    downloadSongFile(url, filename, callback) {
+        request.download({
+            url,
+            filename,
+            success: (task) => {
+                request.onDownloadComplete({
+                    token: task.token,
+                    success: (data) => callback(data.uri),
+                    fail: () => callback(null),
+                });
+            },
+            fail: () => callback(null),
+        });
+    },
+
+    moveSongFile(srcUri, dstUri, callback) {
+        file.move({
+            srcUri,
+            dstUri,
+            success: () => callback(true),
+            fail: () => callback(false)
+        });
+    },
+
+    handleDownloadError(message) {
+        prompt.showToast({ message });
+        this.downloadState = 'not_downloaded';
+        this.isDownloadingLocked = false;
+    },
 };
 </script>
-
 
 <style>
 .volume {

@@ -19,8 +19,13 @@
       <div class="content-list">
           <!-- 开发人员信息 -->
           <div class="content-item">
-              <text class="item-label">参与开发</text>
-              <text class="item-value">OrPudding</text>
+            <text class="item-label">参与开发</text>
+            <text class="item-value">OrPudding</text>
+          </div>
+          <!-- 协助开发 -->
+          <div class="content-item">
+            <text class="item-label">协助开发</text>
+            <text class="item-value">Manus AI</text>
           </div>
           <!-- 开源许可，可点击 -->
           <div class="content-item" onclick="goToLicense">
@@ -103,6 +108,7 @@
         width: 360px;
         flex-direction: column;
         align-items: center;
+padding-bottom: 80px;
     }
 
     .content-item {
@@ -114,6 +120,7 @@
         align-items: center;
         padding: 0 30px;
         justify-content: space-between; /* 两端对齐 */
+        flex-wrap: wrap;
     }
 
     .item-label {
