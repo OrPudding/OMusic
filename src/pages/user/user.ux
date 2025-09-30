@@ -75,7 +75,6 @@
         width: 100px;
         height: 100px;
         border-radius: 50px; /* 圆形头像 */
-        border: 2px solid rgba(255, 255, 255, 0.3);
         background-color: #333;
     }
 
@@ -134,9 +133,11 @@
 <script>
 import router from '@system.router';
 import prompt from '@system.prompt';
+import file from '@system.file'; // 引入 file 模块
 
 const API_BASE = 'https://163api.qijieya.cn';
-const DEFAULT_AVATAR = '/common/icon/default_avatar.png'; // 确保此路径有默认头像图片
+const DEFAULT_AVATAR = '/common/icon/default_avatar.png';
+const PROFILE_FILE_URI = 'internal://files/user_profile.json'; // 定义用户信息文件路径
 
 export default {
     private: {
@@ -144,7 +145,28 @@ export default {
         nickname: '未登录',
         userId: '点击头像登录',
         avatarUrl: DEFAULT_AVATAR,
-        currentTime: '00:00', // 添加 currentTime
+    },
+
+    async onShow( ) {
+        // 1. 优先尝试从本地文件加载用户信息
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: PROFILE_FILE_URI, success: resolve, fail: reject }));
+            const profile = JSON.parse(data.text);
+            if (profile && profile.userId) {
+                console.log("从本地文件加载用户信息成功。");
+                this.isLoggedIn = true;
+                this.nickname = profile.nickname;
+                this.userId = `ID: ${profile.userId}`;
+                this.avatarUrl = profile.avatarUrl || DEFAULT_AVATAR;
+                return; // 加载成功，直接返回，不再执行后续网络请求
+            }
+        } catch (e) {
+            // 文件不存在或解析失败，忽略错误，继续执行后续逻辑
+            console.log("本地用户信息不存在，将尝试通过网络获取。");
+        }
+
+        // 2. 如果本地没有，再通过网络检查Cookie登录状态
+        this.checkLoginStatusWithCookie();
     },
 
     onInit( ) {
@@ -152,10 +174,6 @@ export default {
         setInterval(() => {
             this.updateTime();
         }, 1000);
-    },
-
-    onShow() {
-        this.checkLoginStatus();
     },
 
     updateTime() {
@@ -214,7 +232,7 @@ export default {
     },
 
     goBack() {
-        router.replace({ uri: '/pages/menu' });
+        router.back();
     }
 };
 </script>

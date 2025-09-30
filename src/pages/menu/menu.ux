@@ -36,11 +36,6 @@ export default {
     currentTime: ''
   },
 
-onBackPress() {
-    this.back();
-    return true;
-  },
-
   onInit() {
     this.updateTime();
     // 每分钟更新一次时间
@@ -57,7 +52,7 @@ onBackPress() {
   },
 
   back() {
-    router.replace({ uri: '/pages/player' });
+    router.back();
   },
 
   goToList() {
@@ -107,11 +102,7 @@ onBackPress() {
 
   goToSongList() {
     router.push({
-      uri: "/pages/list",
-      params: {
-        listType: 'songlist',
-        songlistId: 6658985814
-      }
+      uri: "/pages/songlist_list",
     });
   },
   goToUser() {

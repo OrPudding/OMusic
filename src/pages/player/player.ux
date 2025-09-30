@@ -61,84 +61,78 @@ import file from "@system.file";
 import prompt from '@system.prompt';
 
 // --- 1. 常量定义 ---
-// 将硬编码的路径和URL提取为常量，便于维护
 const CONSTANTS = {
-    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=64000&id=',
+    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=320000&id=',
     API_LYRIC_URL: 'https://163api.qijieya.cn/lyric?id=',
     DIR_MUSIC: 'internal://files/music/',
     DIR_LYRICS: 'internal://files/lyrics/',
     FILE_PLAY_LIST: 'internal://files/play_list.json',
     FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
+    SETTINGS_FILE_URI: 'internal://files/settings.json',
+    COOKIE_FILE_URI: 'internal://files/cookie.txt',
 };
 
 export default {
     private: {
-        // --- 2. 状态管理优化 ---
-        // 将播放器核心状态聚合管理
-        playerState: {
-            isPlaying: false,
-            playDuration: 0,
-            currentLyricIndex: 0,
-            lyricType: 'chinese', // 'chinese', 'english', 'japanese'
-        },
+        playerState: { isPlaying: false, playDuration: 0, currentLyricIndex: 0, lyricType: 'chinese' },
         currSong: null,
         lyrics: [],
         expend: false,
         downloadedSongs: {},
+        settings: { lyrics: { japaneseMode: 'translation', englishMode: 'translation' } },
+        cookie: null,
     },
 
     protected: {
         playList: [],
         currentIndex: 0,
         songId: null,
-        action: null,
     },
 
-    // --- 3. 计算属性 (Computed Properties ) ---
-    // 将模板中的复杂逻辑移到此处，使模板更干净
     computed: {
-        // 歌曲名，处理 currSong 为 null 的情况
-        songName() {
+        songName( ) {
             return this.currSong ? this.currSong.name : "未知歌曲";
         },
-        // 歌手名
         songArtists() {
             return this.currSong ? this.currSong.artists : "未知艺术家";
         },
-        // 播放/暂停按钮的图标
         playButtonIcon() {
             return this.playerState.isPlaying ? '/common/icon/pause.png' : '/common/icon/play.png';
         },
-        // 播放进度文本
-progressText() {
-    const duration = this.currSong && this.currSong.duration ? this.currSong.duration : 0;
-    return `${this.second2time(this.playerState.playDuration)}/${this.second2time(duration)}`;
-},
-
-        // 动态计算要显示的歌词行，极大简化模板
+        progressText() {
+            const duration = this.currSong?.duration || 0;
+            return `${this.second2time(this.playerState.playDuration)}/${this.second2time(duration)}`;
+        },
         visibleLyrics() {
             if (!this.lyrics || this.lyrics.length === 0) {
                 return [{ text: this.expend ? '暂无歌词' : '', className: 'lyric-line current-lyric' }];
             }
-
             const lines = [];
             const offsets = this.expend ? [-2, -1, 0, 1, 2, 3, 4] : [-1, 0, 1];
-
             for (const offset of offsets) {
                 const index = this.playerState.currentLyricIndex + offset;
                 if (index >= 0 && index < this.lyrics.length) {
-                    const line = this.lyrics[index];
+                    const lineData = this.lyrics[index];
                     const isCurrent = offset === 0;
-
-                    // 主歌词
                     lines.push({
-                        text: line.original || line.text || '',
+                        text: lineData.original || lineData.text || '',
                         className: `lyric-line ${isCurrent ? 'current-lyric' : 'secondary-lyric'}`
                     });
-
-                    // 如果是当前行，且有翻译，则添加翻译行
-                    if (isCurrent && this.playerState.lyricType !== 'chinese' && line.translation) {
-                        lines.push({ text: line.translation, className: 'lyric-line extra-lyric' });
+                    if (isCurrent) {
+                        let extraText = '';
+                        if (this.playerState.lyricType === 'japanese') {
+                            switch (this.settings.lyrics.japaneseMode) {
+                                case 'translation': extraText = lineData.translation || ''; break;
+                                case 'romaji': extraText = lineData.romaji || ''; break;
+                            }
+                        } else if (this.playerState.lyricType === 'english') {
+                            if (this.settings.lyrics.englishMode === 'translation') {
+                                extraText = lineData.translation || '';
+                            }
+                        }
+                        if (extraText) {
+                            lines.push({ text: extraText, className: 'lyric-line extra-lyric' });
+                        }
                     }
                 }
             }
@@ -146,70 +140,79 @@ progressText() {
         }
     },
 
-
-    // =================================================================
-    // 生命周期函数 (Lifecycle Hooks)
-    // =================================================================
- onInit() {
-    // 处理通过路由传递的参数
-    if (this.playList && typeof this.playList === 'string') {
-        try {
-            this.playList = JSON.parse(this.playList);
-        } catch (e) {
-            console.error('解析播放列表失败:', e);
-            this.playList = [];
+    async onInit() {
+        if (this.playList && typeof this.playList === 'string') {
+            try { this.playList = JSON.parse(this.playList); } catch (e) { this.playList = []; }
         }
-    }
-    
-    this.loadListFromFile();
-    this.loadDownloadedSongs();
-    this.bindAudioEvents();
-},
-
-
-onReady() {
-    if (!this.playList || this.playList.length === 0) {
-        prompt.showToast({ message: '播放列表为空' });
-        return;
-    }
-    
-    let startIndex = 0;
-    // 如果传入了songId，则查找对应歌曲在列表中的位置
-    if (this.songId) {
-        const index = this.playList.findIndex(item => item && item.id == this.songId);
-        if (index !== -1) {
-            startIndex = index;
-        } else {
-            prompt.showToast({ message: '找不到指定歌曲，已为您播放第一首' });
+        
+        await this.loadSettings();
+        await this.loadCookie();
+        
+        if (!this.playList || this.playList.length === 0) {
+            await this.loadListFromFile();
         }
-    }
-    // 如果没有传入songId，则默认从第一首开始播放（startIndex = 0）
-    
-    this.currentIndex = startIndex;
-    this.playCurrent();
-},
-
-
-
-    
-    onShow() {
-        this.loadListFromFile();
-        this.loadDownloadedSongs();
+        
+        await this.loadDownloadedSongs();
+        
+        this.bindAudioEvents();
     },
 
-    // =================================================================
-    // 核心播放控制 (Core Playback Control)
-    // =================================================================
+    onReady() {
+        if (!this.playList || this.playList.length === 0) {
+            prompt.showToast({ message: '播放列表为空' });
+            return;
+        }
+        let startIndex = 0;
+        if (this.songId) {
+            const index = this.playList.findIndex(item => item && item.id == this.songId);
+            if (index !== -1) {
+                startIndex = index;
+            } else {
+                prompt.showToast({ message: '找不到指定歌曲，已为您播放第一首' });
+            }
+        }
+        this.currentIndex = startIndex;
+        this.playCurrent();
+    },
+    
+    async onShow() {
+        await this.loadSettings();
+        await this.loadCookie();
+        await this.loadListFromFile();
+        await this.loadDownloadedSongs();
+    },
+
+    async loadSettings() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.SETTINGS_FILE_URI, success: resolve, fail: reject }));
+            const loadedSettings = JSON.parse(data.text);
+            this.settings = { ...this.settings, ...loadedSettings, lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) } };
+        } catch (e) {
+            console.log("无法加载播放器设置，使用默认值。");
+        }
+    },
+
+    async loadCookie() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.COOKIE_FILE_URI, success: resolve, fail: reject }));
+            this.cookie = (data && data.text) ? data.text : null;
+        } catch (e) {
+            this.cookie = null;
+        }
+    },
+
     playCurrent() {
         if (!this.playList || this.playList.length === 0) {
             this.resetPlayer();
             return;
         }
-
         const song = this.playList[this.currentIndex];
+        if (!song) {
+            this.handlePlaybackError("无效的歌曲数据");
+            return;
+        }
         const downloadedInfo = this.downloadedSongs[song.id];
-
-        if (downloadedInfo && downloadedInfo.localUri) {
+        if (downloadedInfo?.localUri) {
             this.playLocal(song, downloadedInfo);
         } else {
             this.playOnline(song);
@@ -230,36 +233,38 @@ onReady() {
         });
     },
 
-    playOnline(song) {
-        fetch.fetch({
-            url: `${CONSTANTS.API_SONG_URL}${song.id}`,
-            success: (res) => {
-                const songData = res.data?.data?.[0];
-                if (songData?.url) {
-                    const songInfo = {
-                        ...song,
-                        playUrl: songData.url,
-                        duration: Math.floor(songData.time / 1000)
-                    };
-                    this.startPlayback(songInfo, songData.url);
-                    this.fetchLyric(song.id);
-                } else {
-                    prompt.showToast({ message: '获取播放链接失败' });
-                    this.handlePlaybackError();
-                }
-            },
-            fail: () => {
-                prompt.showToast({ message: '网络请求失败' });
-                this.handlePlaybackError();
-            },
-        });
+    async playOnline(song) {
+        try {
+            let headers = {};
+            if (this.cookie) {
+                headers['Cookie'] = this.cookie;
+            }
+
+            const response = await new Promise((resolve, reject) => {
+                fetch.fetch({
+                    url: `${CONSTANTS.API_SONG_URL}${song.id}`,
+                    header: headers,
+                    responseType: 'text',
+                    success: resolve,
+                    fail: (data, code) => reject({ data, code }),
+                });
+            });
+
+            const songData = JSON.parse(response.data)?.data?.[0];
+            if (songData?.url) {
+                const songInfo = { ...song, playUrl: songData.url, duration: Math.floor(songData.time / 1000) };
+                this.startPlayback(songInfo, songData.url);
+                this.fetchLyricOnline(song.id);
+            } else {
+                this.handlePlaybackError('获取播放链接失败');
+            }
+
+        } catch (error) {
+            console.error("playOnline 失败:", error);
+            this.handlePlaybackError('网络请求失败');
+        }
     },
 
-    /**
-     * 统一的开始播放函数
-     * @param {object} song - 歌曲信息对象
-     * @param {string} src - 音频源 URL 或 URI
-     */
     startPlayback(song, src) {
         this.currSong = song;
         audio.stop();
@@ -279,9 +284,6 @@ onReady() {
         this.playCurrent();
     },
 
-    // =================================================================
-    // UI交互与路由 (UI Interaction & Routing)
-    // =================================================================
     onSliderChange(e) {
         audio.currentTime = e.progress;
         this.updateLyric();
@@ -306,14 +308,10 @@ onReady() {
         router.push({ uri: "/pages/menu" });
     },
 
-    // =================================================================
-    // 歌词处理 (Lyrics Handling)
-    // =================================================================
     fetchLyric(songId) {
         this.resetLyrics();
         const downloadedInfo = this.downloadedSongs[songId];
-
-        if (downloadedInfo && downloadedInfo.localLyricUri) {
+        if (downloadedInfo?.localLyricUri) {
             this.loadLyricFromFile(downloadedInfo.localLyricUri, songId);
         } else {
             this.fetchLyricOnline(songId);
@@ -324,22 +322,34 @@ onReady() {
         file.readText({
             uri: uri,
             success: (data) => {
-                try {
-                    this.processAndMergeLyrics(JSON.parse(data.text));
-                } catch (e) {
-                    this.fetchLyricOnline(songId); // 解析失败则在线获取
-                }
+                try { this.processAndMergeLyrics(JSON.parse(data.text)); } catch (e) { this.fetchLyricOnline(songId); }
             },
             fail: () => this.fetchLyricOnline(songId)
         });
     },
 
-    fetchLyricOnline(songId) {
-        fetch.fetch({
-            url: `${CONSTANTS.API_LYRIC_URL}${songId}`,
-            success: (res) => this.processAndMergeLyrics(res.data),
-            fail: () => { this.lyrics = [{ time: 0, text: '歌词加载失败' }]; }
-        });
+    async fetchLyricOnline(songId) {
+        try {
+            let headers = {};
+            if (this.cookie) {
+                headers['Cookie'] = this.cookie;
+            }
+
+            const response = await new Promise((resolve, reject) => {
+                fetch.fetch({
+                    url: `${CONSTANTS.API_LYRIC_URL}${songId}`,
+                    header: headers,
+                    responseType: 'text',
+                    success: resolve,
+                    fail: (data, code) => reject({ data, code }),
+                });
+            });
+            
+            this.processAndMergeLyrics(JSON.parse(response.data));
+
+        } catch (error) {
+            this.lyrics = [{ time: 0, text: '歌词加载失败' }];
+        }
     },
 
     processAndMergeLyrics(data) {
@@ -370,7 +380,6 @@ onReady() {
 
     mergeLyrics(original, translation, romaji) {
         const createMap = (arr) => new Map(arr.map(item => [item.time.toFixed(3), item.text]));
-        
         if (romaji && translation) {
             this.playerState.lyricType = 'japanese';
             const transMap = createMap(translation);
@@ -384,10 +393,7 @@ onReady() {
             this.playerState.lyricType = 'chinese';
             this.lyrics = original.map(line => ({ time: line.time, original: line.text }));
         }
-
-        if (this.lyrics.length === 0) {
-            this.lyrics = [{ time: 0, text: '暂无歌词' }];
-        }
+        if (this.lyrics.length === 0) this.lyrics = [{ time: 0, text: '暂无歌词' }];
     },
 
     updateLyric() {
@@ -401,9 +407,6 @@ onReady() {
         }
     },
 
-    // =================================================================
-    // 辅助与工具函数 (Helpers & Utilities)
-    // =================================================================
     bindAudioEvents() {
         audio.onplay = () => { this.playerState.isPlaying = true; };
         audio.onpause = () => { this.playerState.isPlaying = false; };
@@ -415,26 +418,18 @@ onReady() {
         audio.onended = () => { this.change(1); };
     },
 
-    loadListFromFile() {
-        this.readJsonFile(CONSTANTS.FILE_PLAY_LIST, (data) => { this.playList = data || []; });
+    async loadListFromFile() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_PLAY_LIST, success: resolve, fail: reject }));
+            this.playList = JSON.parse(data.text || '[]');
+        } catch (e) { this.playList = []; }
     },
 
-    loadDownloadedSongs() {
-        this.readJsonFile(CONSTANTS.FILE_DOWNLOADED_SONGS, (data) => { this.downloadedSongs = data || {}; });
-    },
-
-    readJsonFile(uri, callback) {
-        file.readText({
-            uri: uri,
-            success: (data) => {
-                try {
-                    callback(JSON.parse(data.text));
-                } catch (e) {
-                    callback(null);
-                }
-            },
-            fail: () => callback(null),
-        });
+    async loadDownloadedSongs() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: resolve, fail: reject }));
+            this.downloadedSongs = JSON.parse(data.text || '{}');
+        } catch (e) { this.downloadedSongs = {}; }
     },
 
     resetPlayer() {
@@ -450,8 +445,8 @@ onReady() {
         this.playerState.currentLyricIndex = 0;
     },
 
-    handlePlaybackError() {
-        // 播放失败时，可以尝试播放下一首
+    handlePlaybackError(message) {
+        prompt.showToast({ message });
         setTimeout(() => this.change(1), 1500);
     },
 

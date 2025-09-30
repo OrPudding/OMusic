@@ -1,0 +1,265 @@
+<template>
+  <div class="page-container">
+      <div class="header" onclick="goBack">
+          <text class="time-display">{{ currentTime }}</text>
+          <text class="title">‹设置</text>
+      </div>
+
+      <scroll class="settings-list" scroll-y="true" bounces="true">
+          <!-- 歌词设置 -->
+          <text class="category-title">歌词显示</text>
+          <div class="setting-item">
+              <text class="item-label">日语歌词</text>
+              <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
+          </div>
+          <div class="setting-item">
+              <text class="item-label">英文歌词</text>
+              <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
+          </div>
+
+          <!-- 性能与网络设置 -->
+          <text class="category-title">性能与网络</text>
+
+          <!-- 列表渲染数量 -->
+          <div class="setting-item">
+              <text class="item-label">列表渲染数量</text>
+              <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
+          </div>
+          <text class="item-desc">屏幕上同时渲染的项目数。值越高，滚动越平滑，但性能开销越大。</text>
+
+          <!-- 列表加载步长 -->
+          <div class="setting-item">
+              <text class="item-label">列表加载步长</text>
+              <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
+          </div>
+          <text class="item-desc">每次滚动加载的项目数。值越高，滚动次数越少，但单次加载等待可能更长。</text>
+          
+          <!-- **新增**: 网络请求总数 -->
+          <div class="setting-item">
+              <text class="item-label">歌单加载总数</text>
+              <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
+          </div>
+          <text class="item-desc">从在线歌单中获取的歌曲总数。低速网络建议使用较小值。</text>
+
+          <!-- **新增**: 网络请求分页大小 -->
+          <div class="setting-item">
+              <text class="item-label">网络请求分页</text>
+              <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
+          </div>
+          <text class="item-desc">每次网络请求获取的歌曲数。低速网络建议使用较小值以加快响应。</text>
+
+      </scroll>
+  </div>
+</template>
+
+<style>
+    .page-container {
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        align-items: center;
+        background-color: black;
+    }
+    .header {
+        width: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .time-display {
+        font-size: 28px;
+        color: #ffffff;
+        padding: 5px;
+        text-align: center;
+    }
+    .title {
+        font-size: 32px;
+        padding: 5px;
+        text-align: center;
+        font-weight: bold;
+        color: #fff;
+    }
+    .settings-list {
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 0 100px 0;
+    }
+    .category-title {
+        width: 90%;
+        font-size: 26px;
+        color: #888;
+        padding: 20px 0 5px 15px;
+        margin-bottom: 10px;
+    }
+    .setting-item {
+        width: 90%;
+        height: 80px;
+        padding: 0 20px;
+        margin: 10px 0;
+        background-color: rgba(255, 255, 255, 0.06);
+        border-radius: 40px;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .item-label {
+        font-size: 26px;
+        color: #fff;
+    }
+    .item-value-btn {
+        min-width: 100px;
+        height: 50px;
+        padding: 0 20px;
+        background-color: rgba(58, 225, 255, 0.2);
+        border-radius: 25px;
+        color: #3ae1ff;
+        font-size: 24px;
+        text-align: center;
+    }
+    .item-desc {
+        width: 85%;
+        font-size: 20px;
+        color: #666;
+        margin-top: -5px;
+        margin-bottom: 20px;
+    }
+</style>
+<script>
+import router from '@system.router';
+import file from '@system.file';
+import prompt from '@system.prompt';
+
+const SETTINGS_FILE_URI = 'internal://files/settings.json';
+
+// 预设的档位
+const PRESETS = {
+    lyrics: {
+        japaneseMode: ['translation', 'romaji', 'original'],
+        englishMode: ['translation', 'original'],
+    },
+    performance: {
+        windowSize: [20, 30, 40], // 低, 中, 高
+        pageSize: [10, 15, 20],   // 低, 中, 高
+    },
+    network: {
+        totalLimit: [50, 200, 500], // 慢, 均衡, 快
+        apiPageSize: [20, 50, 100], // 慢, 均衡, 快
+    }
+};
+
+export default {
+    private: {
+        currentTime: '00:00',
+        // 默认设置，作为加载失败时的备用
+        settings: {
+            lyrics: {
+                japaneseMode: 'translation',
+                englishMode: 'translation',
+            },
+            performance: {
+                windowSize: 30,
+                pageSize: 15,
+            },
+            network: {
+                totalLimit: 200,
+                apiPageSize: 50,
+            }
+        },
+    },
+
+    computed: {
+        japaneseLyricModeText() {
+            const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' };
+            return map[this.settings.lyrics.japaneseMode] || '未知';
+        },
+        englishLyricModeText() {
+            const map = { 'translation': '显示翻译', 'original': '仅显示原文' };
+            return map[this.settings.lyrics.englishMode] || '未知';
+        }
+    },
+
+    onInit() {
+        this.loadSettings();
+        this.updateTime();
+        setInterval(() => this.updateTime(), 1000);
+    },
+
+    updateTime() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        this.currentTime = `${hours}:${minutes}`;
+    },
+
+    loadSettings() {
+        file.readText({
+            uri: SETTINGS_FILE_URI,
+            success: (data) => {
+                try {
+                    const loadedSettings = JSON.parse(data.text);
+                    // 深层合并，防止因新增设置项导致旧版配置文件出错
+                    this.settings = {
+                        ...this.settings,
+                        ...loadedSettings,
+                        lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
+                        performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
+                        network: { ...this.settings.network, ...(loadedSettings.network || {}) },
+                    };
+                } catch (e) {
+                    console.error("解析设置文件失败，将保存默认设置。");
+                    this.saveSettings();
+                }
+            },
+            fail: () => {
+                console.log("设置文件不存在，将创建并保存默认设置。");
+                this.saveSettings();
+            }
+        });
+    },
+
+    saveSettings() {
+        file.writeText({
+            uri: SETTINGS_FILE_URI,
+            text: JSON.stringify(this.settings, null, 2),
+            success: () => {
+                prompt.showToast({ message: '设置已保存' });
+            },
+            fail: () => {
+                prompt.showToast({ message: '设置保存失败' });
+            }
+        });
+    },
+
+    // --- 切换设置项的辅助函数 ---
+    _toggleSetting(category, key, presets) {
+        const currentValue = this.settings[category][key];
+        const currentIndex = presets.indexOf(currentValue);
+        const nextIndex = (currentIndex + 1) % presets.length;
+        this.settings[category][key] = presets[nextIndex];
+        this.saveSettings();
+    },
+
+    toggleJapaneseLyricMode() {
+        this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode);
+    },
+    toggleEnglishLyricMode() {
+        this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode);
+    },
+    toggleWindowSize() {
+        this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize);
+    },
+    togglePageSize() {
+        this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize);
+    },
+    toggleTotalLimit() {
+        this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit);
+    },
+    toggleApiPageSize() {
+        this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize);
+    },
+
+    goBack() {
+        router.back();
+    }
+};
+</script>

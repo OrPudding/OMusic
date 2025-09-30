@@ -77,8 +77,8 @@
       "pages/user": {
         "component": "user"
       },
-      "pages/setting": {
-        "component": "setting"
+      "pages/settings": {
+        "component": "settings"
       },
       "pages/login": {
         "component": "login"
@@ -88,6 +88,9 @@
       },
       "pages/license": {
         "component": "license"
+      },
+      "pages/songlist_list": {
+        "component": "songlist_list"
       }
     }
   }

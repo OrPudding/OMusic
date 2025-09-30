@@ -1,309 +1,489 @@
 <template>
-  <div class="page-container">
-    <div class="header" onclick="back">
-    <text class="time-display">{{currentTime}}</text>
-      <text class="title">‹扫码登录</text>
-    </div>
-      <div class="qrcode-wrapper">
-          <!-- 当 qrCodeValue 有效时，显示二维码 -->
-          <qrcode if="{{ qrCodeValue }}"
-                  value="{{ qrCodeValue }}"
-                  class="qrcode-component"
-                  onclick="startLoginFlow">
-          </qrcode>
-          <!-- 加载中或失败时，显示提示文本 -->
-          <div class="status-overlay" if="{{ !qrCodeValue || loginStatus !== '等待扫码' }}">
-              <text class="status-text">{{ loginStatus }}</text>
-          </div>
-      </div>
-      <text class="tip">请使用网易云音乐APP扫码</text>
-  </div>
+	<div class="page-container">
+		<!-- 扫码登录部分 -->
+		<div class="header" onclick="back">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹扫码登录</text>
+		</div>
+		<div class="qrcode-wrapper">
+			<qrcode
+				if="{{ qrCodeValue }}"
+				value="{{ qrCodeValue }}"
+				class="qrcode-component"
+				onclick="startLoginFlow"
+			></qrcode>
+			<div
+				class="status-overlay"
+				if="{{ !qrCodeValue || loginStatus !== '等待扫码' }}"
+			>
+				<text class="status-text">{{ loginStatus }}</text>
+			</div>
+		</div>
+		<text class="tip">请使用网易云音乐APP扫码</text>
+
+		<!-- 手动输入入口 -->
+		<text class="manual-input-trigger" onclick="toggleUidInput(true)">
+			提示风险？手动输入用户ID
+		</text>
+
+		<!-- 手动输入覆盖层 -->
+		<div class="uid-input-overlay" if="{{ showUidInput }}">
+			<div class="input-panel">
+				<!-- 1. 输入显示框 -->
+				<div class="uid-display-wrapper">
+					<text class="uid-display">{{ uidInput || "" }}</text>
+				</div>
+				<!-- 2. 紧凑型键盘 -->
+				<div class="keyboard">
+					<div class="key-row">
+						<text class="key" onclick="handleKeyPress('1')">1</text>
+						<text class="key" onclick="handleKeyPress('2')">2</text>
+						<text class="key" onclick="handleKeyPress('3')">3</text>
+					</div>
+					<div class="key-row">
+						<text class="key" onclick="handleKeyPress('4')">4</text>
+						<text class="key" onclick="handleKeyPress('5')">5</text>
+						<text class="key" onclick="handleKeyPress('6')">6</text>
+					</div>
+					<div class="key-row">
+						<text class="key" onclick="handleKeyPress('7')">7</text>
+						<text class="key" onclick="handleKeyPress('8')">8</text>
+						<text class="key" onclick="handleKeyPress('9')">9</text>
+					</div>
+					<div class="key-row">
+						<text class="key action-key" onclick="toggleUidInput(false)">
+							取消
+						</text>
+						<text class="key" onclick="handleKeyPress('0')">0</text>
+						<text class="key action-key" onclick="handleKeyPress('⌫')">⌫</text>
+					</div>
+				</div>
+				<!-- 3. 确认按钮 -->
+				<text class="confirm-button" onclick="confirmUid">确认</text>
+			</div>
+		</div>
+	</div>
 </template>
 <style>
-    .page-container {
-        width: 100%;
-        height: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background-color: #000000; /* 统一背景色 */
-    }
-
-    .header {
-        width: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .time-display {
-  font-size: 28px;
-  color: #ffffff;
-  padding: 5px;
-  text-align: center;
+.page-container {
+	width: 100%;
+	height: 100%;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background-color: #000000;
 }
-
+.header {
+	width: 100%;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+.time-display {
+	font-size: 28px;
+	color: #ffffff;
+	padding: 5px;
+	text-align: center;
+}
 .title {
 	font-size: 32px;
 	padding: 5px;
 	text-align: center;
-  font-weight: bold;
+	font-weight: bold;
 	color: #fff;
 }
+.qrcode-wrapper {
+	width: 260px;
+	height: 260px;
+	justify-content: center;
+	align-items: center;
+	border-radius: 20px;
+}
+.qrcode-component {
+	width: 240px;
+	height: 240px;
+}
+.status-overlay {
+	position: absolute;
+	width: 200px;
+	height: 200px;
+	background-color: rgba(0, 0, 0, 0.8);
+	border-radius: 20px;
+	justify-content: center;
+	align-items: center;
+}
+.status-text {
+	font-size: 24px;
+	color: #ffffff;
+	text-align: center;
+}
+.tip {
+	font-size: 26px;
+	color: rgba(255, 255, 255, 1);
+	margin-top: 8px;
+}
+.manual-input-trigger {
+	font-size: 22px;
+	color: #888;
+	text-decoration: underline;
+	margin-bottom: 40px;
+}
 
-    .qrcode-wrapper {
-        width: 260px; /* 稍作调整以适应整体布局 */
-        height: 260px;
-        justify-content: center;
-        align-items: center;
-        border-radius: 20px; /* 添加圆角 */
-    }
+.uid-input-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: #000;
+	justify-content: center;
+	align-items: center;
+}
 
-    .qrcode-component {
-        width: 240px; /* 内部二维码留出边距 */
-        height: 240px;
-    }
+/* --- 核心尺寸优化 --- */
+.input-panel {
+	width: 320px; /* 显著减小面板宽度 */
+	flex-direction: column;
+	align-items: center;
+}
 
-    .status-overlay {
-        position: absolute;
-        width: 200px;
-        height: 200px;
-        /* 使用更深的遮罩，突出文字 */
-        background-color: rgba(0, 0, 0, 0.8);
-        border-radius: 20px;
-        justify-content: center;
-        align-items: center;
-    }
+.uid-display-wrapper {
+	width: 60%;
+	height: 50px; /* 减小高度 */
+	background-color: rgba(255, 255, 255, 0.06);
+	border-radius: 18px;
+	justify-content: center;
+	align-items: center;
+    margin-top: 10px;
+	margin-bottom: 20px; /* 减小间距 */
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
 
-    .status-text {
-        font-size: 24px;
-        color: #ffffff; /* 状态文字使用白色 */
-        text-align: center;
-    }
+.uid-display {
+	color: #fff;
+	font-size: 26px; /* 减小字体大小 */
+}
 
-    .tip {
-        font-size: 26px; /* 统一辅助文字大小 */
-        color: rgba(255, 255, 255, 1); /* 使用半透明白色 */
-        margin-top: 8px;
-        margin-bottom: 65px;
-    }
+.keyboard {
+	width: 100%;
+	flex-direction: column;
+}
 
-    /* 针对小屏或药丸屏的媒体查询，保持统一性 */
-    @media (shape: pill-shaped) or (max-width: 106) {
-        .title {
-            font-size: 28px;
-            margin-bottom: 20px;
-        }
-        .qrcode-wrapper, .status-overlay {
-            width: 280px;
-            height: 280px;
-        }
-        .qrcode-component {
-            width: 260px;
-            height: 260px;
-        }
-        .tip {
-            font-size: 24px;
-            margin-top: 20px;
-        }
-        .refresh-btn {
-            width: 280px;
-            height: 60px;
-            margin-top: 25px;
-            font-size: 26px;
-        }
-    }
+.key-row {
+	width: 100%;
+	justify-content: space-between;
+	margin-bottom: 12px; /* 减小行间距 */
+}
+
+.key {
+	width: 100px; /* 减小按键宽度 */
+	height: 55px; /* 减小按键高度 */
+	background-color: rgba(255, 255, 255, 0.1);
+	border-radius: 27.5px; /* 保持完美胶囊 */
+	color: #fff;
+	font-size: 28px; /* 减小按键字体 */
+	text-align: center;
+}
+
+.action-key {
+	font-size: 24px; /* 功能键字体更小 */
+	background-color: rgba(255, 255, 255, 0.05);
+}
+
+.confirm-button {
+	width: 60%;
+	height: 60px; /* 减小确认按钮高度 */
+	border-radius: 30px;
+	background-color: #3ae1ff;
+	color: #000;
+	font-size: 26px; /* 减小字体 */
+	font-weight: bold;
+	text-align: center;
+}
 </style>
-
 <script>
-import fetch from '@system.fetch';
-import router from '@system.router';
-import prompt from '@system.prompt';
-import file from '@system.file';
+import fetch from "@system.fetch";
+import router from "@system.router";
+import prompt from "@system.prompt";
+import file from "@system.file";
 
-const API_BASE = 'https://163api.qijieya.cn';
-const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+const API_BASE = "https://163api.qijieya.cn";
+const COOKIE_FILE_URI = "internal://files/cookie.txt";
+const PROFILE_FILE_URI = "internal://files/user_profile.json"; // 新增：用户信息缓存文件
 
 export default {
-    private: {
-        qrCodeValue: '',      // 用于生成二维码的内容 (qrurl )
-        loginKey: '',         // 从API获取的唯一key
-        loginStatus: '正在生成二维码...', // 向用户展示的状态文本
-        pollingTimer: null,   // 轮询定时器的引用
-    },
+	private: {
+		qrCodeValue: "",
+		loginKey: "",
+		loginStatus: "正在生成二维码...",
+		pollingTimer: null,
+		currentTime: "",
+		// --- 新增状态 ---
+		showUidInput: false, // 是否显示手动输入界面
+		uidInput: "", // 用户输入的ID
+		keyboardLayout: [
+			// 键盘布局
+			["1", "2", "3"],
+			["4", "5", "6"],
+			["7", "8", "9"],
+			["", "0", "⌫"], // 最后一个是删除键
+		],
+	},
 
-    onInit() {
-        this.startLoginFlow();
-        this.updateTime();
-    // 每分钟更新一次时间
-    setInterval(() => {
-      this.updateTime();
-    }, 1000);
-  },
+	onInit() {
+		this.startLoginFlow();
+		this.updateTime();
+		setInterval(() => {
+			this.updateTime();
+		}, 1000);
+	},
 
-  updateTime() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    this.currentTime = `${hours}:${minutes}`;
-  },
+	updateTime() {
+		const now = new Date();
+		const hours = now.getHours().toString().padStart(2, "0");
+		const minutes = now.getMinutes().toString().padStart(2, "0");
+		this.currentTime = `${hours}:${minutes}`;
+	},
 
-    onDestroy() {
-        // 页面销毁时，必须清除定时器，防止内存泄漏和后台错误
-        if (this.pollingTimer) {
-            clearTimeout(this.pollingTimer);
-            this.pollingTimer = null;
-        }
-    },
+	onDestroy() {
+		if (this.pollingTimer) {
+			clearTimeout(this.pollingTimer);
+			this.pollingTimer = null;
+		}
+	},
 
-    /**
-     * 开始完整的登录流程
-     */
-    async startLoginFlow() {
-        // 1. 清理旧的定时器和状态
-        if (this.pollingTimer) {
-            clearTimeout(this.pollingTimer);
-            this.pollingTimer = null;
-        }
-        this.qrCodeValue = '';
-        this.loginStatus = '正在生成二维码...';
+	/**
+	 * 开始完整的登录流程
+	 */
+	async startLoginFlow() {
+		// 1. 清理旧的定时器和状态
+		if (this.pollingTimer) {
+			clearTimeout(this.pollingTimer);
+			this.pollingTimer = null;
+		}
+		this.qrCodeValue = "";
+		this.loginStatus = "正在生成二维码...";
 
-        try {
-            // 2. 获取登录key
-            const keyData = await this.getLoginKey();
-            this.loginKey = keyData.data.unikey;
+		try {
+			// 2. 获取登录key
+			const keyData = await this.getLoginKey();
+			this.loginKey = keyData.data.unikey;
 
-            // 3. 使用key生成二维码内容
-            const qrData = await this.createQrCode(this.loginKey);
-            this.qrCodeValue = qrData.data.qrurl;
-            this.loginStatus = '等待扫码'; // 更新状态
+			// 3. 使用key生成二维码内容
+			const qrData = await this.createQrCode(this.loginKey);
+			this.qrCodeValue = qrData.data.qrurl;
+			this.loginStatus = "等待扫码"; // 更新状态
 
-            // 4. 开始轮询检查扫码状态
-            this.pollLoginStatus();
+			// 4. 开始轮询检查扫码状态
+			this.pollLoginStatus();
+		} catch (error) {
+			this.loginStatus = "初始化失败，请刷新";
+			prompt.showToast({ message: `操作失败: ${error.message || "网络错误"}` });
+			console.error("登录流程初始化失败:", error);
+		}
+	},
 
-        } catch (error) {
-            this.loginStatus = '初始化失败，请刷新';
-            prompt.showToast({ message: `操作失败: ${error.message || '网络错误'}` });
-            console.error("登录流程初始化失败:", error);
-        }
-    },
+	/**
+	 * 1. 二维码 key 生成接口
+	 */
+	async getLoginKey() {
+		const url = `${API_BASE}/login/qr/key?timestamp=${Date.now()}`;
+		const response = await this.fetchPromise({ url });
+		if (response.data.code === 200) {
+			return response.data;
+		} else {
+			throw new Error("获取Key失败");
+		}
+	},
 
-    /**
-     * 1. 二维码 key 生成接口
-     */
-    async getLoginKey() {
-        const url = `${API_BASE}/login/qr/key?timestamp=${Date.now()}`;
-        const response = await this.fetchPromise({ url });
-        if (response.data.code === 200) {
-            return response.data;
-        } else {
-            throw new Error('获取Key失败');
-        }
-    },
+	/**
+	 * 2. 二维码生成接口
+	 */
+	async createQrCode(key) {
+		const url = `${API_BASE}/login/qr/create?key=${key}&qrimg=true&timestamp=${Date.now()}`;
+		const response = await this.fetchPromise({ url });
+		if (response.data.code === 200) {
+			return response.data;
+		} else {
+			throw new Error("生成二维码失败");
+		}
+	},
 
-    /**
-     * 2. 二维码生成接口
-     */
-    async createQrCode(key) {
-        const url = `${API_BASE}/login/qr/create?key=${key}&qrimg=true&timestamp=${Date.now()}`;
-        const response = await this.fetchPromise({ url });
-        if (response.data.code === 200) {
-            return response.data;
-        } else {
-            throw new Error('生成二维码失败');
-        }
-    },
+	/**
+	 * 3. 轮询检测扫码状态接口
+	 */
+	async pollLoginStatus() {
+		if (!this.loginKey) return;
 
-    /**
-     * 3. 轮询检测扫码状态接口
-     */
-    async pollLoginStatus() {
-        if (!this.loginKey) return;
+		const url = `${API_BASE}/login/qr/check?key=${
+			this.loginKey
+		}&timestamp=${Date.now()}`;
 
-        const url = `${API_BASE}/login/qr/check?key=${this.loginKey}&timestamp=${Date.now()}`;
-        
-        try {
-            const response = await this.fetchPromise({ url });
-            const { code, message, cookie } = response.data;
+		try {
+			const response = await this.fetchPromise({ url });
+			const { code, message, cookie } = response.data;
 
-            switch (code) {
-                case 800: // 二维码过期
-                    this.loginStatus = '二维码已过期，请刷新';
-                    this.qrCodeValue = ''; // 清空二维码
-                    return; // 停止轮询
-                case 801: // 等待扫码
-                    this.loginStatus = '等待扫码';
-                    break;
-                case 802: // 待确认
-                    this.loginStatus = '扫码成功，请在手机上确认';
-                    break;
-                case 803: // 授权登录成功
-                    this.loginStatus = '登录成功！';
-                    prompt.showToast({ message: '登录成功！' });
-                    await this.saveCookie(cookie); // 保存Cookie
-                    // 登录成功后，可以跳转到其他页面
-                    setTimeout(() => {
-                        router.replace({ uri: '/pages/player' }); // 跳转到播放器页
-                    }, 1000);
-                    return; // 停止轮询
-                default:
-                    this.loginStatus = `未知状态: ${code}`;
-                    break;
-            }
+			switch (code) {
+				case 800: // 二维码过期
+					this.loginStatus = "二维码已过期，请刷新";
+					this.qrCodeValue = ""; // 清空二维码
+					return; // 停止轮询
+				case 801: // 等待扫码
+					this.loginStatus = "等待扫码";
+					break;
+				case 802: // 待确认
+					this.loginStatus = "扫码成功，请在手机上确认";
+					break;
+				case 803: // 授权登录成功
+					this.loginStatus = "登录成功！";
+					prompt.showToast({ message: "登录成功！" });
+					await this.saveCookie(cookie); // 保存Cookie
+					// 登录成功后，可以跳转到其他页面
+					setTimeout(() => {
+						router.replace({ uri: "/pages/player" }); // 跳转到播放器页
+					}, 1000);
+					return; // 停止轮询
+				default:
+					this.loginStatus = `未知状态: ${code}`;
+					break;
+			}
 
-            // 如果流程未终止，则设置下一次轮询 (例如2秒后)
-            this.pollingTimer = setTimeout(() => {
-                this.pollLoginStatus();
-            }, 2000);
+			// 如果流程未终止，则设置下一次轮询 (例如2秒后)
+			this.pollingTimer = setTimeout(() => {
+				this.pollLoginStatus();
+			}, 2000);
+		} catch (error) {
+			console.error("轮询失败:", error);
+			// 网络错误等，可以稍后重试
+			this.pollingTimer = setTimeout(() => {
+				this.pollLoginStatus();
+			}, 5000);
+		}
+	},
 
-        } catch (error) {
-            console.error("轮询失败:", error);
-            // 网络错误等，可以稍后重试
-            this.pollingTimer = setTimeout(() => {
-                this.pollLoginStatus();
-            }, 5000);
-        }
-    },
+	/**
+	 * 将获取到的Cookie保存到文件中
+	 */
+	async saveCookie(cookieString) {
+		return new Promise((resolve, reject) => {
+			file.writeText({
+				uri: COOKIE_FILE_URI,
+				text: cookieString,
+				success: () => {
+					console.log("Cookie保存成功！");
+					// 通知全局服务重新加载Cookie
+					if (this.$app.$def.requestService) {
+						this.$app.$def.requestService.loadCookie();
+					}
+					resolve();
+				},
+				fail: (data, code) => {
+					console.error(`Cookie保存失败, code=${code}`);
+					reject(new Error("保存Cookie失败"));
+				},
+			});
+		});
+	},
 
-    /**
-     * 将获取到的Cookie保存到文件中
-     */
-    async saveCookie(cookieString) {
-        return new Promise((resolve, reject) => {
-            file.writeText({
-                uri: COOKIE_FILE_URI,
-                text: cookieString,
-                success: () => {
-                    console.log("Cookie保存成功！");
-                    // 通知全局服务重新加载Cookie
-                    if (this.$app.$def.requestService) {
-                        this.$app.$def.requestService.loadCookie();
-                    }
-                    resolve();
-                },
-                fail: (data, code) => {
-                    console.error(`Cookie保存失败, code=${code}`);
-                    reject(new Error('保存Cookie失败'));
-                }
-            });
-        });
-    },
+	// --- **新增：手动输入相关方法** ---
 
-    /**
-     * 封装 fetch 为 Promise
-     */
-    fetchPromise(options) {
-        return new Promise((resolve, reject) => {
-            fetch.fetch({
-                ...options,
-                success: resolve,
-                fail: (data, code) => reject({ data, code }),
-            });
-        });
-    },
+	/**
+	 * 切换手动输入界面的显示/隐藏
+	 */
+	toggleUidInput(show) {
+		this.showUidInput = show;
+		if (!show) {
+			this.uidInput = ""; // 关闭时清空输入
+		}
+	},
 
-    back() {
-      router.replace({ uri: '/pages/user' });
-    }
+	/**
+	 * 处理键盘按键
+	 */
+	handleKeyPress(key) {
+		if (key === "⌫") {
+			// 删除键
+			this.uidInput = this.uidInput.slice(0, -1);
+		} else if (typeof key === "string" && this.uidInput.length < 12) {
+			// 数字键，限制最大长度
+			this.uidInput += key;
+		}
+	},
+
+	/**
+	 * 确认输入的UID
+	 */
+	async confirmUid() {
+		if (!this.uidInput) {
+			prompt.showToast({ message: "请输入用户ID" });
+			return;
+		}
+
+		prompt.showToast({ message: "正在验证用户ID..." });
+		const url = `${API_BASE}/user/detail?uid=${this.uidInput}`;
+
+		try {
+			const response = await this.fetchPromise({ url });
+			const profile = response.data?.profile;
+
+			if (profile) {
+				// 验证成功，提取需要的信息
+				const userProfile = {
+					userId: profile.userId,
+					nickname: profile.nickname,
+					avatarUrl: profile.avatarUrl,
+				};
+
+				// 将用户信息保存到本地文件
+				await this.saveProfile(userProfile);
+				prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
+
+				// 成功后返回 user 页面
+				setTimeout(() => {
+					router.replace({ uri: "/pages/user" });
+				}, 1000);
+			} else {
+				prompt.showToast({ message: "用户ID无效或不存在" });
+			}
+		} catch (error) {
+			console.error("获取用户详情失败:", error);
+			prompt.showToast({ message: "验证失败，请检查网络" });
+		}
+	},
+
+	/**
+	 * 将用户信息保存到文件
+	 */
+	async saveProfile(profileData) {
+		return new Promise((resolve, reject) => {
+			file.writeText({
+				uri: PROFILE_FILE_URI,
+				text: JSON.stringify(profileData, null, 2),
+				success: () => {
+					console.log("用户信息保存成功！");
+					resolve();
+				},
+				fail: (data, code) => {
+					console.error(`用户信息保存失败, code=${code}`);
+					reject(new Error("保存用户信息失败"));
+				},
+			});
+		});
+	},
+	// --- **新增方法结束** ---
+
+	fetchPromise(options) {
+		return new Promise((resolve, reject) => {
+			fetch.fetch({
+				...options,
+				success: resolve,
+				fail: (data, code) => reject({ data, code }),
+			});
+		});
+	},
+
+	back() {
+		router.back();
+	},
 };
 </script>

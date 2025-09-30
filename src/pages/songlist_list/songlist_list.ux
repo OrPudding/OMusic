@@ -1,0 +1,267 @@
+<template>
+  <scroll class="page-container" scroll-y="true" bounces="true">
+      <!-- 标题改为动态绑定 -->
+      <div class="header" onclick="goBack">
+        <text class="time-display">{{ currentTime }}</text>
+        <text class="title">‹{{ pageTitle }}</text>
+        </div>
+        <text class="loading-tip" if="{{ isLoading }}">正在刷新...</text>
+        <text class="loading-tip" if="{{ !isLoading && playlists.length === 0 }}">
+            没有公开的歌单或加载失败
+        </text>
+
+      <div class="grid-scroll">
+        
+          <div class="playlist-grid">
+              <div class="playlist-item" for="{{ playlists }}" onclick="goToSongList($item.id)">
+                  <text class="item-name">{{ $item.name }}</text>
+                  <text class="item-track-count">{{ $item.trackCount }} 首</text>
+              </div>
+          </div>
+      </div>
+  </scroll>
+</template>
+<style>
+    .page-container {
+        width: 100%;
+        height: 100%;
+        flex-direction: column;
+        align-items: center;
+        background-color: black;
+    }
+    .header {
+        width: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .time-display {
+        font-size: 28px;
+        color: #ffffff;
+        padding: 5px;
+        text-align: center;
+    }
+    .title {
+        font-size: 32px;
+        padding: 5px;
+        text-align: center;
+        font-weight: bold;
+        color: #fff;
+    }
+    .grid-scroll {
+        width: 100%;
+        margin-bottom: 120px;
+    }
+    .playlist-grid {
+        width: 100%;
+        padding: 10px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-around;
+    }
+    .playlist-item {
+        width: 200px;
+        flex-direction: column;
+        padding: 10px;
+        margin: 10px 5px;
+        background-color: rgba(255, 255, 255, 0.06);
+        border-radius: 20px;
+    }
+    .item-cover {
+        width: 170px;
+        height: 170px;
+        border-radius: 20px;
+        background-color: #333;
+    }
+    .item-name {
+        font-size: 24px;
+        color: #ffffff;
+        lines: 2;
+        text-overflow: ellipsis;
+        margin-top: 8px;
+    }
+    .item-track-count {
+        font-size: 20px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 4px;
+    }
+    .loading-tip {
+        width: 100%;
+        text-align: center;
+        color: #888;
+        font-size: 24px;
+        padding: 30px;
+    }
+</style>
+<script>
+import router from '@system.router';
+import prompt from '@system.prompt';
+import file from '@system.file';
+
+const API_BASE = 'https://163api.qijieya.cn';
+const PROFILE_FILE_URI = 'internal://files/user_profile.json';
+// --- **核心修正 1: 新增常量和文件服务** ---
+const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/'; // 用户歌单的缓存目录
+
+// 简单的文件服务 ，用于读写JSON
+const fileService = {
+    _promisify(fn, options) {
+        return new Promise((resolve, reject) => {
+            fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
+        });
+    },
+    async readJson(uri, defaultValue = null) {
+        try {
+            const data = await this._promisify(file.readText, { uri });
+            return JSON.parse(data.text);
+        } catch (error) {
+            if (error.code !== 301) console.error(`[FileService] readJson 失败: ${uri}`, error);
+            return defaultValue;
+        }
+    },
+    async writeJson(uri, data) {
+        try {
+            await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
+            return true;
+        } catch (error) {
+            console.error(`[FileService] writeJson 失败: ${uri}`, error);
+            return false;
+        }
+    },
+    async ensureDirExists(uri) {
+        try {
+            await this._promisify(file.mkdir, { uri });
+        } catch (error) {
+            // 忽略目录已存在的错误
+        }
+    }
+};
+// ---
+
+export default {
+    protected: {
+        uid: null,
+    },
+
+    private: {
+        playlists: [],
+        isLoading: false,
+        pageTitle: '用户歌单',
+        currentTime: '00:00',
+    },
+
+    async onInit() {
+        // --- **核心修正 2: 确保缓存目录存在** ---
+        await fileService.ensureDirExists(USER_PLAYLISTS_DIR);
+        // ---
+        this.loadUserPlaylistsWithCache(); // 调用新的带缓存方法
+        this.updateTime();
+        setInterval(() => {
+            this.updateTime();
+        }, 1000);
+    },
+
+    updateTime() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        this.currentTime = `${hours}:${minutes}`;
+    },
+
+    // --- **核心修正 3: 实现带缓存的加载逻辑** ---
+    async loadUserPlaylistsWithCache() {
+        if (this.isLoading) return;
+        this.isLoading = true;
+
+        const userId = this.uid || await this.getUserIdFromLocal();
+        if (!userId) {
+            prompt.showToast({ message: '未指定用户ID' });
+            this.isLoading = false;
+            return;
+        }
+
+        const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
+
+        // 1. 尝试从缓存加载并立即显示
+        const cachedData = await fileService.readJson(cacheFileUri, null);
+        if (cachedData) {
+            console.log(`从缓存加载用户 ${userId} 的歌单。`);
+            this.playlists = cachedData.playlists;
+            this.pageTitle = cachedData.pageTitle;
+        } else {
+            prompt.showToast({ message: '正在加载...' });
+        }
+
+        // 2. 异步从网络获取最新数据
+        try {
+            const request = this.$app.$def.requestService;
+            if (!request) throw new Error('内部服务错误');
+
+            const url = `${API_BASE}/user/playlist?uid=${userId}&timestamp=${Date.now()}`;
+            const response = await request.fetch({ url });
+            const newPlaylists = response.data?.playlist;
+
+            if (newPlaylists && newPlaylists.length > 0) {
+                const creatorName = newPlaylists[0].creator?.nickname;
+                const newPageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
+                const newFormattedPlaylists = newPlaylists.map(pl => ({
+                    id: pl.id,
+                    name: pl.name,
+                    trackCount: pl.trackCount,
+                }));
+
+                const newDataToCache = {
+                    pageTitle: newPageTitle,
+                    playlists: newFormattedPlaylists,
+                };
+
+                // 3. 对比并更新
+                if (JSON.stringify(cachedData) !== JSON.stringify(newDataToCache)) {
+                    console.log(`用户 ${userId} 的歌单有更新，刷新UI并写入缓存。`);
+                    this.playlists = newFormattedPlaylists;
+                    this.pageTitle = newPageTitle;
+                    await fileService.writeJson(cacheFileUri, newDataToCache);
+                } else {
+                    console.log(`用户 ${userId} 的歌单无更新。`);
+                }
+            } else if (!cachedData) { // 仅在没有缓存且网络也无数据时提示
+                prompt.showToast({ message: '未找到该用户的公开歌单' });
+            }
+        } catch (error) {
+            console.error("获取用户歌单失败:", error);
+            if (!cachedData) { // 仅在没有缓存且网络失败时提示
+                prompt.showToast({ message: `加载失败: ${error.code || '网络错误'}` });
+            }
+        } finally {
+            this.isLoading = false;
+        }
+    },
+    // ---
+
+    async getUserIdFromLocal() {
+        try {
+            const data = await new Promise((resolve, reject) => {
+                file.readText({ uri: PROFILE_FILE_URI, success: resolve, fail: reject });
+            });
+            const profile = JSON.parse(data.text);
+            return profile?.userId;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    goToSongList(songlistId) {
+        router.push({
+            uri: '/pages/list',
+            params: {
+                listType: 'songlist',
+                songlistId: songlistId,
+            }
+        });
+    },
+
+    goBack() {
+        router.back();
+    }
+};
+</script>
