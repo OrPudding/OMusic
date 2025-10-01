@@ -60,7 +60,8 @@
     "entry": "pages/player",
     "pages": {
       "pages/player": {
-        "component": "player"
+        "component": "player",
+        "launchMode": "singleTask"
       },
       "pages/volume": {
         "component": "volume"

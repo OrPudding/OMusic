@@ -24,19 +24,21 @@
   </div>
 </template>
 <script>
+// pages/volume/index.js
+
 import router from "@system.router";
 import audio from "@system.audio";
 import file from "@system.file";
 import prompt from "@system.prompt";
-import request from "@system.request";
-import fetch from "@system.fetch";
+// request 和 fetch 不再需要，因为下载逻辑已移走
+// import request from "@system.request";
+// import fetch from "@system.fetch";
 
 // --- 1. 常量与配置 ---
 const CONSTANTS = {
-    API_SONG_URL_BASE: 'https://163api.qijieya.cn/song/url', // **修改**: 基础URL
-    API_LYRIC_URL_BASE: 'https://163api.qijieya.cn/lyric',   // **修改**: 基础URL
-    DIR_MUSIC: 'internal://files/music/',
-    DIR_LYRICS: 'internal://files/lyrics/',
+    // 只保留需要用到的常量
+    DIR_MUSIC: 'internal://files/music/', // 用于创建目录
+    DIR_LYRICS: 'internal://files/lyrics/', // 用于创建目录
     FILE_FAVORITES: 'internal://files/favorites.json',
     FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
 };
@@ -48,13 +50,16 @@ export default {
         favorites: {},
         isFavorited: false,
         downloadedSongs: {},
+        // downloadState 仍然需要，用于显示正确的图标
         downloadState: 'not_downloaded',
-        isDownloadingLocked: false,
+        // isDownloadingLocked 不再需要，因为本页面不处理下载过程
+        // isDownloadingLocked: false,
     },
   
     computed: {
-        downloadIcon( ) {
+        downloadIcon() {
             const icons = {
+                // 'downloading' 状态由 player 页面管理，但 volume 页可以显示，以防用户快速返回
                 downloading: '/common/icon/downloading.png',
                 downloaded: '/common/icon/downloaded.png',
                 not_downloaded: '/common/icon/download.png',
@@ -66,26 +71,35 @@ export default {
         }
     },
 
+    // protected 中 currentSong 是从外部传入的，保持不变
     protected: {
         currentSong: {}
     },
 
     onInit() {
         this.volume = audio.volume * 100;
+        
+        // 解析传入的歌曲数据，逻辑保持不变
         let songData = this.currentSong;
-        while (typeof songData === 'string') {
-            try { songData = JSON.parse(songData); } catch (e) {
+        // 简化循环解析逻辑，避免死循环
+        for (let i = 0; i < 5 && typeof songData === 'string'; i++) {
+            try {
+                songData = JSON.parse(songData);
+            } catch (e) {
                 prompt.showToast({ message: '无法加载歌曲信息' });
                 router.back();
                 return;
             }
         }
         this.currentSong = songData;
+
         if (!this.currentSong || !this.currentSong.id) {
             prompt.showToast({ message: '歌曲信息无效' });
             router.back();
             return;
         }
+
+        // 确保目录存在，逻辑保持不变
         file.mkdir({ uri: CONSTANTS.DIR_MUSIC, complete: () => {
             file.mkdir({ uri: CONSTANTS.DIR_LYRICS, complete: () => {
                 this.loadInitialState();
@@ -93,23 +107,58 @@ export default {
         }});
     },
 
-    loadInitialState() {
-        const readFavorites = new Promise(resolve => file.readText({ uri: CONSTANTS.FILE_FAVORITES, success: data => resolve(data.text), fail: () => resolve('{}') }));
-        const readDownloaded = new Promise(resolve => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: data => resolve(data.text), fail: () => resolve('{}') }));
-        Promise.all([readFavorites, readDownloaded]).then(([favoritesText, downloadedText]) => {
-            try { this.favorites = JSON.parse(favoritesText); } catch (e) { this.favorites = {}; }
-            try { this.downloadedSongs = JSON.parse(downloadedText); } catch (e) { this.downloadedSongs = {}; }
-            this.updateFavoriteStatus();
-            this.updateDownloadStatus();
-        });
+    // onShow 周期函数，当从播放器返回时，可以刷新状态
+    async onShow() {
+        // 重新加载下载列表，以更新可能在后台完成的下载状态
+        await this.loadDownloadedSongs();
+        this.updateDownloadStatus();
+    },
+
+    async loadInitialState() {
+        // 使用 Promise.all 并行加载收藏和下载列表
+        await Promise.all([
+            this.loadFavorites(),
+            this.loadDownloadedSongs()
+        ]);
+        this.updateFavoriteStatus();
+        this.updateDownloadStatus();
+    },
+
+    async loadFavorites() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_FAVORITES, success: resolve, fail: reject }));
+            this.favorites = JSON.parse(data.text || '{}');
+        } catch (e) {
+            this.favorites = {};
+        }
+    },
+
+    async loadDownloadedSongs() {
+        try {
+            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: resolve, fail: reject }));
+            this.downloadedSongs = JSON.parse(data.text || '{}');
+        } catch (e) {
+            this.downloadedSongs = {};
+        }
     },
 
     updateFavoriteStatus() {
-        if (this.currentSong) this.isFavorited = !!this.favorites[this.currentSong.id];
+        if (this.currentSong) {
+            this.isFavorited = !!this.favorites[this.currentSong.id];
+        }
     },
 
     updateDownloadStatus() {
-        if (this.currentSong) this.downloadState = this.downloadedSongs[this.currentSong.id] ? 'downloaded' : 'not_downloaded';
+        if (this.currentSong) {
+            const songId = this.currentSong.id;
+            // 检查下载状态，包括 player 页面可能设置的 'downloading' 状态
+            const downloadedInfo = this.downloadedSongs[songId];
+            if (downloadedInfo) {
+                this.downloadState = downloadedInfo.downloadStatus === 'downloading' ? 'downloading' : 'downloaded';
+            } else {
+                this.downloadState = 'not_downloaded';
+            }
+        }
     },
 
     changeVolume(direction) {
@@ -125,10 +174,12 @@ export default {
             delete this.favorites[id];
             prompt.showToast({ message: '已取消收藏' });
         } else {
+            // 存储完整的歌曲信息
             this.favorites[id] = this.currentSong;
             prompt.showToast({ message: '已收藏' });
         }
         this.isFavorited = !this.isFavorited;
+        // 异步写入文件，不阻塞UI
         file.writeText({ uri: CONSTANTS.FILE_FAVORITES, text: JSON.stringify(this.favorites, null, 2) });
     },
 
@@ -136,126 +187,41 @@ export default {
         router.back();
     },
 
-    handleDownloadClick() {
-        if (!this.currentSong) { prompt.showToast({ message: '歌曲信息无效' }); return; }
-        if (this.downloadState === 'downloaded') { prompt.showToast({ message: '歌曲已下载' }); return; }
-        if (this.isDownloadingLocked) { prompt.showToast({ message: '已有任务在下载中' }); return; }
-        this.executeDownload();
-    },
-
-    executeDownload() {
-        this.isDownloadingLocked = true;
-        this.downloadState = 'downloading';
-        const song = this.currentSong;
-        prompt.showToast({ message: `开始下载: ${song.name}` });
-        const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${song.id}.json`;
-        const songFilePath = `${CONSTANTS.DIR_MUSIC}${song.id}.mp3`;
-        this.fetchSongAndLyric(song.id, (songInfo, lyricData) => {
-            if (!songInfo) { this.handleDownloadError('无法获取歌曲信息'); return; }
-            this.saveLyricFile(lyricFilePath, lyricData, () => {
-                this.downloadSongFile(songInfo.url, `${song.id}.mp3`, (tempFileUri) => {
-                    if (!tempFileUri) { this.handleDownloadError('歌曲下载失败'); file.delete({ uri: lyricFilePath }); return; }
-                    this.moveSongFile(tempFileUri, songFilePath, (success) => {
-                        if (!success) { this.handleDownloadError('文件处理失败'); file.delete({ uri: lyricFilePath }); return; }
-                        const downloadedInfo = { ...song, localUri: songFilePath, localLyricUri: lyricData ? lyricFilePath : null, duration: songInfo.duration };
-                        this.downloadedSongs[song.id] = downloadedInfo;
-                        file.writeText({
-                            uri: CONSTANTS.FILE_DOWNLOADED_SONGS,
-                            text: JSON.stringify(this.downloadedSongs, null, 2),
-                            complete: () => {
-                                this.downloadState = 'downloaded';
-                                this.isDownloadingLocked = false;
-                                prompt.showToast({ message: `${song.name} 下载成功` });
-                            }
-                        });
-                    });
-                });
-            });
-        });
-    },
-
     /**
-     * **核心测试方法**: 直接在 URL 中拼接 Cookie
+     * **核心修改**: 处理下载点击事件
+     * 不再执行下载，而是通过路由参数通知播放器页面执行下载任务。
      */
-    fetchSongAndLyric(songId, callback) {
-        // 1. 这是你提供的 Cookie
-        const myCookie = "MUSIC_U=00B80A65849DDFBF4D402F6A25149E4333730205542048A9D695203044846659255FEAE40F658D5EC10C1DE5246779699869DA46B102D7DEBA3237C308F8A8AE9AB4964CF63F3CCF211056417882A762BAD1ACFA900E4478E9C03380851A29453168D2DCAD0E8F67D26F4174F388960CD741FC349952868E8CEEDB58F3B26BD917E316239723046D5A37B25BAB8DFD53B459CF68100DE7391AE8DBE46A61B7A3EA7ED0634804BC5A88A9FDFF3641D43DB98A2DF4C1FD5F2E444CC221FC14025C6B8C3496CA22E875F16646EF92E05E1B91D68D0921D9C4ACD531EBB129932A6C90939501DB291F518E540F33A0DC64E47875E7992C8B0FF866536E00F6347502CD7BA0CABFADD4EE7F4A11A9A8181F1D4BE5664485CFAD7BC9A8B02C8ED47355C690EC88554646D0AD61E668701A1C5FD7D189B9F7A62F6CC392C45FC09657CAB613281BB2A74CD4AD52EF85E245A3953310B5EF8F7217630F59FA1E4CCCD80492";
-        
-        // 2. 对 Cookie 进行 URL 编码
-        const encodedCookie = encodeURIComponent(myCookie);
+    handleDownloadClick() {
+        if (!this.currentSong) {
+            prompt.showToast({ message: '歌曲信息无效' });
+            return;
+        }
+        if (this.downloadState === 'downloaded') {
+            prompt.showToast({ message: '歌曲已下载' });
+            return;
+        }
+        if (this.downloadState === 'downloading') {
+            prompt.showToast({ message: '正在下载中，请稍候...' });
+            return;
+        }
 
-        // 3. 构造请求 URL
-        const songUrl = `${CONSTANTS.API_SONG_URL_BASE}?br=320000&id=${songId}&cookie=${encodedCookie}`;
-        const lyricUrl = `${CONSTANTS.API_LYRIC_URL_BASE}?id=${songId}&cookie=${encodedCookie}`;
+        // 通知用户即将开始下载
+        prompt.showToast({ message: '即将开始下载...' });
 
-        console.log("正在使用URL拼接Cookie发起请求...");
-        prompt.showToast({ message: "正在使用Cookie加载..." });
-
-        const fetchPromise = (url) => new Promise((resolve, reject) => {
-            fetch.fetch({ url, responseType: 'text', success: resolve, fail: reject });
-        });
-
-        Promise.all([
-            fetchPromise(songUrl),
-            fetchPromise(lyricUrl).catch(() => null)
-        ]).then(([songRes, lyricRes]) => {
-            const songData = JSON.parse(songRes.data)?.data?.[0];
-            if (songData && songData.url) {
-                if (songData.freeTrialInfo === null) {
-                    prompt.showToast({ message: "Cookie有效！获取到完整音源！" });
-                } else {
-                    prompt.showToast({ message: "Cookie可能无效，获取到试听音源。" });
-                }
-                const songInfo = {
-                    url: songData.url,
-                    duration: Math.floor(songData.time / 1000)
-                };
-                callback(songInfo, lyricRes ? JSON.parse(lyricRes.data) : null);
-            } else {
-                console.error("解析歌曲URL失败:", songRes.data);
-                callback(null, null);
+        // 返回到播放器页面，并传递一个参数 `triggerDownload=true`
+        router.push({
+            uri: '/pages/player',
+            params: {
+                triggerDownload: true
             }
-        }).catch(error => {
-            console.error("fetchSongAndLyric 失败:", error);
-            callback(null, null);
         });
     },
 
-    saveLyricFile(path, data, callback) {
-        if (!data) { callback(); return; }
-        file.writeText({ uri: path, text: JSON.stringify(data, null, 2), complete: callback });
-    },
-
-    downloadSongFile(url, filename, callback) {
-        request.download({
-            url,
-            filename,
-            success: (task) => {
-                request.onDownloadComplete({
-                    token: task.token,
-                    success: (data) => callback(data.uri),
-                    fail: () => callback(null),
-                });
-            },
-            fail: () => callback(null),
-        });
-    },
-
-    moveSongFile(srcUri, dstUri, callback) {
-        file.move({
-            srcUri,
-            dstUri,
-            success: () => callback(true),
-            fail: () => callback(false)
-        });
-    },
-
-    handleDownloadError(message) {
-        prompt.showToast({ message });
-        this.downloadState = 'not_downloaded';
-        this.isDownloadingLocked = false;
-    },
+    // 所有旧的下载相关方法 (executeDownload, fetchSongAndLyric, saveLyricFile, downloadSongFile, moveSongFile, handleDownloadError)
+    // 都已从该文件中移除。
 };
+</script>
+
 </script>
 
 <style>

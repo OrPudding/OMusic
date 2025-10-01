@@ -1,69 +1,113 @@
 <script>
 import file from '@system.file';
+import fetch from '@system.fetch'; // **新增**: 导入 fetch 模块
 
-// 定义常量，确保与页面中的路径一致
+// 定义常量
 const FILE_PLAY_LIST = 'internal://files/play_list.json';
+const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 
 export default {
-  /**
-   * 应用的 onCreate 生命周期，在应用冷启动时执行。
-   */
-  onCreate() {
-    console.info('App onCreate: 应用启动');
-    // 你可以在这里保留或添加其他应用级的初始化逻辑，
-    // 例如重置下载状态等。
-    this.resetDownloadingStatusOnLaunch();
-  },
+    onCreate() {
+        console.info('App onCreate: 应用启动');
+        this.resetDownloadingStatusOnLaunch();
+    },
 
-  onDestroy() {
-    console.info('App onDestroy: 应用销毁');
-  },
+    onDestroy() {
+        console.info('App onDestroy: 应用销毁');
+    },
 
-  /**
-   * @description 在应用启动时，异步重置所有“正在下载”的状态。
-   * 这是为了处理因应用异常退出而导致的状态不一致问题。
-   */
-  resetDownloadingStatusOnLaunch() {
-    console.info('开始检查并重置下载状态...');
-    file.readText({
-      uri: FILE_PLAY_LIST,
-      success: (data) => {
-        if (!data || !data.text) {
-          console.info('播放列表为空，无需重置。');
-          return;
-        }
-        try {
-          let playList = JSON.parse(data.text);
-          let statusChanged = false;
-          playList = playList.map(song => {
-            if (song.downloadStatus === 'downloading') {
-              console.warn(`发现悬空下载任务: ${song.name} (ID: ${song.id})，状态将被重置。`);
-              song.downloadStatus = 'failed';
-              statusChanged = true;
+    requestService: {
+        cookie: null,
+
+        async loadCookie() {
+            if (this.cookie) return this.cookie;
+            try {
+                const data = await new Promise((resolve, reject) => {
+                    file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: reject });
+                });
+                this.cookie = data.text;
+                return this.cookie;
+            } catch (e) {
+                return null;
             }
-            return song;
-          });
-          if (statusChanged) {
-            console.info('正在将重置后的播放列表写回文件...');
-            file.writeText({
-              uri: FILE_PLAY_LIST,
-              text: JSON.stringify(playList, null, 2),
-              success: () => console.info('下载状态重置完成。'),
-              fail: (err, code) => console.error(`写回播放列表失败，码: ${code}`)
+        },
+
+        /**
+         * **核心修正**: 无论成功或失败，都 resolve 一个包含所有信息的标准对象
+         * 这样调用方 (player.ux) 就永远不会进入 catch 块（除非是网络完全不通等底层错误）
+         * 而是总能拿到一个结果对象，然后自己判断 status 是 'success' 还是 'fail'
+         */
+        async fetch(options) {
+            const cookie = await this.loadCookie();
+            const headers = { ...(options.header || {}), Cookie: cookie };
+
+            return new Promise((resolve) => { // 注意：这里只用 resolve
+                fetch.fetch({
+                    ...options,
+                    header: headers,
+                    success: (response) => {
+                        // 请求成功，包装成一个成功状态的对象
+                        resolve({
+                            status: 'success',
+                            ...response
+                        });
+                    },
+                    fail: (data, code) => {
+                        // 请求失败（包括4xx, 5xx），包装成一个失败状态的对象
+                        resolve({
+                            status: 'fail',
+                            data: data,
+                            code: code
+                        });
+                    },
+                });
             });
-          } else {
-            console.info('未发现悬空下载任务，无需重置。');
-          }
-        } catch (e) {
-          console.error('解析播放列表JSON时发生错误:', e);
         }
-      },
-      fail: (data, code) => {
-        if (code !== 301) { // 忽略文件不存在的错误
-          console.error(`读取播放列表文件失败，错误码: ${code}`);
-        }
-      }
-    });
-  }
+    },
+
+    resetDownloadingStatusOnLaunch() {
+        console.info('开始检查并重置下载状态...');
+        file.readText({
+            uri: FILE_PLAY_LIST,
+            success: (data) => {
+                if (!data || !data.text) {
+                    console.info('播放列表为空，无需重置。');
+                    return;
+                }
+                try {
+                    let playList = JSON.parse(data.text);
+                    let statusChanged = false;
+                    playList = playList.map(song => {
+                        if (song.downloadStatus === 'downloading') {
+                            console.warn(`发现悬空下载任务: ${song.name} (ID: ${song.id})，状态将被重置。`);
+                            song.downloadStatus = 'failed';
+                            statusChanged = true;
+                        }
+                        return song;
+                    });
+                    if (statusChanged) {
+                        console.info('正在将重置后的播放列表写回文件...');
+                        file.writeText({
+                            uri: FILE_PLAY_LIST,
+                            text: JSON.stringify(playList, null, 2),
+                            success: () => console.info('下载状态重置完成。'),
+                            fail: (errData, code) => console.error(`写回重置后的播放列表失败，错误码: ${code}`)
+                        });
+                    } else {
+                        console.info('未发现悬空下载任务，无需重置。');
+                    }
+                } catch (e) {
+                    console.error('解析播放列表JSON时发生错误:', e);
+                }
+            },
+            fail: (data, code) => {
+                if (code === 301) {
+                    console.info('播放列表文件不存在，无需重置。');
+                } else {
+                    console.error(`读取播放列表文件失败，错误码: ${code}`);
+                }
+            }
+        });
+    }
 };
 </script>
