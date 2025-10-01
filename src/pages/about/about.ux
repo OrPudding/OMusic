@@ -62,8 +62,9 @@
 
     .time-display {
         font-size: 28px;
+        font-weight: bold;
         color: #ffffff;
-        padding: 5px;
+        padding-top: 5px;
         text-align: center;
     }
 

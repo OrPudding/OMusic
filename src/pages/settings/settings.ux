@@ -1,62 +1,83 @@
 <template>
-  <scroll class="page-container" scroll-y="true" bounces="true">
-      <div class="header" onclick="goBack">
-          <text class="time-display">{{ currentTime }}</text>
-          <text class="title">‹设置</text>
-      </div>
-
-      <div class="settings-list">
-          <!-- 歌词设置 -->
-          <text class="category-title">歌词显示</text>
-          <div class="setting-item">
-              <text class="item-label">日语歌词</text>
-              <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
-          </div>
-          <div class="setting-item">
-              <text class="item-label">英文歌词</text>
-              <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
-          </div>
-
-          <!-- 性能与网络设置 -->
-          <text class="category-title">性能与网络</text>
-
-          <!-- 列表渲染数量 -->
-          <div class="setting-item">
-              <text class="item-label">列表渲染数量</text>
-              <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
-          </div>
-          <text class="item-desc">屏幕上同时渲染的项目数。值越高，滚动越平滑，但性能开销越大。</text>
-
-          <!-- 列表加载步长 -->
-          <div class="setting-item">
-              <text class="item-label">列表加载步长</text>
-              <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
-          </div>
-          <text class="item-desc">每次滚动加载的项目数。值越高，滚动次数越少，但单次加载等待可能更长。</text>
-          
-          <!-- **新增**: 网络请求总数 -->
-          <div class="setting-item">
-              <text class="item-label">歌单加载总数</text>
-              <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
-          </div>
-          <text class="item-desc">从在线歌单中获取的歌曲总数。低速网络建议使用较小值。</text>
-
-          <!-- **新增**: 网络请求分页大小 -->
-          <div class="setting-item">
-              <text class="item-label">网络请求分页</text>
-              <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
-          </div>
-          <text class="item-desc">每次网络请求获取的歌曲数。低速网络建议使用较小值以加快响应。</text>
-          <div class="logout-section">
-            <div class="logout-button" onclick="handleLogout">
-                <text class="logout-text">退出登录</text>
+    <scroll class="page-container" scroll-y="true" bounces="true">
+        <div class="header" onclick="goBack">
+            <text class="time-display">{{ currentTime }}</text>
+            <text class="title">‹设置</text>
+        </div>
+        <div class="settings-list">
+            <!-- 歌词设置 (无变化) -->
+            <text class="category-title">歌词显示</text>
+            <div class="setting-item">
+                <text class="item-label">日语歌词</text>
+                <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
+            </div>
+            <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，如日语、韩语。</text>
+            
+            <div class="setting-item">
+                <text class="item-label">英文歌词</text>
+                <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
+            </div>
+            <text class="item-desc">适用于仅提供原文和翻译的歌曲，如英语、法语等。</text>
+  
+            <!-- 性能设置 (无变化) -->
+            <text class="category-title">列表性能</text>
+            <div class="setting-item">
+                <text class="item-label">列表渲染数量</text>
+                <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
+            </div>
+            <text class="item-desc">影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。</text>
+            
+            <div class="setting-item">
+                <text class="item-label">列表加载步长</text>
+                <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
+            </div>
+            <text class="item-desc">每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。</text>
+            
+            <!-- 网络与加载设置 (核心修改) -->
+            <text class="category-title">网络与加载</text>
+            <div class="setting-item">
+                <text class="item-label">歌单加载总数</text>
+                <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
+            </div>
+            <!-- **优化后文案** -->
+            <text class="item-desc">在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。</text>
+            
+            <div class="setting-item">
+                <text class="item-label">网络请求分页</text>
+                <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
+            </div>
+            <!-- **优化后文案** -->
+            <text class="item-desc">每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。</text>
+  
+            <!-- 搜索设置 (核心修改) -->
+            <text class="category-title">搜索设置</text>
+            <div class="setting-item">
+                <text class="item-label">最大搜索结果</text>
+                <text class="item-value-btn" onclick="toggleSearchTotalLimit">{{ settings.search.totalLimit }}</text>
+            </div>
+            <!-- **优化后文案** -->
+            <text class="item-desc">单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。</text>
+            
+            <div class="setting-item">
+                <text class="item-label">搜索请求分页</text>
+                <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
+            </div>
+            <!-- **优化后文案** -->
+            <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
+  
+            <!-- 退出登录 (保持不变) -->
+            <div class="logout-section">
+              <div class="logout-button" onclick="handleLogout">
+                  <text class="logout-text">退出登录</text>
+              </div>
             </div>
         </div>
-        </div>
 
-  </scroll>
-</template>
 
+
+</scroll>
+  </template>
+  
 <style>
     .page-container {
         width: 100%;
@@ -74,7 +95,8 @@
     .time-display {
         font-size: 28px;
         color: #ffffff;
-        padding: 5px;
+        font-weight: bold;
+        padding-top: 5px;
         text-align: center;
     }
     .title {
@@ -88,7 +110,7 @@
         width: 360px;
         flex-direction: column;
         align-items: center;
-        padding: 10px 0 40px 0;
+        padding: 0 0 40px 0;
     }
     .category-title {
         width: 96%;
@@ -158,7 +180,6 @@ import file from '@system.file';
 import prompt from '@system.prompt';
 
 const SETTINGS_FILE_URI = 'internal://files/settings.json';
-// **新增**: 引入需要清除的文件路径
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
@@ -170,12 +191,17 @@ const PRESETS = {
         englishMode: ['translation', 'original'],
     },
     performance: {
-        windowSize: [20, 30, 40], // 低, 中, 高
-        pageSize: [10, 15, 20],   // 低, 中, 高
+        windowSize: [20, 30, 40],
+        pageSize: [10, 15, 20],
     },
     network: {
-        totalLimit: [50, 200, 500], // 慢, 均衡, 快
-        apiPageSize: [20, 50, 100], // 慢, 均衡, 快
+        totalLimit: [50, 200, 500],
+        apiPageSize: [20, 50, 100],
+    },
+    // **新增**: 搜索设置的档位
+    search: {
+        totalLimit: [10, 25, 50],
+        apiPageSize: [5, 10, 25],
     }
 };
 
@@ -195,6 +221,11 @@ export default {
             network: {
                 totalLimit: 200,
                 apiPageSize: 50,
+            },
+            // **新增**: 搜索的默认设置
+            search: {
+                totalLimit: 25,
+                apiPageSize: 10,
             }
         },
     },
@@ -211,9 +242,9 @@ export default {
     },
 
     onInit() {
-        this.loadSettings();
         this.updateTime();
         setInterval(() => this.updateTime(), 1000);
+        this.loadSettings();
     },
 
     updateTime() {
@@ -236,6 +267,7 @@ export default {
                         lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
                         performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
                         network: { ...this.settings.network, ...(loadedSettings.network || {}) },
+                        search: { ...this.settings.search, ...(loadedSettings.search || {}) }, // **新增**: 合并搜索设置
                     };
                 } catch (e) {
                     console.error("解析设置文件失败，将保存默认设置。");
@@ -254,15 +286,12 @@ export default {
             uri: SETTINGS_FILE_URI,
             text: JSON.stringify(this.settings, null, 2),
             success: () => {
-                prompt.showToast({ message: '设置已保存' });
             },
             fail: () => {
-                prompt.showToast({ message: '设置保存失败' });
             }
         });
     },
 
-    // --- 切换设置项的辅助函数 ---
     _toggleSetting(category, key, presets) {
         const currentValue = this.settings[category][key];
         const currentIndex = presets.indexOf(currentValue);
@@ -271,30 +300,17 @@ export default {
         this.saveSettings();
     },
 
-    toggleJapaneseLyricMode() {
-        this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode);
-    },
-    toggleEnglishLyricMode() {
-        this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode);
-    },
-    toggleWindowSize() {
-        this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize);
-    },
-    togglePageSize() {
-        this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize);
-    },
-    toggleTotalLimit() {
-        this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit);
-    },
-    toggleApiPageSize() {
-        this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize);
-    },
+    toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
+    toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
+    toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
+    togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
+    toggleTotalLimit() { this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit); },
+    toggleApiPageSize() { this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize); },
+    // **新增**: 切换搜索设置的方法
+    toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
+    toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
 
-
-    /**
-     * **核心修正**: 完全遵循 VelaOS 的 success/cancel 回调逻辑
-     */
-     handleLogout() {
+    handleLogout() {
         prompt.showDialog({
             title: '退出登录',
             message: '您确定要退出登录吗？这将清除您的本地用户数据。',
@@ -302,52 +318,30 @@ export default {
                 { text: '取消', color: '#999999' },
                 { text: '确定', color: '#FF453A' }
             ],
-            
-            // **关键1**: 当用户点击“确定”时，此回调被触发
             success: async () => {
                 prompt.showToast({ message: '正在退出...' });
-                
                 try {
-                    // 并行删除所有相关文件
                     await Promise.all([
                         this.deleteFile(PROFILE_FILE_URI),
                         this.deleteFile(AVATAR_CACHE_URI),
                         this.deleteFile(COOKIE_FILE_URI)
                     ]);
-
-                    // 清理 app.ux 中的 cookie 缓存
                     if (this.$app.$def.cookieService) {
                         this.$app.$def.cookieService.cookie = null;
                     }
-
                     prompt.showToast({ message: '已退出登录' });
-
-                    // 跳转回个人中心
-                        router.back();
-
+                    router.back();
                 } catch (error) {
                     console.error("退出登录失败:", error);
                     prompt.showToast({ message: '操作失败，请重试' });
                 }
             },
-
-            // **关键2**: 当用户点击“取消”或按返回键时，此回调被触发
             cancel: () => {
                 prompt.showToast({ message: '操作已取消' });
-                console.log("用户取消了退出登录操作。");
             },
-
-            // fail 回调作为最后的保障，处理API调用本身的失败
-            fail: (data, code) => {
-                console.error(`showDialog API 调用失败, code=${code}, data=${data}`);
-                prompt.showToast({ message: '对话框显示失败' });
-            }
         });
     },
 
-    /**
-     * 封装一个安全的删除文件方法 (保持不变)
-     */
     async deleteFile(uri) {
         return new Promise((resolve) => {
             file.delete({ uri: uri, success: resolve, fail: resolve });

@@ -107,12 +107,42 @@ export default {
         }});
     },
 
-    // onShow 周期函数，当从播放器返回时，可以刷新状态
-    async onShow() {
-        // 重新加载下载列表，以更新可能在后台完成的下载状态
-        await this.loadDownloadedSongs();
-        this.updateDownloadStatus();
-    },
+// volume.js
+
+// ...
+
+async onShow() {
+    // 重新加载下载列表，以更新可能在后台完成的下载状态
+    await this.loadDownloadedSongs();
+    this.updateDownloadStatus();
+},
+
+// ...
+
+async loadDownloadedSongs() {
+    try {
+        const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: resolve, fail: reject }));
+        this.downloadedSongs = JSON.parse(data.text || '{}');
+    } catch (e) {
+        this.downloadedSongs = {};
+    }
+},
+
+// ...
+
+updateDownloadStatus() {
+    if (this.currentSong) {
+        const songId = this.currentSong.id;
+        // 检查下载状态，包括 player 页面可能设置的 'downloading' 状态
+        const downloadedInfo = this.downloadedSongs[songId];
+        if (downloadedInfo) {
+            this.downloadState = downloadedInfo.downloadStatus === 'downloading' ? 'downloading' : 'downloaded';
+        } else {
+            this.downloadState = 'not_downloaded';
+        }
+    }
+},
+
 
     async loadInitialState() {
         // 使用 Promise.all 并行加载收藏和下载列表
@@ -133,33 +163,12 @@ export default {
         }
     },
 
-    async loadDownloadedSongs() {
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: resolve, fail: reject }));
-            this.downloadedSongs = JSON.parse(data.text || '{}');
-        } catch (e) {
-            this.downloadedSongs = {};
-        }
-    },
-
     updateFavoriteStatus() {
         if (this.currentSong) {
             this.isFavorited = !!this.favorites[this.currentSong.id];
         }
     },
 
-    updateDownloadStatus() {
-        if (this.currentSong) {
-            const songId = this.currentSong.id;
-            // 检查下载状态，包括 player 页面可能设置的 'downloading' 状态
-            const downloadedInfo = this.downloadedSongs[songId];
-            if (downloadedInfo) {
-                this.downloadState = downloadedInfo.downloadStatus === 'downloading' ? 'downloading' : 'downloaded';
-            } else {
-                this.downloadState = 'not_downloaded';
-            }
-        }
-    },
 
     changeVolume(direction) {
         const newVolume = this.volume + (direction * 10);

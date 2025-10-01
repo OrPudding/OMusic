@@ -38,7 +38,8 @@
     .time-display {
         font-size: 28px;
         color: #ffffff;
-        padding: 5px;
+        font-weight: bold;
+        padding-top: 5px;
         text-align: center;
     }
     .title {
@@ -60,7 +61,7 @@
         justify-content: space-around;
     }
     .playlist-item {
-        width: 200px;
+        width:45%;
         flex-direction: column;
         padding: 10px;
         margin: 10px 5px;
@@ -97,15 +98,14 @@
 import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
+// **注意**: 不再需要直接导入 fetch
 
 const API_BASE = 'https://163api.qijieya.cn';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
-// --- **核心修正 1: 新增常量和文件服务** ---
-const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/'; // 用户歌单的缓存目录
+const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
 
-// 简单的文件服务 ，用于读写JSON
 const fileService = {
-    _promisify(fn, options) {
+    _promisify(fn, options ) {
         return new Promise((resolve, reject) => {
             fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
         });
@@ -136,7 +136,6 @@ const fileService = {
         }
     }
 };
-// ---
 
 export default {
     protected: {
@@ -151,10 +150,8 @@ export default {
     },
 
     async onInit() {
-        // --- **核心修正 2: 确保缓存目录存在** ---
         await fileService.ensureDirExists(USER_PLAYLISTS_DIR);
-        // ---
-        this.loadUserPlaylistsWithCache(); // 调用新的带缓存方法
+        this.loadUserPlaylistsWithCache();
         this.updateTime();
         setInterval(() => {
             this.updateTime();
@@ -168,7 +165,6 @@ export default {
         this.currentTime = `${hours}:${minutes}`;
     },
 
-    // --- **核心修正 3: 实现带缓存的加载逻辑** ---
     async loadUserPlaylistsWithCache() {
         if (this.isLoading) return;
         this.isLoading = true;
@@ -182,7 +178,6 @@ export default {
 
         const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
 
-        // 1. 尝试从缓存加载并立即显示
         const cachedData = await fileService.readJson(cacheFileUri, null);
         if (cachedData) {
             console.log(`从缓存加载用户 ${userId} 的歌单。`);
@@ -192,51 +187,59 @@ export default {
             prompt.showToast({ message: '正在加载...' });
         }
 
-        // 2. 异步从网络获取最新数据
         try {
+            // **核心修改 1**: 获取全局请求服务
             const request = this.$app.$def.requestService;
             if (!request) throw new Error('内部服务错误');
 
-            const url = `${API_BASE}/user/playlist?uid=${userId}&timestamp=${Date.now()}`;
+            // **核心修改 2**: 移除不被支持的 timestamp 参数
+            const url = `${API_BASE}/user/playlist?uid=${userId}`;
+            console.log("Requesting user playlists with URL:", url);
+
+            // **核心修改 3**: 使用全局服务发起请求
             const response = await request.fetch({ url });
-            const newPlaylists = response.data?.playlist;
 
-            if (newPlaylists && newPlaylists.length > 0) {
-                const creatorName = newPlaylists[0].creator?.nickname;
-                const newPageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
-                const newFormattedPlaylists = newPlaylists.map(pl => ({
-                    id: pl.id,
-                    name: pl.name,
-                    trackCount: pl.trackCount,
-                }));
+            if (response.status === 'success') {
+                const newPlaylists = response.data?.playlist;
 
-                const newDataToCache = {
-                    pageTitle: newPageTitle,
-                    playlists: newFormattedPlaylists,
-                };
+                if (newPlaylists && newPlaylists.length > 0) {
+                    const creatorName = newPlaylists[0].creator?.nickname;
+                    const newPageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
+                    const newFormattedPlaylists = newPlaylists.map(pl => ({
+                        id: pl.id,
+                        name: pl.name,
+                        trackCount: pl.trackCount,
+                    }));
 
-                // 3. 对比并更新
-                if (JSON.stringify(cachedData) !== JSON.stringify(newDataToCache)) {
-                    console.log(`用户 ${userId} 的歌单有更新，刷新UI并写入缓存。`);
-                    this.playlists = newFormattedPlaylists;
-                    this.pageTitle = newPageTitle;
-                    await fileService.writeJson(cacheFileUri, newDataToCache);
-                } else {
-                    console.log(`用户 ${userId} 的歌单无更新。`);
+                    const newDataToCache = {
+                        pageTitle: newPageTitle,
+                        playlists: newFormattedPlaylists,
+                    };
+
+                    if (JSON.stringify(cachedData) !== JSON.stringify(newDataToCache)) {
+                        console.log(`用户 ${userId} 的歌单有更新，刷新UI并写入缓存。`);
+                        this.playlists = newFormattedPlaylists;
+                        this.pageTitle = newPageTitle;
+                        await fileService.writeJson(cacheFileUri, newDataToCache);
+                    } else {
+                        console.log(`用户 ${userId} 的歌单无更新。`);
+                    }
+                } else if (!cachedData) {
+                    prompt.showToast({ message: '未找到该用户的公开歌单' });
                 }
-            } else if (!cachedData) { // 仅在没有缓存且网络也无数据时提示
-                prompt.showToast({ message: '未找到该用户的公开歌单' });
+            } else {
+                // **核心修改 4**: 抛出从全局服务获取的、更具体的错误信息
+                throw new Error(response.message || '未知错误');
             }
         } catch (error) {
             console.error("获取用户歌单失败:", error);
-            if (!cachedData) { // 仅在没有缓存且网络失败时提示
-                prompt.showToast({ message: `加载失败: ${error.code || '网络错误'}` });
+            if (!cachedData) {
+                prompt.showToast({ message: `加载失败: ${error.message}` });
             }
         } finally {
             this.isLoading = false;
         }
     },
-    // ---
 
     async getUserIdFromLocal() {
         try {
@@ -264,4 +267,3 @@ export default {
         router.back();
     }
 };
-</script>

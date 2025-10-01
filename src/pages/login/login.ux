@@ -1,39 +1,30 @@
 <template>
 	<div class="page-container">
-		<!-- 扫码登录部分 -->
+		<!-- 头部信息 -->
 		<div class="header" onclick="back">
 			<text class="time-display">{{ currentTime }}</text>
-			<text class="title">‹扫码登录</text>
+			<text class="title">‹账号登录</text>
 		</div>
-		<div class="qrcode-wrapper">
-			<qrcode
-				if="{{ qrCodeValue }}"
-				value="{{ qrCodeValue }}"
-				class="qrcode-component"
-				onclick="startLoginFlow"
-			></qrcode>
-			<div
-				class="status-overlay"
-				if="{{ !qrCodeValue || loginStatus !== '等待扫码' }}"
-			>
-				<text class="status-text">{{ loginStatus }}</text>
-			</div>
-		</div>
-		<text class="tip">请使用网易云音乐APP扫码</text>
 
-		<!-- 手动输入入口 -->
+        <!-- 状态指示器 -->
+		<div class="status-wrapper">
+			<image class="status-icon" src="{{ connectionIcon }}"></image>
+			<text class="status-text">{{ connectionStatus }}</text>
+		</div>
+
+		<text class="tip">请在AstroBox插件中输入Cookie</text>
+
+		<!-- 手动输入UID入口 -->
 		<text class="manual-input-trigger" onclick="toggleUidInput(true)">
-			提示风险？手动输入用户ID
+			或者手动输入用户ID
 		</text>
 
-		<!-- 手动输入覆盖层 -->
+		<!-- 手动输入UID覆盖层 -->
 		<div class="uid-input-overlay" if="{{ showUidInput }}">
 			<div class="input-panel">
-				<!-- 1. 输入显示框 -->
 				<div class="uid-display-wrapper">
 					<text class="uid-display">{{ uidInput || "" }}</text>
 				</div>
-				<!-- 2. 紧凑型键盘 -->
 				<div class="keyboard">
 					<div class="key-row">
 						<text class="key" onclick="handleKeyPress('1')">1</text>
@@ -58,158 +49,42 @@
 						<text class="key action-key" onclick="handleKeyPress('退格')">退格</text>
 					</div>
 				</div>
-				<!-- 3. 确认按钮 -->
 				<text class="confirm-button" onclick="confirmUid">确认</text>
 			</div>
 		</div>
 	</div>
 </template>
+
 <style>
-.page-container {
-	width: 100%;
-	height: 100%;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	background-color: #000000;
-}
-.header {
-	width: 100%;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-}
-.time-display {
-	font-size: 28px;
-	color: #ffffff;
-	padding: 5px;
-	text-align: center;
-}
-.title {
-	font-size: 32px;
-	padding: 5px;
-	text-align: center;
-	font-weight: bold;
-	color: #fff;
-}
-.qrcode-wrapper {
-	width: 260px;
-	height: 260px;
-	justify-content: center;
-	align-items: center;
-	border-radius: 20px;
-}
-.qrcode-component {
-	width: 240px;
-	height: 240px;
-}
-.status-overlay {
-	position: absolute;
-	width: 200px;
-	height: 200px;
-	background-color: rgba(0, 0, 0, 0.8);
-	border-radius: 20px;
-	justify-content: center;
-	align-items: center;
-}
-.status-text {
-	font-size: 24px;
-	color: #ffffff;
-	text-align: center;
-}
-.tip {
-	font-size: 26px;
-	color: rgba(255, 255, 255, 1);
-	margin-top: 8px;
-}
-.manual-input-trigger {
-	font-size: 22px;
-	color: #888;
-	text-decoration: underline;
-	margin-bottom: 40px;
-}
-
-.uid-input-overlay {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	background-color: #000;
-	justify-content: center;
-	align-items: center;
-}
-
-/* --- 核心尺寸优化 --- */
-.input-panel {
-	width: 320px; /* 显著减小面板宽度 */
-	flex-direction: column;
-	align-items: center;
-}
-
-.uid-display-wrapper {
-	width: 60%;
-	height: 50px; /* 减小高度 */
-	background-color: rgba(255, 255, 255, 0.06);
-	border-radius: 18px;
-	justify-content: center;
-	align-items: center;
-    margin-top: 10px;
-	margin-bottom: 20px; /* 减小间距 */
-	border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.uid-display {
-	color: #fff;
-	font-size: 26px; /* 减小字体大小 */
-}
-
-.keyboard {
-	width: 100%;
-	flex-direction: column;
-}
-
-.key-row {
-	width: 100%;
-	justify-content: space-between;
-	margin-bottom: 12px; /* 减小行间距 */
-}
-
-.key {
-	width: 100px; /* 减小按键宽度 */
-	height: 55px; /* 减小按键高度 */
-	background-color: rgba(255, 255, 255, 0.1);
-	border-radius: 27.5px; /* 保持完美胶囊 */
-	color: #fff;
-	font-size: 28px; /* 减小按键字体 */
-	font-weight: bold;
-	text-align: center;
-}
-
-.action-key {
-	font-size: 26px; /* 功能键字体更小 */
-	font-weight: bold;
-	background-color: rgba(255, 255, 255, 0.05);
-}
-
-.confirm-button {
-	width: 60%;
-	height: 60px; /* 减小确认按钮高度 */
-	border-radius: 30px;
-	background-color: #3ae1ff;
-	color: #000;
-	font-size: 26px; /* 减小字体 */
-	font-weight: bold;
-	text-align: center;
-}
+/* ... (样式无变化) ... */
+.page-container { width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background-color: #000000; }
+.header { width: 100%; flex-direction: column; justify-content: center; align-items: center; }
+.time-display { font-size: 28px; color: #ffffff; font-weight: bold; padding-top: 5px; text-align: center; }
+.title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
+.status-wrapper { width: 260px; height: 231px; justify-content: center; align-items: center; flex-direction: column; }
+.status-icon { width: 80px; height: 80px; margin-bottom: 20px; }
+.status-text { font-size: 26px; color: #ffffff; text-align: center; }
+.tip { font-size: 26px; color: rgba(255, 255, 255, 1); margin-top: 8px; }
+.manual-input-trigger { font-size: 22px; color: #888; text-decoration: underline; margin-bottom: 70px; }
+.uid-input-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; justify-content: center; align-items: center; }
+.input-panel { width: 320px; flex-direction: column; align-items: center; }
+.uid-display-wrapper { width: 60%; height: 50px; background-color: rgba(255, 255, 255, 0.06); border-radius: 18px; justify-content: center; align-items: center; margin-top: 10px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.uid-display { color: #fff; font-size: 26px; }
+.keyboard { width: 100%; flex-direction: column; }
+.key-row { width: 100%; justify-content: space-between; margin-bottom: 12px; }
+.key { width: 100px; height: 55px; background-color: rgba(255, 255, 255, 0.1); border-radius: 27.5px; color: #fff; font-size: 28px; font-weight: bold; text-align: center; }
+.action-key { font-size: 26px; font-weight: bold; background-color: rgba(255, 255, 255, 0.05); }
+.confirm-button { width: 60%; height: 60px; border-radius: 30px; background-color: #3ae1ff; color: #000; font-size: 26px; font-weight: bold; text-align: center; }
 </style>
+
 <script>
-import fetch from '@system.fetch';
 import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
 import request from '@system.request';
+// **注意**: fetch 模块不再需要，因为我们只保存cookie，不在此页面发起网络请求
 
+// --- 常量定义 (无变化) ---
 const API_BASE = 'https://163api.qijieya.cn';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
@@ -218,38 +93,28 @@ const LOCAL_AVATAR_URI = `${AVATAR_CACHE_DIR}user_avatar.png`;
 
 export default {
     private: {
-        qrCodeValue: '',
-        loginKey: '',
-        loginStatus: '正在生成二维码...',
-        pollingTimer: null,
+        connectionStatus: '正在初始化...',
+        connectionIcon: '/common/icon/connecting.png',
         showUidInput: false,
         uidInput: '',
-        keyboardLayout: [
-            ['1', '2', '3'],
-            ['4', '5', '6'],
-            ['7', '8', '9'],
-            ['', '0', '⌫'],
-        ],
         currentTime: "00:00",
     },
 
-    onInit( ) {
-        file.mkdir({
-            uri: AVATAR_CACHE_DIR,
-            complete: () => {
-                this.startLoginFlow();
-                this.updateTime();
-                setInterval(() => {
-                    this.updateTime();
-                }, 1000);
-            }
-        });
+    onInit(  ) {
+        this.updateTime();
+        setInterval(() => this.updateTime(), 1000);
+        file.mkdir({ uri: AVATAR_CACHE_DIR });
+    },
+
+    onShow() {
+        console.log("Login page onShow: 初始化或刷新 Interconnect 逻辑。");
+        this.initializeInterconnect();
     },
 
     onDestroy() {
-        if (this.pollingTimer) {
-            clearTimeout(this.pollingTimer);
-            this.pollingTimer = null;
+        const connect = this.$app.$def.connectInstance;
+        if (connect) {
+            connect.onmessage = null;
         }
     },
 
@@ -260,118 +125,75 @@ export default {
         this.currentTime = `${hours}:${minutes}`;
     },
 
-    startLoginFlow() {
-        if (this.pollingTimer) {
-            clearTimeout(this.pollingTimer);
-            this.pollingTimer = null;
+    initializeInterconnect() {
+        const connect = this.$app.$def.connectInstance;
+        if (!connect) {
+            this.connectionStatus = '连接初始化失败';
+            this.connectionIcon = '/common/icon/error.png';
+            return;
         }
-        this.qrCodeValue = '';
-        this.loginStatus = '正在生成二维码...';
 
-        this.getLoginKey()
-            .then(keyData => {
-                this.loginKey = keyData.data.unikey;
-                return this.createQrCode(this.loginKey);
-            })
-            .then(qrData => {
-                this.qrCodeValue = qrData.data.qrurl;
-                this.loginStatus = '等待扫码';
-                this.pollLoginStatus();
-            })
-            .catch(error => {
-                this.loginStatus = '初始化失败，请刷新';
-                prompt.showToast({ message: `操作失败: ${error.message || '网络错误'}` });
-                console.error("登录流程初始化失败:", error);
-            });
-    },
+        connect.onmessage = (data) => {
+            console.log(`Login page received message: ${data.data}`);
+            const musicUCookie = data.data;
 
-    async getLoginKey() {
-        const url = `${API_BASE}/login/qr/key?timestamp=${Date.now()}`;
-        const response = await this.fetchPromise({ url });
-        if (response.data.code === 200) {
-            return response.data;
-        } else {
-            throw new Error('获取Key失败');
-        }
-    },
+            if (musicUCookie && musicUCookie.startsWith('MUSIC_U=')) {
+                prompt.showToast({ message: '接收到登录凭证！' });
+                // **核心修改**: 只保存Cookie，不获取用户信息
+                this.handleCookieSave(musicUCookie);
+            } else {
+                prompt.showToast({ message: '同步数据格式错误' });
+            }
+        };
 
-    async createQrCode(key) {
-        const url = `${API_BASE}/login/qr/create?key=${key}&qrimg=true&timestamp=${Date.now()}`;
-        const response = await this.fetchPromise({ url });
-        if (response.data.code === 200) {
-            return response.data;
-        } else {
-            throw new Error('生成二维码失败');
-        }
-    },
-
-    pollLoginStatus() {
-        if (!this.loginKey) return;
-        const url = `${API_BASE}/login/qr/check?key=${this.loginKey}&timestamp=${Date.now()}`;
-        
-        this.fetchPromise({ url })
-            .then(response => {
-                const { code, cookie } = response.data;
-                switch (code) {
-                    case 800:
-                        this.loginStatus = '二维码已过期，请刷新';
-                        this.qrCodeValue = '';
-                        return;
-                    case 801:
-                        this.loginStatus = '等待扫码';
-                        break;
-                    case 802:
-                        this.loginStatus = '扫码成功，请在手机上确认';
-                        break;
-                    case 803:
-                        this.loginStatus = '登录成功！';
-                        prompt.showToast({ message: '登录成功！' });
-                        this.saveCookie(cookie, () => {
-                            setTimeout(() => {
-                                router.back();
-                            }, 1000);
-                        });
-                        return;
-                    default:
-                        this.loginStatus = `未知状态: ${code}`;
-                        break;
-                }
-                this.pollingTimer = setTimeout(() => {
-                    this.pollLoginStatus();
-                }, 2000);
-            })
-            .catch(error => {
-                console.error("轮询失败:", error);
-                this.pollingTimer = setTimeout(() => {
-                    this.pollLoginStatus();
-                }, 5000);
-            });
-    },
-
-    saveCookie(cookieString, callback) {
-        file.writeText({
-            uri: COOKIE_FILE_URI,
-            text: cookieString,
-            success: () => {
-                console.log("Cookie保存成功！");
-                if (this.$app.$def.cookieService) {
-                    this.$app.$def.cookieService.cookie = cookieString;
-                }
-                callback();
+        connect.getReadyState({
+            success: (data) => {
+                this.connectionStatus = data.status === 1 ? '连接成功，等待同步...' : '连接已断开';
+                this.connectionIcon = data.status === 1 ? '/common/icon/connected.png' : '/common/icon/disconnected.png';
             },
-            fail: (data, code) => {
-                console.error(`Cookie保存失败, code=${code}`);
-                callback(); // 即使失败也继续
+            fail: () => {
+                this.connectionStatus = '获取状态失败';
+                this.connectionIcon = '/common/icon/error.png';
             }
         });
     },
 
-    fetchPromise(options) {
+    /**
+     * **核心新增**: 处理Cookie保存和后续流程
+     */
+    async handleCookieSave(cookie) {
+        try {
+            this.connectionStatus = '正在保存凭证...';
+            await this.saveCookie(cookie);
+
+            this.connectionStatus = '登录成功！';
+            this.connectionIcon = '/common/icon/success.png';
+            prompt.showToast({ message: '登录成功！用户信息将在下次启动时更新。' });
+
+            setTimeout(() => router.back(), 1500);
+
+        } catch (error) {
+            console.error("保存Cookie失败:", error);
+            const errorMessage = error.message || '未知错误';
+            this.connectionStatus = `登录失败: ${errorMessage}`;
+            this.connectionIcon = '/common/icon/error.png';
+            prompt.showToast({ message: `登录失败: ${errorMessage}`, duration: 3000 });
+        }
+    },
+
+    saveCookie(cookieString) {
         return new Promise((resolve, reject) => {
-            fetch.fetch({
-                ...options,
-                success: resolve,
-                fail: (data, code) => reject({ data, code }),
+            file.writeText({
+                uri: COOKIE_FILE_URI,
+                text: cookieString,
+                success: () => {
+                    console.log("Cookie保存成功！");
+                    if (this.$app.$def.cookieService) {
+                        this.$app.$def.cookieService.cookie = cookieString;
+                    }
+                    resolve();
+                },
+                fail: (data, code) => reject(new Error(`保存Cookie失败, code: ${code}`)),
             });
         });
     },
@@ -380,121 +202,88 @@ export default {
         router.back();
     },
 
+    // --- 手动输入UID相关方法 (保持不变) ---
     toggleUidInput(show) {
         this.showUidInput = show;
         if (!show) {
-            this.uidInput = ''; // 关闭时清空输入
+            this.uidInput = '';
         }
     },
-
     handleKeyPress(key) {
         if (key === '退格') {
             this.uidInput = this.uidInput.slice(0, -1);
-        } else if (this.uidInput.length < 15) { // 限制最大长度
+        } else if (this.uidInput.length < 15) {
             this.uidInput += key;
         }
     },
-
-    confirmUid() {
+    async confirmUid() {
         if (!this.uidInput) {
             prompt.showToast({ message: "请输入用户ID" });
             return;
         }
-
         prompt.showToast({ message: "正在验证用户ID..." });
-        const url = `${API_BASE}/user/detail?uid=${this.uidInput}`;
+        
+        try {
+            // **注意**: 手动输入流程依然需要 fetch，所以需要从全局服务获取
+            const request = this.$app.$def.requestService;
+            if (!request) throw new Error("内部服务错误");
 
-        this.fetchPromise({ url })
-            .then(response => {
-                const profile = response.data?.profile;
-                if (profile) {
-                    this.clearAvatarCache(() => {
-                        this.downloadAndCacheAvatar(profile.avatarUrl, (localAvatarPath) => {
-                            const userProfile = {
-                                userId: profile.userId,
-                                nickname: profile.nickname,
-                                avatarUrl: localAvatarPath,
-                            };
-                            this.saveProfile(userProfile, () => {
-                                prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
-                                setTimeout(() => {
-                                    router.back();
-                                }, 1000);
-                            });
-                        });
-                    });
-                } else {
-                    prompt.showToast({ message: "用户ID无效或不存在" });
-                }
-            })
-            .catch(error => {
-                console.error("获取用户详情失败:", error);
-                prompt.showToast({ message: "验证失败，请检查网络" });
-            });
-    },
+            const url = `${API_BASE}/user/detail?uid=${this.uidInput}`;
+            const response = await request.fetch({ url });
 
-    downloadAndCacheAvatar(remoteUrl, callback) {
-        if (!remoteUrl) {
-            callback(null);
-            return;
+            if (response.status !== 'success') throw new Error(response.message || `网络请求失败, code: ${response.code}`);
+
+            const profile = response.data?.profile;
+            if (profile) {
+                const localAvatarPath = await this.downloadAndCacheAvatar(profile.avatarUrl);
+                const userProfile = {
+                    userId: profile.userId,
+                    nickname: profile.nickname,
+                    avatarUrl: localAvatarPath || '/common/icon/default_avatar.png',
+                };
+                await this.saveProfileToFile(userProfile);
+                prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
+                setTimeout(() => router.back(), 1000);
+            } else {
+                prompt.showToast({ message: "用户ID无效或不存在" });
+            }
+        } catch (error) {
+            console.error("手动验证用户详情失败:", error);
+            prompt.showToast({ message: "验证失败，请检查网络" });
         }
-
-        const thumbnailUrl = remoteUrl + (remoteUrl.includes('?') ? '&param=100y100' : '?param=100y100');
-
-        request.download({
-            url: thumbnailUrl,
-            success: (task) => {
-                request.onDownloadComplete({
-                    token: task.token,
-                    success: (data) => {
-                        file.move({
-                            srcUri: data.uri,
-                            dstUri: LOCAL_AVATAR_URI,
-                            success: () => {
-                                console.log("头像缓存成功:", LOCAL_AVATAR_URI);
-                                callback(LOCAL_AVATAR_URI);
-                            },
-                            fail: (moveData, moveCode) => {
-                                console.error(`移动文件失败, code=${moveCode}`);
-                                callback(null);
-                            }
-                        });
-                    },
-                    fail: (dlData, dlCode) => {
-                        console.error(`下载任务失败, code=${dlCode}`);
-                        callback(null);
-                    }
-                });
-            },
-            fail: (reqData, reqCode) => {
-                console.error(`创建下载任务失败, code=${reqCode}`);
-                callback(null);
-            }
+    },
+    downloadAndCacheAvatar(remoteUrl) {
+        return new Promise((resolve) => {
+            if (!remoteUrl) { resolve(null); return; }
+            const thumbnailUrl = remoteUrl + (remoteUrl.includes('?') ? '&param=100y100' : '?param=100y100');
+            request.download({
+                url: thumbnailUrl,
+                success: (task) => {
+                    request.onDownloadComplete({
+                        token: task.token,
+                        success: (data) => {
+                            file.move({
+                                srcUri: data.uri,
+                                dstUri: LOCAL_AVATAR_URI,
+                                success: () => resolve(LOCAL_AVATAR_URI),
+                                fail: () => resolve(null),
+                            });
+                        },
+                        fail: () => resolve(null),
+                    });
+                },
+                fail: () => resolve(null),
+            });
         });
     },
-
-    clearAvatarCache(callback) {
-        file.delete({
-            uri: LOCAL_AVATAR_URI,
-            complete: () => {
-                console.log("旧头像缓存清除操作完成。");
-                callback();
-            }
-        });
-    },
-
-    saveProfile(profileData, callback) {
-        file.writeText({
-            uri: PROFILE_FILE_URI,
-            text: JSON.stringify(profileData, null, 2),
-            success: () => {
-                console.log("用户信息保存成功！");
-                callback();
-            },
-            fail: (data, code) => {
-                console.error(`用户信息保存失败, code=${code}`);
-                callback();
-            },
+    saveProfileToFile(profileData) {
+        return new Promise((resolve, reject) => {
+            file.writeText({
+                uri: PROFILE_FILE_URI,
+                text: JSON.stringify(profileData, null, 2),
+                success: resolve,
+                fail: (data, code) => reject(new Error(`保存Profile失败, code: ${code}`)),
+            });
         });
     },
 };

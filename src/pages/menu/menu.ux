@@ -139,7 +139,8 @@ export default {
 .time-display {
   font-size: 28px;
   color: #ffffff;
-  padding: 5px;
+    font-weight: bold;
+	padding-top: 5px;
   text-align: center;
 }
 

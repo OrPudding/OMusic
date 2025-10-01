@@ -1,14 +1,93 @@
 <script>
 import file from '@system.file';
-import fetch from '@system.fetch'; // **新增**: 导入 fetch 模块
+import fetch from '@system.fetch';
+import interconnect from "@system.interconnect";
+import prompt from '@system.prompt'; // **新增**: 用于可能的全局提示
 
-// 定义常量
-const FILE_PLAY_LIST = 'internal://files/play_list.json';
+// --- 常量定义 ---
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+const FILE_PLAY_LIST = 'internal://files/play_list.json';
 
 export default {
+    // 1. 全局 interconnect 实例 (保持不变)
+    connectInstance: interconnect.instance(),
+
+    // 2. 全局 requestService
+    requestService: {
+        /**
+         * **核心修改**: 增加严格的 Cookie 格式校验
+         */
+        async loadCookie() {
+            try {
+                const data = await new Promise((resolve, reject) => {
+                    file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: reject });
+                });
+
+                const cookieText = data.text;
+
+                // **关键校验**: 检查文本是否存在，并且是否以 "MUSIC_U=" 开头
+                if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
+                    console.log("有效的 Cookie 已加载。");
+                    return cookieText.trim(); // 返回整理过的、有效的 cookie
+                } else {
+                    console.warn("cookie.txt 内容无效或格式不正确，视为未登录。");
+                    return null; // 内容无效，返回 null
+                }
+            } catch (e) {
+                // 读取文件失败（例如文件不存在），也视为未登录
+                // console.log("cookie.txt 文件不存在，视为未登录。");
+                return null;
+            }
+        },
+
+        async fetch(options) {
+            try {
+                const cookie = await this.loadCookie();
+                let url = options.url;
+
+                if (cookie) {
+                    const connector = url.includes('?') ? '&' : '?';
+                    url = `${url}${connector}cookie=${encodeURIComponent(cookie)}`;
+                }
+                
+                console.log(`Requesting URL: ${url}`);
+
+                const response = await new Promise((resolve, reject) => {
+                    fetch.fetch({
+                        ...options,
+                        url: url,
+                        header: {},
+                        responseType: 'text',
+                        success: resolve,
+                        fail: (data, code) => reject({ data, code }),
+                    });
+                });
+
+                if (response.code === 200) {
+                    try {
+                        const jsonData = JSON.parse(response.data);
+                        return { status: 'success', data: jsonData };
+                    } catch (e) {
+                        return { status: 'fail', message: 'JSON解析失败', data: response.data };
+                    }
+                } else {
+                    return { status: 'fail', message: `网络错误, code: ${response.code}`, code: response.code };
+                }
+
+            } catch (error) {
+                return { status: 'fail', message: error.message || '未知请求异常', data: error.data, code: error.code };
+            }
+        }
+    },
+
     onCreate() {
         console.info('App onCreate: 应用启动');
+        
+        const connect = this.connectInstance;
+        connect.onopen = (data) => { console.log("Global onopen:", data); prompt.showToast({ message: "App: 连接已建立" }); };
+        connect.onerror = (error) => { console.error("Global onerror:", error); prompt.showToast({ message: "App: 连接出错" }); };
+        connect.onclose = () => { console.log("Global onclose"); prompt.showToast({ message: "App: 连接已断开" }); };
+
         this.resetDownloadingStatusOnLaunch();
     },
 
@@ -16,64 +95,12 @@ export default {
         console.info('App onDestroy: 应用销毁');
     },
 
-    requestService: {
-        cookie: null,
-
-        async loadCookie() {
-            if (this.cookie) return this.cookie;
-            try {
-                const data = await new Promise((resolve, reject) => {
-                    file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: reject });
-                });
-                this.cookie = data.text;
-                return this.cookie;
-            } catch (e) {
-                return null;
-            }
-        },
-
-        /**
-         * **核心修正**: 无论成功或失败，都 resolve 一个包含所有信息的标准对象
-         * 这样调用方 (player.ux) 就永远不会进入 catch 块（除非是网络完全不通等底层错误）
-         * 而是总能拿到一个结果对象，然后自己判断 status 是 'success' 还是 'fail'
-         */
-        async fetch(options) {
-            const cookie = await this.loadCookie();
-            const headers = { ...(options.header || {}), Cookie: cookie };
-
-            return new Promise((resolve) => { // 注意：这里只用 resolve
-                fetch.fetch({
-                    ...options,
-                    header: headers,
-                    success: (response) => {
-                        // 请求成功，包装成一个成功状态的对象
-                        resolve({
-                            status: 'success',
-                            ...response
-                        });
-                    },
-                    fail: (data, code) => {
-                        // 请求失败（包括4xx, 5xx），包装成一个失败状态的对象
-                        resolve({
-                            status: 'fail',
-                            data: data,
-                            code: code
-                        });
-                    },
-                });
-            });
-        }
-    },
-
     resetDownloadingStatusOnLaunch() {
         console.info('开始检查并重置下载状态...');
         file.readText({
             uri: FILE_PLAY_LIST,
             success: (data) => {
-                if (!data || !data.text) {
-                    console.info('播放列表为空，无需重置。');
-                    return;
-                }
+                if (!data || !data.text) { console.info('播放列表为空，无需重置。'); return; }
                 try {
                     let playList = JSON.parse(data.text);
                     let statusChanged = false;
@@ -101,11 +128,8 @@ export default {
                 }
             },
             fail: (data, code) => {
-                if (code === 301) {
-                    console.info('播放列表文件不存在，无需重置。');
-                } else {
-                    console.error(`读取播放列表文件失败，错误码: ${code}`);
-                }
+                if (code === 301) { console.info('播放列表文件不存在，无需重置。'); }
+                else { console.error(`读取播放列表文件失败，错误码: ${code}`); }
             }
         });
     }
