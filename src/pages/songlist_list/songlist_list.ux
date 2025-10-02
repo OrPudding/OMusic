@@ -93,6 +93,16 @@
         font-size: 24px;
         padding: 30px;
     }
+    @media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
+    }
+    .time-display {
+        font-size: 32px;
+    }
+  }
 </style>
 <script>
 import router from '@system.router';
@@ -100,7 +110,7 @@ import prompt from '@system.prompt';
 import file from '@system.file';
 // **注意**: 不再需要直接导入 fetch
 
-const API_BASE = 'https://163api.qijieya.cn';
+const API_BASE = 'https://';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
 

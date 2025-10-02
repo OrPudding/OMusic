@@ -172,6 +172,16 @@
         font-size: 24px;
         padding: 30px;
     }
+    @media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
+    }
+    .time-display {
+        font-size: 32px;
+    }
+  }
 </style>
 
 <script>
@@ -406,7 +416,7 @@ export default {
             this.updateDisplayList(0);
         }
 
-        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
+        const BASE_URL = 'https:///playlist/track/all';
         let offset = cachedList ? cachedList.length : 0;
         let hasMore = true;
         let allSongs = cachedList ? [...cachedList] : [];

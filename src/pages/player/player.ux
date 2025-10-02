@@ -63,9 +63,9 @@ import request from '@system.request';
 
 // --- 1. 常量定义 ---
 const CONSTANTS = {
-    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=64000&id=',
-    API_LYRIC_URL: 'https://163api.qijieya.cn/lyric?id=',
-    API_DOWNLOAD_SONG_URL: 'https://163api.qijieya.cn/song/url?br=320000&id=',
+    API_SONG_URL: 'https:///song/url?br=64000&id=',
+    API_LYRIC_URL: 'https:///lyric?id=',
+    API_DOWNLOAD_SONG_URL: 'https:///song/url?br=320000&id=',
     DIR_MUSIC: 'internal://files/music/',
     DIR_LYRICS: 'internal://files/lyrics/',
     FILE_PLAY_LIST: 'internal://files/play_list.json',
@@ -208,6 +208,10 @@ export default {
     },
 
     async onInit() {
+        if (this.$app.isActivated === false) {
+        console.warn("Page Guard: 未授权，强制跳转到 Splash 页面。");
+        router.replace({ uri: '/pages/splash' });
+        return;}
         console.log("Player onInit: 页面实例创建。");
         this.bindAudioEvents();
         await this.loadSettings();

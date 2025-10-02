@@ -1,0 +1,354 @@
+<template>
+    <scroll class="splash-container" scroll-y="true" bounces="true">
+        <!-- 状态一：加载与验证中 -->
+        <div if="{{ verificationState === 'verifying' }}" class="verifying-content">
+            <image class="logo" src="/common/icon.png"></image>
+            <text class="app-name">OMusic</text>
+            <text class="status-text">正在验证授权...</text>
+        </div>
+  
+        <!-- 状态二：验证失败，显示最终优化后的引导页 -->
+        <div elif="{{ verificationState === 'failed' }}" class="activation-content">
+            <div class="header" onclick="back">
+                <text class="time-display">{{ currentTime }}</text>
+                <text class="title">‹软件激活</text>
+            </div>
+  
+            <!-- 
+              ===================================================================
+              核心修正：将设备ID也生成一个二维码，方便用户扫码复制
+              ===================================================================
+            -->
+  
+            <!-- 购买引导胶囊 -->
+            <div class="info-capsule">
+                <text class="capsule-title">第一步：扫码购买</text>
+                <qrcode value="{{ afdianPurchaseUrl }}" class="qrcode-component-large"></qrcode>
+                <text class="capsule-tip">请用手机扫码，打开爱发电页面</text>
+            </div>
+  
+            <!-- 设备ID填写引导胶囊 -->
+            <div class="info-capsule">
+                <text class="capsule-title">第二步：扫码复制ID并备注</text>
+                <div class="device-id-display">
+                    <!-- 左侧是设备ID的二维码 -->
+                    <qrcode value="{{ deviceId }}" class="qrcode-component-small"></qrcode>
+                    <!-- 右侧是引导文字和ID文本 -->
+                    <div class="device-id-text-wrapper">
+                        <text class="capsule-tip">购买时，扫码复制下方ID并填入订单备注</text>
+                        <text class="device-id-value">{{ deviceId }}</text>
+                    </div>
+                </div>
+            </div>
+  
+            <!-- ... 其他胶囊 ... -->
+  
+            <!-- 完成后操作按钮 -->
+            <text class="post-purchase-button" onclick="retryActivation">我已完成购买，开始验证</text>
+
+            <!-- ======================================================== -->
+            <!--  新增：用于调试的清除缓存按钮                          -->
+            <!-- ======================================================== -->
+            <text class="debug-button" onclick="handleClearAllCache">清除所有缓存并重置</text>
+
+        </div>
+    </scroll>
+  </template>
+  
+  <style>
+    /* --- 基础容器样式 --- */
+    .splash-container { width: 100%; height: 100%; flex-direction: column; align-items: center; background-color: black; padding: 20px 0; }
+    .verifying-content { width: 100%; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; }
+    .logo { width: 120px; height: 120px; }
+    .app-name { font-size: 48px; font-weight: bold; color: #ffffff; margin-top: 20px; }
+    .status-text { font-size: 24px; color: rgba(255, 255, 255, 0.6); margin-top: 15px; }
+    .activation-content { width: 100%; flex-direction: column; align-items: center; }
+    .header { width: 100%; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 5px; }
+    .time-display { font-size: 28px; font-weight: bold; color: #ffffff; }
+    .title { font-size: 32px; font-weight: bold; color: #fff; }
+  
+    /* --- 信息胶囊样式 --- */
+    .info-capsule { width: 360px; background-color: rgba(255, 255, 255, 0.06); border-radius: 24px;margin-bottom: 20px; flex-direction: column; align-items: center; padding: 20px; }
+    .capsule-title { font-size: 26px; font-weight: bold; color: #ffffff; margin-bottom: 15px; }
+    .capsule-tip { font-size: 20px; color: rgba(255, 255, 255, 0.7); text-align: center; }
+    
+    /* --- 大二维码样式 --- */
+    .qrcode-component-large { width: 220px; height: 220px; background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+  
+    /* --- 设备ID区域的特殊样式 --- */
+    .device-id-display {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+    }
+    .qrcode-component-small {
+        width: 180px; /* 适当增大，更容易扫描 */
+        height: 180px;
+        background-color: #ffffff;
+        padding: 5px;
+        border-radius: 4px;
+        margin-right: 15px;
+        flex-shrink: 0; /* 防止被压缩 */
+    }
+    .device-id-text-wrapper {
+        flex: 1;
+        flex-direction: column;
+    }
+    .device-id-value {
+        margin-top: 8px;
+        font-size: 22px;
+        font-weight: bold;
+        color: #3ae1ff;
+        text-overflow: clip;
+        lines: 3;
+    }
+  
+    /* --- 底部按钮样式 --- */
+    .post-purchase-button { font-size: 26px; color: #000000; background-color: #3ae1ff; padding: 15px 30px; border-radius: 50px; font-weight: bold; }
+        /* --- 新增：调试按钮样式 --- */
+        .debug-button {
+        font-size: 24px;
+        color: #000;
+        background-color: #fff;
+        margin-top: 15px;
+        margin-bottom: 60px;
+        padding: 10px 20px;
+        border-radius: 30px;
+    }
+
+  
+  /* 当屏幕为矩形形屏幕时 */
+  @media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
+    }
+    .time-display { font-size: 32px; }
+    .debug-button { margin-bottom: 20px; }
+  }
+  </style>
+  
+  <script>
+  import router from '@system.router';
+  import prompt from '@system.prompt';
+  import fetch from '@system.fetch';
+  import file from '@system.file';
+
+  // **新增**: 定义所有需要清除的缓存文件URI
+const LICENSE_FILE_URI = 'internal://files/license.json';
+const PROFILE_FILE_URI = 'internal://files/user_profile.json';
+const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
+const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+const ALL_CACHE_FILES = [LICENSE_FILE_URI, PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
+
+  
+  export default {
+      private: {
+          verificationState: 'verifying',
+          deviceId: '获取中...',
+          afdianPurchaseUrl: '',
+          currentTime: '00:00',
+          pollInterval: null,
+          isLoading: false, // 新增：用于防止重复点击的状态锁
+      },
+  
+      onInit() {
+          console.log("Splash.onInit: 初始化 Splash 页面。");
+          this.updateTime();
+          setInterval(() => { this.updateTime(); }, 1000);
+  
+          // 启动轮询，监控全局激活状态
+          this.pollInterval = setInterval(() => {
+              const appDef = this.$app.$def;
+              if (appDef.isActivated === true) {
+                  // --- 核心修改：平滑的成功跳转 ---
+                  clearInterval(this.pollInterval); // 立即停止轮询
+                  
+                  // 1. 确保UI处于“验证中”或类似状态，避免显示失败页
+                  this.verificationState = 'verifying'; 
+                  
+                  // 2. 给予明确的成功Toast
+                  prompt.showToast({ message: '授权成功！即将进入应用...' });
+                  
+                  // 3. 延迟1.5秒后再跳转，给用户反应时间
+                  setTimeout(() => {
+                      router.replace({ uri: '/pages/player' });
+                  }, 1500);
+  
+              } else if (appDef.isActivated === false) {
+                  // 如果明确知道失败了，并且当前还没显示失败页，就显示它
+                  if (appDef.deviceId && this.verificationState !== 'failed') {
+                      this.showFailedState();
+                  }
+              }
+              // isActivated 为 null 时，保持等待
+          }, 200);
+      },
+  
+      onDestroy() {
+          if (this.pollInterval) {
+              clearInterval(this.pollInterval);
+          }
+      },
+  
+      updateTime() {
+          const now = new Date();
+          const hours = now.getHours().toString().padStart(2, '0');
+          const minutes = now.getMinutes().toString().padStart(2, '0');
+          this.currentTime = `${hours}:${minutes}`;
+      },
+  
+      showFailedState() {
+          const appDef = this.$app.$def;
+          this.deviceId = appDef.deviceId || 'ID获取失败,请重启应用';
+          this.afdianPurchaseUrl = appDef.AFDIAN_PURCHASE_URL || 'https://afdian.com';
+          this.verificationState = 'failed';
+      },
+  
+      /**
+       * 最终生产版本 (包含完整的用户反馈流程 )
+       */
+      retryActivation() {
+          if (this.isLoading) {
+              prompt.showToast({ message: '正在验证中，请稍候...' });
+              return;
+          }
+          this.isLoading = true;
+          this.verificationState = 'verifying'; // 点击按钮后，立刻回到“验证中”的加载界面
+  
+          try {
+              const appDef = this.$app.$def;
+              const deviceId = appDef.deviceId;
+              const serverUrl = appDef.ACTIVATION_SERVER_URL;
+              const activateUrl = `${serverUrl}/activate`;
+              const licenseUri = appDef.LICENSE_FILE_URI;
+  
+              if (!deviceId || !serverUrl || !licenseUri) {
+                  throw new Error('应用内部配置错误，请重启应用。');
+              }
+  
+              console.log("Requesting activation via POST to:", activateUrl);
+              prompt.showToast({ message: '已发送验证请求...' });
+  
+              fetch.fetch({
+                  url: activateUrl,
+                  method: 'POST',
+                  header: { 'Content-Type': 'application/json' },
+                  data: { device_id: deviceId },
+                  success: (response) => {
+                      console.log("Global fetch success callback triggered.");
+  
+                      if (response.code === 200) {
+                          const result = response.data;
+                          if (result.status === 'success' && result.license) {
+                              prompt.showToast({ message: '已获取许可证，正在写入...' });
+                              const licenseData = result.license;
+                              
+                              file.writeText({
+                                  uri: licenseUri,
+                                  text: JSON.stringify(licenseData),
+                                  success: () => {
+                                      console.log("License file successfully written.");
+                                      prompt.showToast({ message: '写入成功，开始最终验证！' });
+                                      appDef.runActivationFlow(); // 触发全局验证流程
+                                      // 注意：成功后的跳转逻辑已移至 onInit 的轮询器中，以确保状态同步
+                                      this.isLoading = false; // 解锁按钮
+                                  },
+                                  fail: (data, code) => {
+                                      console.error(`许可证文件写入失败 (code: ${code})`, data);
+                                      prompt.showToast({ message: '关键文件写入失败，请检查存储权限或重启应用。' });
+                                      this.showFailedState();
+                                      this.isLoading = false;
+                                  }
+                              });
+                          } else {
+                              const serverMessage = result.message || '服务器返回了未知错误。';
+                              console.error("Activation business logic failed:", serverMessage);
+                              prompt.showToast({ message: `激活失败: ${serverMessage}` });
+                              this.showFailedState();
+                              this.isLoading = false;
+                          }
+                      } else {
+                          // 处理服务器返回的非200状态码，例如 403 (未付费)
+                          let errorMessage = `服务器错误 (代码: ${response.code})。`;
+                          try {
+                              const errorResult = (typeof response.data === 'string') ? JSON.parse(response.data) : response.data;
+                              if (errorResult && errorResult.message) {
+                                  errorMessage = errorResult.message; // 使用服务器提供的、更友好的中文错误信息
+                              }
+                          } catch (e) {
+                              console.error("Could not parse error response from server.");
+                          }
+                          console.error(`Activation failed with HTTP status ${response.code}.`);
+                          prompt.showToast({ message: `激活失败: ${errorMessage}` });
+                          this.showFailedState();
+                          this.isLoading = false;
+                      }
+                  },
+                  fail: (data, code) => {
+                      console.error(`网络请求失败 (code: ${code})`, data);
+                      prompt.showToast({ message: '网络连接失败，请检查网络后重试。' });
+                      this.showFailedState();
+                      this.isLoading = false;
+                  }
+              });
+  
+          } catch (error) {
+              console.error("Synchronous error during activation setup:", error.message);
+              prompt.showToast({ message: `激活准备失败: ${error.message}` });
+              this.showFailedState();
+              this.isLoading = false;
+          }
+      },
+      // **新增**: 清除所有缓存的方法
+    handleClearAllCache() {
+        prompt.showDialog({
+            title: '彻底重置',
+            message: '此操作将删除所有本地缓存，包括登录信息和激活状态，用于解决疑难问题。确定要继续吗？',
+            buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
+            success: (data) => {
+                if (data.index === 1) {
+                    prompt.showToast({ message: '正在清除所有缓存...' });
+                    let deletedCount = 0;
+                    const totalFiles = ALL_CACHE_FILES.length;
+
+                    const onFileDelete = () => {
+                        deletedCount++;
+                        if (deletedCount === totalFiles) {
+                            // 所有文件都处理完毕
+                            if (this.$app.$def) {
+                                this.$app.$def.isActivated = false;
+                                this.$app.$def.deviceId = null; // 重置设备ID
+                                if (this.$app.$def.cookieService) {
+                                    this.$app.$def.cookieService.cookie = null;
+                                }
+                            }
+                            prompt.showToast({ message: '所有缓存已清除！请重启应用。' });
+                            // 简单的刷新，让页面重新获取设备ID
+                            this.verificationState = 'verifying';
+                            setTimeout(() => {
+                                // 重新触发全局的初始化流程
+                                this.$app.$def.getDeviceIdentifier(true); 
+                            }, 1000);
+                        }
+                    };
+
+                    ALL_CACHE_FILES.forEach(uri => {
+                        file.delete({
+                            uri: uri,
+                            success: onFileDelete,
+                            fail: onFileDelete // 无论成功失败，都视为完成
+                        });
+                    });
+                } else {
+                    prompt.showToast({ message: '操作已取消' });
+                }
+            }
+        });
+    }
+  };
+  </script>
+  

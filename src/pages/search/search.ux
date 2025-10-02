@@ -118,6 +118,11 @@
     font-size: 24px;
     padding: 30px;
 }
+@media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+    }
+  }
 </style>
 <script>
 import fetch from "@system.fetch";
@@ -274,7 +279,7 @@ export default {
         let offset = 0;
         let hasMore = true;
         while (hasMore && this.fullResultList.length < this.TOTAL_LIMIT) {
-            const apiUrl = `https://163api.qijieya.cn/search?keywords=${encodeURIComponent(this.textValue  )}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
+            const apiUrl = `https:///search?keywords=${encodeURIComponent(this.textValue  )}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
             try {
                 const response = await new Promise((resolve, reject) => {
                     fetch.fetch({ url: apiUrl, responseType: 'text', success: resolve, fail: reject });

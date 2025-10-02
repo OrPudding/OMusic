@@ -44,6 +44,9 @@
     },
     {
       "name": "system.interconnect"
+    },
+    {
+      "name": "system.crypto"
     }
   ],
   "config": {
@@ -60,7 +63,7 @@
     "backgroundColor": "#000000"
   },
   "router": {
-    "entry": "pages/player",
+    "entry": "pages/splash",
     "pages": {
       "pages/player": {
         "component": "player",
@@ -95,7 +98,14 @@
       },
       "pages/songlist_list": {
         "component": "songlist_list"
+      },
+      "pages/splash": {
+        "component": "splash"
       }
-    }
+    },
+      "permissions": [
+        { "name": "hapjs.permission.DEVICE_INFO" }
+      ]
+    
   }
 }

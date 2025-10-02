@@ -143,6 +143,16 @@ padding-bottom: 80px;
         color: rgba(255, 255, 255, 0.5);
     }
 
+    @media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
+    }
+    .time-display {
+        font-size: 32px;
+    }
+  }
 </style>
 <script>
 import router from '@system.router';

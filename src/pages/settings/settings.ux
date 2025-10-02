@@ -5,7 +5,7 @@
             <text class="title">‹设置</text>
         </div>
         <div class="settings-list">
-            <!-- 歌词设置 (无变化) -->
+            <!-- ... 其他设置类别保持不变 ... -->
             <text class="category-title">歌词显示</text>
             <div class="setting-item">
                 <text class="item-label">日语歌词</text>
@@ -19,7 +19,6 @@
             </div>
             <text class="item-desc">适用于仅提供原文和翻译的歌曲，如英语、法语等。</text>
   
-            <!-- 性能设置 (无变化) -->
             <text class="category-title">列表性能</text>
             <div class="setting-item">
                 <text class="item-label">列表渲染数量</text>
@@ -33,157 +32,119 @@
             </div>
             <text class="item-desc">每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。</text>
             
-            <!-- 网络与加载设置 (核心修改) -->
             <text class="category-title">网络与加载</text>
             <div class="setting-item">
                 <text class="item-label">歌单加载总数</text>
                 <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
             </div>
-            <!-- **优化后文案** -->
             <text class="item-desc">在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。</text>
             
             <div class="setting-item">
                 <text class="item-label">网络请求分页</text>
                 <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
             </div>
-            <!-- **优化后文案** -->
             <text class="item-desc">每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。</text>
   
-            <!-- 搜索设置 (核心修改) -->
             <text class="category-title">搜索设置</text>
             <div class="setting-item">
                 <text class="item-label">最大搜索结果</text>
                 <text class="item-value-btn" onclick="toggleSearchTotalLimit">{{ settings.search.totalLimit }}</text>
             </div>
-            <!-- **优化后文案** -->
             <text class="item-desc">单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。</text>
             
             <div class="setting-item">
                 <text class="item-label">搜索请求分页</text>
                 <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
             </div>
-            <!-- **优化后文案** -->
             <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
-  
-            <!-- 退出登录 (保持不变) -->
-            <div class="logout-section">
-              <div class="logout-button" onclick="handleLogout">
-                  <text class="logout-text">退出登录</text>
-              </div>
+
+            <!-- ======================================================== -->
+            <!--  重构后的“危险区域”                                    -->
+            <!-- ======================================================== -->
+            <text class="category-title">危险区域</text>
+
+            <!-- 退出登录 -->
+            <div class="setting-item">
+                <text class="item-label">退出当前登录</text>
+                <!-- 使用新的 action-btn 样式，并添加 logout-color 类 -->
+                <text class="action-btn logout-color" onclick="handleLogout">退出登录</text>
             </div>
+            <text class="item-desc">仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。</text>
+
+            <!-- 清除授权 -->
+            <div class="setting-item">
+                <text class="item-label">清除设备授权</text>
+                <!-- 使用新的 action-btn 样式，并添加 deauth-color 类 -->
+                <text class="action-btn deauth-color" onclick="handleClearActivation">清除授权</text>
+            </div>
+            <text class="item-desc">清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。</text>
+
+            <!-- 清空全部数据 -->
+            <div class="setting-item">
+                <text class="item-label">清空全部数据</text>
+                <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
+                <text class="action-btn reset-color" onclick="handleResetApp">彻底重置</text>
+            </div>
+            <text class="item-desc">将应用恢复到初始安装状态，清除包括登录、授权、设置在内的所有本地数据。</text>
         </div>
-
-
-
-</scroll>
-  </template>
+    </scroll>
+</template>
   
 <style>
-    .page-container {
-        width: 100%;
-        height: 100%;
-        flex-direction: column;
-        align-items: center;
-        background-color: black;
-    }
-    .header {
-        width: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-    .time-display {
-        font-size: 28px;
-        color: #ffffff;
-        font-weight: bold;
-        padding-top: 5px;
-        text-align: center;
-    }
-    .title {
-        font-size: 32px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        color: #fff;
-    }
-    .settings-list {
-        width: 360px;
-        flex-direction: column;
-        align-items: center;
-        padding: 0 0 40px 0;
-    }
-    .category-title {
-        width: 96%;
-        font-size: 26px;
-        font-weight: bold;
-        color: #888;
-        padding: 20px 0 5px 15px;
-        margin-bottom: 10px;
-    }
-    .setting-item {
-        width: 100%;
-        height: 80px;
-        padding: 0 20px;
-        margin: 10px 0;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 40px;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .item-label {
-        font-weight: bold;
-        font-size: 26px;
-        color: #fff;
-    }
-    .item-value-btn {
-        min-width: 100px;
+    /* ... 原有的 .page-container, .header, .title, .settings-list, .category-title, .setting-item, .item-label, .item-value-btn, .item-desc 样式保持不变 ... */
+    .page-container { width: 100%; height: 100%; flex-direction: column; align-items: center; background-color: black; }
+    .header { width: 100%; flex-direction: column; justify-content: center; align-items: center; }
+    .time-display { font-size: 28px; color: #ffffff; font-weight: bold; padding-top: 5px; text-align: center; }
+    .title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
+    .settings-list { width: 360px; flex-direction: column; align-items: center; padding: 0 0 40px 0; }
+    .category-title { width: 96%; font-size: 26px; font-weight: bold; color: #888; padding: 20px 0 5px 15px; margin-bottom: 10px; }
+    .setting-item { width: 100%; height: 80px; padding: 0 20px; margin: 10px 0; background-color: rgba(255, 255, 255, 0.06); border-radius: 40px; justify-content: space-between; align-items: center; }
+    .item-label { font-weight: bold; font-size: 26px; color: #fff; }
+    .item-value-btn { min-width: 100px; height: 50px; padding: 0 20px; background-color: rgba(58, 225, 255, 0.2); border-radius: 25px; color: #3ae1ff; font-size: 24px; font-weight: bold; text-align: center; }
+    .item-desc { width: 85%; font-size: 20px; color: #666; margin-top: -5px; margin-bottom: 20px; }
+
+    /* ======================================================== */
+    /*  新增：危险操作按钮的统一和专属颜色样式                  */
+    /* ======================================================== */
+    .action-btn {
+        min-width: 120px; /* 统一最小宽度 */
         height: 50px;
         padding: 0 20px;
-        background-color: rgba(58, 225, 255, 0.2);
         border-radius: 25px;
-        color: #3ae1ff;
         font-size: 24px;
         font-weight: bold;
         text-align: center;
     }
-    .item-desc {
-        width: 85%;
-        font-size: 20px;
-        color: #666;
-        margin-top: -5px;
-        margin-bottom: 20px;
+    .logout-color {
+        background-color: rgba(255, 59, 48, 0.2); /* 红色背景 */
+        color: #FF453A; /* 亮红色文字 */
+    }
+    .deauth-color {
+        background-color: rgba(255, 149, 0, 0.2); /* 橙色背景 */
+        color: #FF9500; /* 亮橙色文字 */
+    }
+    .reset-color {
+        background-color: rgba(199, 0, 57, 0.2); /* 深红色背景 */
+        color: #c70039; /* 深红色文字 */
     }
 
-    .logout-section {
-    width: 240px;
-    padding: 20px 40px; /* 上下留出间距 */
-}
-
-.logout-button {
-    width: 100%;
-    height: 80px;
-    background-color: rgba(255, 59, 48, 0.2); /* 红色背景，半透明 */
-    border-radius: 40px; /* 完全圆角 */
-    justify-content: center;
-    align-items: center;
-}
-
-.logout-text {
-    font-size: 28px;
-    color: #FF453A; /* 亮红色文字 */
-    font-weight: bold;
-}
+    @media screen and (shape: rect) {
+        .header { padding-top: 10px; flex-direction: row-reverse; justify-content:space-around; }
+        .time-display { font-size: 32px; }
+    }
 </style>
+
 <script>
 import router from '@system.router';
 import file from '@system.file';
 import prompt from '@system.prompt';
 
+// --- 文件路径常量 ---
+const LICENSE_FILE_URI = 'internal://files/license.json';
 const SETTINGS_FILE_URI = 'internal://files/settings.json';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
-
 // 预设的档位
 const PRESETS = {
     lyrics: {
@@ -310,6 +271,45 @@ export default {
     toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
     toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
 
+        // **新增**: 清除激活的方法
+        handleClearActivation() {
+        prompt.showDialog({
+            title: '清除授权',
+            message: '您确定要清除本地授权信息吗？清除后需要重新联网激活应用。',
+            buttons: [
+                { text: '取消', color: '#999999' },
+                { text: '确定', color: '#FF9500' } // 橙色按钮
+            ],
+            success: (data) => {
+                if (data.index === 1) { // 确保点击的是“确定”
+                    prompt.showToast({ message: '正在清除授权...' });
+                    file.delete({
+                        uri: LICENSE_FILE_URI,
+                        success: () => {
+                            // 清除全局状态
+                            if (this.$app.$def) {
+                                this.$app.$def.isActivated = false;
+                            }
+                            prompt.showToast({ message: '授权已清除，请重新激活' });
+                            // 强制跳转到 Splash 页面
+                            router.replace({ uri: '/' }); 
+                        },
+                        fail: () => {
+                            // 即使文件不存在，也视为成功
+                            if (this.$app.$def) {
+                                this.$app.$def.isActivated = false;
+                            }
+                            prompt.showToast({ message: '授权已清除，请重新激活' });
+                            router.replace({ uri: '/' });
+                        }
+                    });
+                } else {
+                    prompt.showToast({ message: '操作已取消' });
+                }
+            }
+        });
+    },
+
     handleLogout() {
         prompt.showDialog({
             title: '退出登录',
@@ -341,10 +341,109 @@ export default {
             },
         });
     },
-
-    async deleteFile(uri) {
+    /**
+     * 将 file.delete 包装成一个返回 Promise 的函数
+     */
+     _deleteFilePromise(uri) {
         return new Promise((resolve) => {
             file.delete({ uri: uri, success: resolve, fail: resolve });
+        });
+    },
+
+    /**
+     * 1. 退出登录
+     */
+    handleLogout() {
+        prompt.showDialog({
+            title: '退出登录',
+            message: '您确定要退出登录吗？这将清除您的本地用户数据。',
+            buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
+            // **核心修正**: success 回调没有参数，只要执行就代表用户点击了“确定”
+            success: async () => {
+                prompt.showToast({ message: '正在退出登录...' });
+                try {
+                    const filesToClear = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
+                    await Promise.all(filesToClear.map(uri => this._deleteFilePromise(uri)));
+                    
+                    if (this.$app.$def.cookieService) {
+                        this.$app.$def.cookieService.cookie = null;
+                    }
+                    prompt.showToast({ message: '已退出登录' });
+                    router.back();
+                } catch (error) {
+                    console.error("退出登录失败:", error);
+                    prompt.showToast({ message: '操作失败，请重试' });
+                }
+            },
+            // **核心修正**: cancel 回调没有参数，只要执行就代表用户点击了“取消”
+            cancel: () => {
+                prompt.showToast({ message: '操作已取消' });
+            }
+        });
+    },
+
+    /**
+     * 2. 清除授权
+     */
+    handleClearActivation() {
+        prompt.showDialog({
+            title: '清除授权',
+            message: '您确定要清除本地授权信息吗？应用将需要重新联网激活。',
+            buttons: [{ text: '取消' }, { text: '确定', color: '#FF9500' }],
+            success: async () => {
+                prompt.showToast({ message: '正在清除授权...' });
+                try {
+                    await this._deleteFilePromise(LICENSE_FILE_URI);
+                    if (this.$app.$def) {
+                        this.$app.$def.isActivated = false;
+                    }
+                    prompt.showToast({ message: '授权已清除，请重新激活' });
+                    router.replace({ uri: '/' });
+                } catch (error) {
+                    console.error("清除授权失败:", error);
+                    prompt.showToast({ message: '操作失败，请重试' });
+                }
+            },
+            cancel: () => {
+                prompt.showToast({ message: '操作已取消' });
+            }
+        });
+    },
+
+    /**
+     * 3. 清空全部数据 (彻底重置)
+     */
+    handleResetApp() {
+        prompt.showDialog({
+            title: '彻底重置应用',
+            message: '警告：此操作将删除所有本地数据，包括登录、授权和全部设置！',
+            buttons: [{ text: '取消' }, { text: '确定重置', color: '#c70039' }],
+            success: async () => {
+                prompt.showToast({ message: '正在重置应用...' });
+                try {
+                    const allFiles = [
+                        PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI,
+                        LICENSE_FILE_URI,
+                        SETTINGS_FILE_URI
+                    ];
+                    await Promise.all(allFiles.map(uri => this._deleteFilePromise(uri)));
+
+                    if (this.$app.$def) {
+                        this.$app.$def.isActivated = false;
+                        if (this.$app.$def.cookieService) {
+                            this.$app.$def.cookieService.cookie = null;
+                        }
+                    }
+                    prompt.showToast({ message: '应用已重置' });
+                    router.replace({ uri: '/' });
+                } catch (error) {
+                    console.error("重置应用失败:", error);
+                    prompt.showToast({ message: '操作失败，请重试' });
+                }
+            },
+            cancel: () => {
+                prompt.showToast({ message: '操作已取消' });
+            }
         });
     },
 

@@ -1,264 +1,311 @@
 <template>
-  <scroll class="menu-container" scroll-y="true" bounces="true">
-        <div class="header" onclick="goBack">
-    <text class="time-display">{{currentTime}}</text>
-      <text class="title">‹开放源代码许可</text>
-        </div>
-
-      <div class="license-list">
-
-          <!-- OMusic (本项目) -->
-          <div class="license-capsule" onclick="toggleLicense('agpl')">
-              <div class="capsule-header">
-                  <div class="header-info">
-                      <text class="item-title">OMusic (本软件)</text>
-                      <text class="license-name">AGPL 3.0</text>
-                  </div>
-              </div>
-              <!-- 二维码区域 -->
-              <div if="{{ showAgpl }}" class="qrcode-section">
-                  <qrcode value="{{ agplUrl }}" class="qrcode-component"></qrcode>
-                  <text class="qrcode-tip">请扫码阅读完整许可协议</text>
-              </div>
+    <scroll class="menu-container" scroll-y="true" bounces="true">
+          <div class="header" onclick="goBack">
+      <text class="time-display">{{currentTime}}</text>
+        <text class="title">‹开放源代码许可</text>
           </div>
-
-          <!-- NeteaseCloudMusicApi -->
-          <div class="license-capsule" onclick="toggleLicense('mit')">
-              <div class="capsule-header">
-                  <div class="header-info">
-                      <text class="item-title">NeteaseCloudMusicApi</text>
-                      <text class="license-name">MIT License</text>
-                  </div>
-              </div>
-              <div if="{{ showMit }}" class="qrcode-section">
-                  <qrcode value="{{ mitUrl }}" class="qrcode-component"></qrcode>
-                  <text class="qrcode-tip">请扫码阅读完整许可协议</text>
-              </div>
+  
+        <div class="license-list">
+  
+            <!-- OMusic (本项目) -->
+            <div class="license-capsule" onclick="toggleLicense('agpl')">
+                <div class="capsule-header">
+                    <div class="header-info">
+                        <text class="item-title">OMusic (本软件)</text>
+                        <text class="item-author">OrPudding</text>
+                        <text class="license-name">AGPL 3.0</text>
+                    </div>
+                </div>
+                <div if="{{ showAgpl }}" class="qrcode-section">
+                    <qrcode value="{{ agplUrl }}" class="qrcode-component"></qrcode>
+                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
+                </div>
+            </div>
+  
+            <!-- NeteaseCloudMusicApi -->
+            <div class="license-capsule" onclick="toggleLicense('mit')">
+                <div class="capsule-header">
+                    <div class="header-info">
+                        <text class="item-title">NeteaseCloudMusicApi (API 接口)</text>
+                        <text class="item-author">Binaryify</text>
+                        <text class="license-name">MIT License</text>
+                    </div>
+                </div>
+                <div if="{{ showMit }}" class="qrcode-section">
+                    <qrcode value="{{ mitUrl }}" class="qrcode-component"></qrcode>
+                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
+                </div>
+            </div>
+  
+            <!-- VelaVerify -->
+            <div class="license-capsule" onclick="toggleLicense('vela')">
+                <div class="capsule-header">
+                    <div class="header-info">
+                        <text class="item-title">VelaVerify (付费验证方案)</text>
+                        <text class="item-author">CheongSzesuen &JIFENG &OrPudding</text>
+                        <text class="license-name">MIT License</text>
+                    </div>
+                </div>
+                <div if="{{ showVela }}" class="qrcode-section">
+                    <qrcode value="{{ mitUrl }}" class="qrcode-component"></qrcode>
+                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
+                </div>
+            </div>
+  
+            <!-- Material Symbols -->
+            <div class="license-capsule" onclick="toggleLicense('apache')">
+                <div class="capsule-header">
+                    <div class="header-info">
+                        <text class="item-title">Material Symbols (图标)</text>
+                        <text class="item-author">Google</text>
+                        <text class="license-name">Apache License 2.0</text>
+                    </div>
+                </div>
+                <div if="{{ showApache }}" class="qrcode-section">
+                    <qrcode value="{{ apacheUrl }}" class="qrcode-component"></qrcode>
+                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
+                </div>
+            </div>
+  
+            <!-- OpenVela Player Example (新增项目) -->
+            <div class="license-capsule" onclick="toggleLicense('openvela')">
+                <div class="capsule-header">
+                    <div class="header-info">
+                        <text class="item-title">OpenVela Player Example (播放器示例)</text>
+                        <text class="item-author">Xiaomi Corporation</text>
+                        <text class="license-name">Apache License 2.0</text>
+                    </div>
+                </div>
+                <div if="{{ showOpenVela }}" class="qrcode-section">
+                    <qrcode value="{{ apacheUrl }}" class="qrcode-component"></qrcode>
+                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
+                </div>
+            </div>
+  
+            <!-- 项目链接信息 -->
+            <div class="info-footer">
+                <text class="footer-title">项目地址</text>
+                <text class="footer-link" onclick="showProjectLink('OMusic')">OrPudding/OMusic</text>
+                <text class="footer-link" onclick="showProjectLink('NeteaseCloudMusicApi')">Binaryify/NeteaseCloudMusicApi</text>
+                <text class="footer-link" onclick="showProjectLink('VelaVerify')">CheongSzesuen/VelaVerify</text>
+                <text class="footer-link" onclick="showProjectLink('MaterialSymbols')">google/material-design-icons</text>
+                <text class="footer-link" onclick="showProjectLink('OpenVelaExample')">open-vela/packages_fe_examples</text>
+            </div>
+  
           </div>
-
-          <!-- Material Symbols -->
-          <div class="license-capsule" onclick="toggleLicense('apache')">
-              <div class="capsule-header">
-                  <div class="header-info">
-                      <text class="item-title">Material Symbols (图标)</text>
-                      <text class="license-name">Apache License 2.0</text>
-                  </div>
-              </div>
-              <div if="{{ showApache }}" class="qrcode-section">
-                  <qrcode value="{{ apacheUrl }}" class="qrcode-component"></qrcode>
-                  <text class="qrcode-tip">请扫码阅读完整许可协议</text>
-              </div>
-          </div>
-
-          <!-- 项目链接信息 (保持不变) -->
-          <div class="info-footer">
-              <text class="footer-title">项目地址</text>
-              <text class="footer-link" onclick="showProjectLink('OMusic')">OrPudding/OMusic</text>
-          </div>
-
-        </div>
-      </scroll>
-</template>
-<style>
-    .menu-container {
-        width: 100%;
-        height: 100%;
-        flex-direction: column;
-        align-items: center;
-        background-color: black;
-    }
-
-
+        </scroll>
+  </template>
+  <style>
+      .menu-container {
+          width: 100%;
+          height: 100%;
+          flex-direction: column;
+          align-items: center;
+          background-color: black;
+      }
+  
+  
+      .header {
+          width: 100%;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+      }
+  
+  .time-display {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+    padding-top: 5px;
+    text-align: center;
+  }
+  
+      .title {
+          font-size: 32px;
+          padding: 5px;
+          text-align: center;
+          font-weight: bold;
+          color: #fff;
+      }
+  
+      .license-list {
+          width: 360px;
+          flex-direction: column;
+          align-items: center;
+          padding: 0 20px;
+      }
+  
+      .license-capsule {
+          width: 100%;
+          background-color: rgba(255, 255, 255, 0.06);
+          border-radius: 24px;
+          margin-bottom: 20px;
+          flex-direction: column;
+          padding: 20px;
+      }
+  
+      .capsule-header {
+          width: 100%;
+          align-items: center;
+          justify-content: space-between;
+      }
+  
+      .header-info {
+          flex-direction: column;
+      }
+  
+      .item-title {
+          font-size: 26px;
+          font-weight: bold;
+          color: #ffffff;
+      }
+  
+      .item-author {
+          font-size: 24px;
+          color: rgba(255, 255, 255, 0.7);
+          margin-top: 8px;
+      }
+  
+      .license-name {
+          font-size: 24px;
+          color: #3ae1ff;
+          margin-top: 4px;
+      }
+  
+      .item-arrow {
+          font-size: 48px;
+          color: rgba(255, 255, 255, 0.5);
+          transition: transform 300ms ease-in-out;
+      }
+  
+      .item-arrow.expanded {
+          transform: rotate(90deg);
+      }
+  
+      .qrcode-section {
+          width: 100%;
+          flex-direction: column;
+          align-items: center;
+          margin-top: 15px;
+          padding-top: 15px;
+      }
+  
+      .qrcode-component {
+          width: 240px;
+          height: 240px;
+          background-color: #ffffff;
+          padding: 10px;
+          border-radius: 8px;
+      }
+  
+      .qrcode-tip {
+          font-size: 22px;
+          color: rgba(255, 255, 255, 0.7);
+          margin-top: 10px;
+      }
+  
+      .info-footer {
+          width: 100%;
+          flex-direction: column;
+          align-items: center;
+          margin-top: 5px;
+          margin-bottom: 80px;
+          padding: 20px;
+          background-color: rgba(255, 255, 255, 0.06);
+          border-radius: 24px;
+      }
+  
+      .footer-title {
+          font-size: 26px;
+          color: #fff;
+          font-weight: bold;
+          margin-bottom: 5px;
+      }
+  
+      .footer-link {
+          font-size: 24px;
+          color: #888;
+          padding: 5px;
+      }
+      @media screen and (shape: rect) {
     .header {
-        width: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
     }
-
-.time-display {
-  font-size: 28px;
-  font-weight: bold;
-  color: #ffffff;
-  padding-top: 5px;
-  text-align: center;
-}
-
-    .title {
+    .time-display {
         font-size: 32px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        color: #fff;
     }
-
-    .license-list {
-        width: 360px;
-        flex-direction: column;
-        align-items: center;
-        padding: 0 20px;
-    }
-
-    .license-capsule {
-        width: 100%;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 24px;
-        margin-bottom: 20px;
-        flex-direction: column;
-        padding: 20px;
-    }
-
-    .capsule-header {
-        width: 100%;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .header-info {
-        flex-direction: column;
-    }
-
-    .item-title {
-        font-size: 28px;
-        font-weight: bold;
-        color: #ffffff;
-    }
-
-    .license-name {
-        font-size: 24px;
-        color: #3ae1ff;
-        margin-top: 5px;
-    }
-
-    .item-arrow {
-        font-size: 48px;
-        color: rgba(255, 255, 255, 0.5);
-        transition: transform 300ms ease-in-out;
-    }
-
-    .item-arrow.expanded {
-        transform: rotate(90deg);
-    }
-
-    /* --- 新增：二维码区域样式 --- */
-    .qrcode-section {
-        width: 100%;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 15px;
-        padding-top: 15px;
-    }
-
-    .qrcode-component {
-        width: 240px; /* 调整一个合适的大小 */
-        height: 240px;
-        background-color: #ffffff; /* 二维码背景设为白色 */
-        padding: 10px; /* 留出白边 */
-        border-radius: 8px;
-    }
-
-    .qrcode-tip {
-        font-size: 22px;
-        color: rgba(255, 255, 255, 0.7);
-        margin-top: 10px;
-    }
-    /* --- 样式结束 --- */
-
-    .info-footer {
-        width: 100%;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 5px;
-        margin-bottom: 80px;
-        padding: 20px;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 24px;
-    }
-
-    .footer-title {
-        font-size: 26px;
-        color: #fff;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-
-    .footer-link {
-        font-size: 24px;
-        color: #888;
-        padding: 5px;
-    }
-</style>
-<script>
-import router from '@system.router';
-import prompt from '@system.prompt';
-
-export default {
-    private: {
-        // 控制每个胶囊的展开状态
-        showAgpl: false,
-        showMit: false,
-        showApache: false,
-
-        // 存储官方许可证页面的URL
-        agplUrl: 'https://www.gnu.org/licenses/agpl-3.0.html',
-        mitUrl: 'https://opensource.org/licenses/MIT',
-        apacheUrl: 'https://www.apache.org/licenses/LICENSE-2.0',
-    },
-
-    onInit() {
-    this.updateTime();
-    // 每分钟更新一次时间
-    setInterval(() => {
+  }
+  </style>
+  <script>
+  import router from '@system.router';
+  import prompt from '@system.prompt';
+  
+  export default {
+      private: {
+          showAgpl: false,
+          showMit: false,
+          showApache: false,
+          showVela: false,
+          showOpenVela: false, // 为OpenVela示例新增状态
+  
+          agplUrl: 'https://www.gnu.org/licenses/agpl-3.0.html',
+          mitUrl: 'https://opensource.org/licenses/MIT',
+          apacheUrl: 'https://www.apache.org/licenses/LICENSE-2.0',
+      },
+  
+      onInit( ) {
       this.updateTime();
-    }, 1000);
-  },
-
-  updateTime() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    this.currentTime = `${hours}:${minutes}`;
-  },
-
-    /**
-     * 切换指定许可证的显示状态
-     * @param {string} licenseKey - 'agpl', 'mit', 'apache'
-     */
-    toggleLicense(licenseKey ) {
-        switch (licenseKey) {
-            case 'agpl':
-                this.showAgpl = !this.showAgpl;
-                break;
-            case 'mit':
-                this.showMit = !this.showMit;
-                break;
-            case 'apache':
-                this.showApache = !this.showApache;
-                break;
-        }
+      setInterval(() => {
+        this.updateTime();
+      }, 1000);
     },
-
-    /**
-     * 显示项目链接提示
-     * @param {string} projectKey 
-     */
-    showProjectLink(projectKey) {
-        const urls = {
-            'OMusic': 'https://github.com/OrPudding/OMusic',
-            'NeteaseCloudMusicApi': 'https://github.com/Binaryify/NeteaseCloudMusicApi',
-            'MaterialSymbols': 'https://fonts.google.com/icons'
-        };
-        const url = urls[projectKey];
-        if (url) {
-            prompt.showToast({ message: `请访问: ${url}` });
-        }
+  
+    updateTime() {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      this.currentTime = `${hours}:${minutes}`;
     },
-
-    /**
-     * 返回上一页
-     */
-    goBack() {
-        router.back();
-    }
-};
-</script>
+  
+      toggleLicense(licenseKey ) {
+          switch (licenseKey) {
+              case 'agpl':
+                  this.showAgpl = !this.showAgpl;
+                  break;
+              case 'mit':
+                  this.showMit = !this.showMit;
+                  break;
+              case 'apache':
+                  this.showApache = !this.showApache;
+                  break;
+              case 'vela':
+                  this.showVela = !this.showVela;
+                  break;
+              case 'openvela': // 新增OpenVela的逻辑
+                  this.showOpenVela = !this.showOpenVela;
+                  break;
+          }
+      },
+  
+      showProjectLink(projectKey) {
+          const urls = {
+              'OMusic': 'https://github.com/OrPudding/OMusic',
+              'NeteaseCloudMusicApi': 'https://github.com/Binaryify/NeteaseCloudMusicApi',
+              'VelaVerify': 'https://github.com/CheongSzesuen/VelaVerify',
+              'MaterialSymbols': 'https://github.com/google/material-design-icons',
+              'OpenVelaExample': 'https://github.com/open-vela/packages_fe_examples/tree/trunk/player' // 新增链接
+          };
+          const url = urls[projectKey];
+          if (url ) {
+              prompt.showToast({ message: `请访问: ${url}` });
+          }
+      },
+  
+      goBack() {
+          router.back();
+      }
+  };
+  </script>
+  

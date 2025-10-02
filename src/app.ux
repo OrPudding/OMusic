@@ -2,56 +2,241 @@
 import file from '@system.file';
 import fetch from '@system.fetch';
 import interconnect from "@system.interconnect";
-import prompt from '@system.prompt'; // **新增**: 用于可能的全局提示
+import crypto from '@system.crypto'; // 验证需要
+import device from '@system.device';   // 验证需要
 
 // --- 常量定义 ---
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const FILE_PLAY_LIST = 'internal://files/play_list.json';
+const LICENSE_FILE_URI = 'internal://files/omusic_license.json'; // 激活码文件
 
 export default {
-    // 1. 全局 interconnect 实例 (保持不变)
-    connectInstance: interconnect.instance(),
+    // ===================================================================
+    // =================== 全局状态与配置 ================================
+    // ===================================================================
+    
+    // --- 授权相关的全局状态 ---
+    isActivated: null, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
+    deviceId: null,    // 全局设备ID
 
-    // 2. 全局 requestService
-    requestService: {
-        /**
-         * **核心修改**: 增加严格的 Cookie 格式校验
-         */
+        // 1. 全局 interconnect 实例 (保持不变)
+    //connectInstance: interconnect.instance(),
+
+
+    // --- 服务器和密钥配置 ---
+    // !! 替换为你的 服务器 URL
+    ACTIVATION_SERVER_URL: '',
+
+    
+    // !! 替换为你的服务器公钥 (server_public.pem 的内容 )
+    SERVER_PUBLIC_KEY: `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0YQakr41N+9bHZ7SI5Il
+IO7FDTkf6708E94ZUH57zUgzLtx4LwUxp6w+374D2LU/xVRBNaJhvdbTHwPV0CKS
+w2IvHtZDMCYlTpZ/CKMkcTioHJ+49roCquhETWiEGWf7dQJFhxsdndqsrzx4Cih/
+HwS3vI1kcRfiuklkaW542OeaOrvCPx0OKRVz5ngeUWD9fS2I9QQ3vkhodnI5C8+O
+uEknhKNaBOc0r2sDFSyAGBz4aVkF3X95dGmfWQ6aoTMZpmoEi0zMfQXUUIxl7lN1
+ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
+6QIDAQAB
+-----END PUBLIC KEY-----`,
+    
+    // !! 替换为你的爱发电购买链接
+    AFDIAN_PURCHASE_URL: 'https://afdian.com/item/64db28ce9f7d11f088fc52540025c377',
+
+    // --- 激活码文件URI (暴露出来方便其他页面使用 ) ---
+    LICENSE_FILE_URI: LICENSE_FILE_URI,
+
+    // --- 你原有的全局实例和方法 ---
+
+
+
+    // ===================================================================
+    // =================== App 生命周期 ==================================
+    // ===================================================================
+
+    async onCreate() {
+        console.info('App onCreate: 应用启动');
+        
+        // 步骤 1: 在任何其他操作之前，首先执行激活验证
+        await this.runActivationFlow();
+
+        // 步骤 2: 根据验证结果，条件性地执行后续初始化任务
+        if (this.isActivated) {
+            console.info('授权验证通过，继续执行应用初始化...');
+            
+            // 初始化你原有的服务
+            const connect = this.connectInstance;
+            connect.onopen = (data) => { console.log("Global onopen:", data); };
+            connect.onerror = (error) => { console.error("Global onerror:", error); };
+            connect.onclose = () => { console.log("Global onclose"); };
+
+            this.resetDownloadingStatusOnLaunch();
+        } else {
+            console.warn('授权验证失败！应用功能将受限。');
+            // 如果验证失败，入口页面 splash.ux 会负责显示引导界面
+            // 此处无需做额外操作
+        }
+    },
+
+    onDestroy() {
+        console.info('App onDestroy: 应用销毁');
+    },
+
+    // ===================================================================
+    // =================== 激活验证核心逻辑 ==============================
+    // ===================================================================
+
+/**
+ * 修正版 checkLocalActivation
+ * 完全使用回调模式，并将所有后续操作（JSON解析、设备ID比对、签名验证）
+ * 嵌套在 file.readText 的 success 回调中。
+ */
+ checkLocalActivation(currentDeviceId, callback) {
+    console.log("开始检查本地激活状态...");
+    file.readText({
+        uri: this.LICENSE_FILE_URI,
+        success: (fileData) => {
+            try {
+                console.log("成功读取本地激活文件。");
+                const license = JSON.parse(fileData.text);
+
+                // 检查设备ID是否匹配
+                if (license.payload.device_id !== currentDeviceId) {
+                    console.error('激活码与本设备不匹配。');
+                    callback(false); // 通过回调返回结果
+                    return;
+                }
+                console.log("设备ID匹配成功。");
+
+                // 准备验签
+                // 注意：为了确保 payload 字符串与服务器端生成时完全一致，
+                // 必须使用与服务器端相同的序列化方法。如果服务器端没有排序，这里也不应该排序。
+                // 假设服务器端是简单序列化：
+                const payloadStr = JSON.stringify(license.payload); 
+
+                console.log("开始验证签名...");
+                crypto.verify({
+                    data: payloadStr,
+                    signature: license.signature,
+                    publicKey: this.SERVER_PUBLIC_KEY,
+                    algo: 'RSA-SHA256',
+                    success: (verifyResult) => {
+                        // crypto.verify 的 success 回调返回的是一个布尔值
+                        console.log(`签名验证结果: ${verifyResult}`);
+                        callback(verifyResult); // 最终通过回调返回成功或失败
+                    },
+                    fail: (data, code) => {
+                        console.error(`签名验证API调用失败, code=${code}, data=${data}`);
+                        callback(false); // 验签API失败，返回未激活
+                    }
+                });
+            } catch (e) {
+                console.error(`解析激活文件失败: ${e.message}`);
+                callback(false); // JSON解析失败，返回未激活
+            }
+        },
+        fail: (data, code) => {
+            console.log(`本地未找到激活文件或读取失败 (code: ${code})，视为未激活。`);
+            callback(false); // 文件读取失败，返回未激活
+        }
+    });
+},
+/**
+ * 修正版 getDeviceIdentifier
+ * 移除 Promise 包装，直接接受一个回调函数来传递结果。
+ */
+ getDeviceIdentifier(callback) {
+    console.log("正在获取设备ID...");
+    device.getDeviceId({
+        success: (data) => {
+            if (data && data.deviceId) {
+                console.log(`成功获取设备ID: ${data.deviceId}`);
+                // 直接调用回调函数，传递ID和成功状态
+                callback(data.deviceId, null); 
+            } else {
+                const errorMsg = '未能获取到有效的设备ID';
+                console.error(errorMsg);
+                // 调用回调函数，传递错误信息
+                callback(null, errorMsg);
+            }
+        },
+        fail: (data, code) => {
+            const errorMsg = `获取设备ID失败 (code: ${code})`;
+            console.error(errorMsg, data);
+            // 调用回调函数，传递错误信息
+            callback(null, errorMsg);
+        }
+    });
+},
+/**
+ * 修正版 runActivationFlow
+ * 彻底改造为回调金字塔，以保证正确的执行顺序：
+ * 1. 获取设备ID
+ * 2. 在获取成功的回调中，检查本地激活状态
+ * 3. 在检查完成的回调中，更新最终状态
+ */
+ runActivationFlow() {
+    console.log("--- 开始执行激活验证流程 ---");
+    
+    // 步骤1: 调用重构后的 getDeviceIdentifier
+    this.getDeviceIdentifier((deviceId, error) => {
+        if (error) {
+            console.error(`激活流程因无法获取设备ID而终止: ${error}`);
+            this.isActivated = false;
+            console.log(`--- 激活验证流程结束，结果: ${this.isActivated} ---`);
+            return;
+        }
+        
+        this.deviceId = deviceId;
+        
+        // 步骤2: 在获取设备ID成功的回调中，调用重构后的 checkLocalActivation
+        this.checkLocalActivation(deviceId, (isActivated) => {
+            // 步骤3: 在检查本地激活状态的回调中，更新最终结果
+            this.isActivated = isActivated;
+            console.log(`--- 激活验证流程结束，结果: ${this.isActivated} ---`);
+
+            // 在这里可以根据 this.isActivated 的结果更新UI
+            if (this.isActivated) {
+                this.showSuccessState(); // 例如: 显示激活成功界面
+            } else {
+                // 如果是从 retryActivation 过来的，这里不需要再显示失败
+                // 但如果是应用启动时自发运行的，这里可能需要显示未激活状态
+            }
+        });
+    });
+},
+
+
+    // ===================================================================
+    // =================== 其他原有逻辑 ==================================
+    // ===================================================================
+
+        requestService: {
         async loadCookie() {
             try {
                 const data = await new Promise((resolve, reject) => {
                     file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: reject });
                 });
-
                 const cookieText = data.text;
-
-                // **关键校验**: 检查文本是否存在，并且是否以 "MUSIC_U=" 开头
                 if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
                     console.log("有效的 Cookie 已加载。");
-                    return cookieText.trim(); // 返回整理过的、有效的 cookie
+                    return cookieText.trim();
                 } else {
                     console.warn("cookie.txt 内容无效或格式不正确，视为未登录。");
-                    return null; // 内容无效，返回 null
+                    return null;
                 }
             } catch (e) {
-                // 读取文件失败（例如文件不存在），也视为未登录
-                // console.log("cookie.txt 文件不存在，视为未登录。");
                 return null;
             }
         },
-
         async fetch(options) {
             try {
                 const cookie = await this.loadCookie();
                 let url = options.url;
-
                 if (cookie) {
                     const connector = url.includes('?') ? '&' : '?';
                     url = `${url}${connector}cookie=${encodeURIComponent(cookie)}`;
                 }
-                
                 console.log(`Requesting URL: ${url}`);
-
                 const response = await new Promise((resolve, reject) => {
                     fetch.fetch({
                         ...options,
@@ -62,7 +247,6 @@ export default {
                         fail: (data, code) => reject({ data, code }),
                     });
                 });
-
                 if (response.code === 200) {
                     try {
                         const jsonData = JSON.parse(response.data);
@@ -73,26 +257,10 @@ export default {
                 } else {
                     return { status: 'fail', message: `网络错误, code: ${response.code}`, code: response.code };
                 }
-
             } catch (error) {
                 return { status: 'fail', message: error.message || '未知请求异常', data: error.data, code: error.code };
             }
         }
-    },
-
-    onCreate() {
-        console.info('App onCreate: 应用启动');
-        
-        const connect = this.connectInstance;
-        connect.onopen = (data) => { console.log("Global onopen:", data); prompt.showToast({ message: "App: 连接已建立" }); };
-        connect.onerror = (error) => { console.error("Global onerror:", error); prompt.showToast({ message: "App: 连接出错" }); };
-        connect.onclose = () => { console.log("Global onclose"); prompt.showToast({ message: "App: 连接已断开" }); };
-
-        this.resetDownloadingStatusOnLaunch();
-    },
-
-    onDestroy() {
-        console.info('App onDestroy: 应用销毁');
     },
 
     resetDownloadingStatusOnLaunch() {

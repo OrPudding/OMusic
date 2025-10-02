@@ -165,4 +165,15 @@ export default {
   font-weight: bold;
   color: #ffffff;
 }
+
+@media screen and (shape: rect) {
+    .header {
+        padding-top: 10px;
+      flex-direction: row-reverse;
+      justify-content:space-around
+    }
+    .time-display {
+        font-size: 32px;
+    }
+  }
 </style>
