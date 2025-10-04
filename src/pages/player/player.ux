@@ -63,9 +63,9 @@ import request from '@system.request';
 
 // --- 1. 常量定义 ---
 const CONSTANTS = {
-    API_SONG_URL: 'https:///song/url?br=64000&id=',
-    API_LYRIC_URL: 'https:///lyric?id=',
-    API_DOWNLOAD_SONG_URL: 'https:///song/url?br=320000&id=',
+    API_SONG_URL: 'https://163api.qijieya.cn/song/url?br=64000&id=',
+    API_LYRIC_URL: 'https://163api.qijieya.cn/lyric?id=',
+    API_DOWNLOAD_SONG_URL: 'https://163api.qijieya.cn/song/url?br=128000&id=',
     DIR_MUSIC: 'internal://files/music/',
     DIR_LYRICS: 'internal://files/lyrics/',
     FILE_PLAY_LIST: 'internal://files/play_list.json',
@@ -110,6 +110,7 @@ export default {
         isChangingSong: false,
         wasRestored: false,
         retryCount: 0,
+        isEnding: false,
     },
 
     protected: {
@@ -208,10 +209,11 @@ export default {
     },
 
     async onInit() {
-        if (this.$app.isActivated === false) {
+        if (this.$app.$def.isActivated === false) {
         console.warn("Page Guard: 未授权，强制跳转到 Splash 页面。");
         router.replace({ uri: '/pages/splash' });
         return;}
+        console.log("Player onInit: 应用状态:", this.$app.$def.isActivated);
         console.log("Player onInit: 页面实例创建。");
         this.bindAudioEvents();
         await this.loadSettings();
@@ -503,20 +505,54 @@ export default {
 
     downloadSongFile(url, filename) {
         return new Promise((resolve) => {
+            // ==================== 核心修改点 1: 定义定时器变量 ====================
+            let downloadToastInterval = null;
+
             request.download({
                 url,
                 filename,
                 success: (task) => {
+                    // ==================== 核心修改点 2: 下载开始，启动定时器 ====================
+                    // 立即显示一次，然后每5秒显示一次
+                    prompt.showToast({ message: '歌曲下载中' ,duration:500});
+                    downloadToastInterval = setInterval(() => {
+                        prompt.showToast({ message: '歌曲下载中' ,duration:500});
+                    }, 5000); // 5000毫秒 = 5秒
+
+                    // 监听下载完成事件
                     request.onDownloadComplete({
                         token: task.token,
-                        success: (data) => resolve(data.uri),
-                        fail: () => resolve(null),
+                        success: (data) => {
+                            // ==================== 核心修改点 3: 下载成功，清除定时器 ====================
+                            if (downloadToastInterval) {
+                                clearInterval(downloadToastInterval);
+                            }
+                            prompt.showToast({ message: '下载完成！' ,duration:5000});
+                            resolve(data.uri); // 返回文件 URI
+                        },
+                        fail: () => {
+                            // ==================== 核心修改点 4: 下载失败，清除定时器 ====================
+                            if (downloadToastInterval) {
+                                clearInterval(downloadToastInterval);
+                            }
+                            prompt.showToast({ message: '下载失败，请重试。' });
+                            resolve(null); // 返回 null
+                        },
                     });
                 },
-                fail: () => resolve(null),
+                fail: () => {
+                    // 如果连 `request.download` 本身都失败了（例如URL无效），也要确保清理
+                    // ==================== 核心修改点 5: 初始请求失败，也要清除定时器 ====================
+                    if (downloadToastInterval) {
+                        clearInterval(downloadToastInterval);
+                    }
+                    prompt.showToast({ message: '下载启动失败，请检查链接。' });
+                    resolve(null); // 返回 null
+                },
             });
         });
     },
+
 
     moveSongFile(srcUri, dstUri) {
         return new Promise((resolve, reject) => {
@@ -571,6 +607,7 @@ export default {
     },
 
     async playOnline(song) {
+        this.isEnding = false;
         try {
             // **修改**: 使用辅助函数构建URL
             const url = this.buildAuthenticatedUrl(`${CONSTANTS.API_SONG_URL}${song.id}`);
@@ -597,6 +634,7 @@ export default {
     },
     
     startPlayback(song, src) {
+        this.isEnding = false;
         if (!src || typeof src !== 'string') {
             console.error("无效的播放源(src)，播放被中止。");
             this.handlePlaybackError("无效的播放源");
@@ -730,29 +768,64 @@ export default {
     },
 
     bindAudioEvents() {
-        audio.onplay = () => { 
-            this.playerState.isPlaying = true; 
+        audio.onplay = () => {
+            this.playerState.isPlaying = true;
             this.isChangingSong = false;
-            console.log("Event: onplay, isChangingSong set to false.");
+            this.isEnding = false; // 每次开始播放时，重置准备切歌的状态
+            console.log("Event: onplay, isChangingSong and isEnding set to false.");
         };
-        audio.onpause = () => { this.playerState.isPlaying = false; };
-        audio.onstop = () => { 
-            this.playerState.isPlaying = false; 
+
+        audio.onpause = () => {
+            this.playerState.isPlaying = false;
+        };
+
+        audio.onstop = () => {
+            this.playerState.isPlaying = false;
             this.isChangingSong = false;
-            console.log("Event: onstop, isChangingSong set to false.");
+            this.isEnding = false; // 停止时也重置状态
+            console.log("Event: onstop, isChangingSong and isEnding set to false.");
         };
+
         audio.ontimeupdate = () => {
+            // 优先处理“即将结束并切歌”的逻辑
+            // 当 isEnding 为 true 且时间到达歌曲末尾（误差1秒内）时执行
+            if (this.isEnding && audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
+                console.log(`ontimeupdate: Reached end of track (currentTime: ${audio.currentTime}). Changing song now.`);
+                this.isEnding = false; // 切歌前重置标志位，防止重复触发
+                this.change(1);
+                return; // 退出，避免执行下面的歌词更新
+            }
+
+            // 原有的歌词更新逻辑
             if (!this.isChangingSong) {
                 this.playerState.playDuration = audio.currentTime;
                 this.updateLyric();
             }
         };
-        audio.onended = () => { this.change(1); };
+
+        audio.onended = () => {
+            console.log(`Event: onended triggered. CurrentTime: ${audio.currentTime}, Duration: ${audio.duration}`);
+
+            // 检查是否在正常时间（最后1秒内）触发
+            if (audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
+                console.log("onended: Playback complete. Changing song directly.");
+                this.change(1);
+            } else {
+                // 如果是提前触发，则设置标志位，等待 ontimeupdate 来完成切歌
+                console.warn("onended: Triggered prematurely. Setting isEnding flag to true.");
+                console.log("fuck xiaomi's stupid audio.onended");
+                prompt.showToast("fuck xiaomi's stupid audio.onended");
+                this.isEnding = true;
+            }
+        };
+
         audio.onerror = () => {
             console.error("Audio player error occurred.");
+            this.isEnding = false; // 发生错误时也应重置状态
             this.handlePlaybackError("播放器发生错误");
         };
     },
+
 
     async loadSettings() {
         try {
@@ -856,7 +929,7 @@ export default {
 /* --- 歌词容器 --- */
 .lyrics-container {
   width: 100%;
-  height: 100px;
+  height: 130px;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -937,7 +1010,7 @@ export default {
 
 .song {
 	width: 320px;
-	height: 100px;
+	height: 80px;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
@@ -978,9 +1051,22 @@ export default {
 }
 
 .footer {
-	height: 80px;
+	height: 75px;
 	width: 320px;
 	justify-content: space-around;
 	align-items: center;
+}
+
+@media screen and (shape: rect) {
+    .lyrics-container {
+        height: 140px;
+    }
+    .lyrics-container-expended {
+        height: 360px;
+    }
+    .current-lyric {
+  lines: -1;
+  text-overflow: ellipsis;
+}
 }
 </style>

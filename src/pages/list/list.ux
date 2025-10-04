@@ -6,23 +6,22 @@
         <div class="header">
             <text class="time-display">{{currentTime}}</text>
             <text class="title" onclick="goBack">‹{{ pageTitle }}</text>
-            
-            <!-- "播放全部" 按钮 (已移除触摸事件) -->
-            <div class="play-all-button" 
-                 if="{{ (listType === 'downloadlist' || listType === 'songlist') && fullSongList.length > 0 }}" 
-                 onclick="playAll">
-                <image class="play-all-icon" src="/common/icon/play.png"></image>
-                <text class="play-all-text">播放全部</text>
-            </div>
-
-            <!-- "清空列表" 按钮 (已移除触摸事件) -->
-            <div class="clear-list-button"
-                 if="{{ listType === 'playlist' && fullSongList.length > 0 }}"
-                 onclick="clearPlaylist">
-                <image class="clear-list-icon" src="/common/icon/delete.png"></image>
-                <text class="clear-list-text">清空列表</text>
-            </div>
         </div>
+                    <!-- "播放全部" 按钮 (已移除触摸事件) -->
+                    <div class="play-all-button" 
+                    if="{{ (listType === 'downloadlist' || listType === 'songlist') && fullSongList.length > 0 }}" 
+                    onclick="playAll">
+                   <image class="play-all-icon" src="/common/icon/play.png"></image>
+                   <text class="play-all-text">播放全部</text>
+               </div>
+   
+               <!-- "清空列表" 按钮 (已移除触摸事件) -->
+               <div class="clear-list-button"
+                    if="{{ listType === 'playlist' && fullSongList.length > 0 }}"
+                    onclick="clearPlaylist">
+                   <image class="clear-list-icon" src="/common/icon/delete.png"></image>
+                   <text class="clear-list-text">清空列表</text>
+               </div>
         
         <div class="list-content">
             <!-- 列表项 (已移除触摸事件和动态class) -->
@@ -64,7 +63,6 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding-bottom: 20px;
     }
     .time-display {
         font-size: 28px;
@@ -84,6 +82,7 @@
     /* --- 按钮通用样式 --- */
     .play-all-button, .clear-list-button {
         margin-top: 20px;
+        margin-bottom: 20px;
         width: 280px;
         height: 70px;
         border-radius: 35px;
@@ -174,8 +173,8 @@
     }
     @media screen and (shape: rect) {
     .header {
+        flex-direction: row-reverse;
         padding-top: 10px;
-      flex-direction: row-reverse;
       justify-content:space-around
     }
     .time-display {
@@ -416,7 +415,7 @@ export default {
             this.updateDisplayList(0);
         }
 
-        const BASE_URL = 'https:///playlist/track/all';
+        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
         let offset = cachedList ? cachedList.length : 0;
         let hasMore = true;
         let allSongs = cachedList ? [...cachedList] : [];

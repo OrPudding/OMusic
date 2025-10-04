@@ -8,7 +8,7 @@ import device from '@system.device';   // 验证需要
 // --- 常量定义 ---
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const FILE_PLAY_LIST = 'internal://files/play_list.json';
-const LICENSE_FILE_URI = 'internal://files/omusic_license.json'; // 激活码文件
+const LICENSE_FILE_URI = 'internal://files/license.json'; // 激活码文件
 
 export default {
     // ===================================================================
@@ -16,16 +16,16 @@ export default {
     // ===================================================================
     
     // --- 授权相关的全局状态 ---
-    isActivated: null, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
+    isActivated: false, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
     deviceId: null,    // 全局设备ID
 
         // 1. 全局 interconnect 实例 (保持不变)
-    //connectInstance: interconnect.instance(),
+    connectInstance: interconnect.instance(),
 
 
     // --- 服务器和密钥配置 ---
     // !! 替换为你的 服务器 URL
-    ACTIVATION_SERVER_URL: '',
+    ACTIVATION_SERVER_URL: 'http://75.127.89.154:5000',
 
     
     // !! 替换为你的服务器公钥 (server_public.pem 的内容 )
@@ -85,34 +85,24 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
     // =================== 激活验证核心逻辑 ==============================
     // ===================================================================
 
-/**
- * 修正版 checkLocalActivation
- * 完全使用回调模式，并将所有后续操作（JSON解析、设备ID比对、签名验证）
- * 嵌套在 file.readText 的 success 回调中。
- */
- checkLocalActivation(currentDeviceId, callback) {
+    checkLocalActivation(currentDeviceId, callbacks) {
     console.log("开始检查本地激活状态...");
     file.readText({
         uri: this.LICENSE_FILE_URI,
-        success: (fileData) => {
+        success: (data) => {
             try {
                 console.log("成功读取本地激活文件。");
-                const license = JSON.parse(fileData.text);
+                // 这里的 data.text 是字符串，需要解析
+                const license = JSON.parse(data.text);
 
-                // 检查设备ID是否匹配
                 if (license.payload.device_id !== currentDeviceId) {
                     console.error('激活码与本设备不匹配。');
-                    callback(false); // 通过回调返回结果
+                    if (callbacks && callbacks.fail) callbacks.fail();
                     return;
                 }
                 console.log("设备ID匹配成功。");
 
-                // 准备验签
-                // 注意：为了确保 payload 字符串与服务器端生成时完全一致，
-                // 必须使用与服务器端相同的序列化方法。如果服务器端没有排序，这里也不应该排序。
-                // 假设服务器端是简单序列化：
-                const payloadStr = JSON.stringify(license.payload); 
-
+                const payloadStr = JSON.stringify(license.payload, Object.keys(license.payload).sort());
                 console.log("开始验证签名...");
                 crypto.verify({
                     data: payloadStr,
@@ -120,88 +110,73 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
                     publicKey: this.SERVER_PUBLIC_KEY,
                     algo: 'RSA-SHA256',
                     success: (verifyResult) => {
-                        // crypto.verify 的 success 回调返回的是一个布尔值
                         console.log(`签名验证结果: ${verifyResult}`);
-                        callback(verifyResult); // 最终通过回调返回成功或失败
+                        if (verifyResult) {
+                            if (callbacks && callbacks.success) callbacks.success();
+                        } else {
+                            if (callbacks && callbacks.fail) callbacks.fail();
+                        }
                     },
                     fail: (data, code) => {
                         console.error(`签名验证API调用失败, code=${code}, data=${data}`);
-                        callback(false); // 验签API失败，返回未激活
+                        if (callbacks && callbacks.fail) callbacks.fail();
                     }
                 });
             } catch (e) {
-                console.error(`解析激活文件失败: ${e.message}`);
-                callback(false); // JSON解析失败，返回未激活
+                console.error(`解析本地激活文件失败: ${e.message}`);
+                if (callbacks && callbacks.fail) callbacks.fail();
             }
         },
         fail: (data, code) => {
             console.log(`本地未找到激活文件或读取失败 (code: ${code})，视为未激活。`);
-            callback(false); // 文件读取失败，返回未激活
+            if (callbacks && callbacks.fail) callbacks.fail();
         }
     });
 },
-/**
- * 修正版 getDeviceIdentifier
- * 移除 Promise 包装，直接接受一个回调函数来传递结果。
- */
- getDeviceIdentifier(callback) {
+
+// 确保 runActivationFlow 也使用回调
+runActivationFlow() {
+    console.log("--- 开始执行激活验证流程 ---");
+    this.getDeviceIdentifier({
+        success: (deviceId) => {
+            this.deviceId = deviceId;
+            this.checkLocalActivation(deviceId, {
+                success: () => {
+                    this.isActivated = true;
+                    console.log("--- 激活验证流程结束，结果: true ---");
+                },
+                fail: () => {
+                    this.isActivated = false;
+                    console.warn("授权验证失败！应用功能将受限。");
+                    console.log("--- 激活验证流程结束，结果: false ---");
+                }
+            });
+        },
+        fail: (errorMsg) => {
+            this.isActivated = false;
+            console.error(`激活流程中发生严重错误: ${errorMsg}`);
+            console.log("--- 激活验证流程结束，结果: false ---");
+        }
+    });
+},
+
+// 确保 getDeviceIdentifier 也使用回调
+getDeviceIdentifier(callbacks) {
     console.log("正在获取设备ID...");
     device.getDeviceId({
         success: (data) => {
             if (data && data.deviceId) {
                 console.log(`成功获取设备ID: ${data.deviceId}`);
-                // 直接调用回调函数，传递ID和成功状态
-                callback(data.deviceId, null); 
+                if (callbacks && callbacks.success) callbacks.success(data.deviceId);
             } else {
-                const errorMsg = '未能获取到有效的设备ID';
-                console.error(errorMsg);
-                // 调用回调函数，传递错误信息
-                callback(null, errorMsg);
+                if (callbacks && callbacks.fail) callbacks.fail('未能获取到有效的设备ID');
             }
         },
         fail: (data, code) => {
             const errorMsg = `获取设备ID失败 (code: ${code})`;
             console.error(errorMsg, data);
-            // 调用回调函数，传递错误信息
-            callback(null, errorMsg);
+            if (callbacks && callbacks.fail) callbacks.fail(errorMsg);
         }
-    });
-},
-/**
- * 修正版 runActivationFlow
- * 彻底改造为回调金字塔，以保证正确的执行顺序：
- * 1. 获取设备ID
- * 2. 在获取成功的回调中，检查本地激活状态
- * 3. 在检查完成的回调中，更新最终状态
- */
- runActivationFlow() {
-    console.log("--- 开始执行激活验证流程 ---");
-    
-    // 步骤1: 调用重构后的 getDeviceIdentifier
-    this.getDeviceIdentifier((deviceId, error) => {
-        if (error) {
-            console.error(`激活流程因无法获取设备ID而终止: ${error}`);
-            this.isActivated = false;
-            console.log(`--- 激活验证流程结束，结果: ${this.isActivated} ---`);
-            return;
-        }
-        
-        this.deviceId = deviceId;
-        
-        // 步骤2: 在获取设备ID成功的回调中，调用重构后的 checkLocalActivation
-        this.checkLocalActivation(deviceId, (isActivated) => {
-            // 步骤3: 在检查本地激活状态的回调中，更新最终结果
-            this.isActivated = isActivated;
-            console.log(`--- 激活验证流程结束，结果: ${this.isActivated} ---`);
-
-            // 在这里可以根据 this.isActivated 的结果更新UI
-            if (this.isActivated) {
-                this.showSuccessState(); // 例如: 显示激活成功界面
-            } else {
-                // 如果是从 retryActivation 过来的，这里不需要再显示失败
-                // 但如果是应用启动时自发运行的，这里可能需要显示未激活状态
-            }
-        });
     });
 },
 

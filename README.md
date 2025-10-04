@@ -7,13 +7,11 @@
 <p align="center">
   <strong>一款专为 VelaOS 智能手表打造的第三方网易云音乐客户端。</strong>
     
-
   轻量、高效，专为圆形小屏优化，提供核心的音乐播放体验。
 </p>
 
 <p align="center">
     <img src="https://img.shields.io/badge/platform-VelaOS-blue.svg" alt="Platform">
-    <img src="https://img.shields.io/badge/license-AGPL--3.0-red.svg" alt="License">
     <img src="https://img.shields.io/badge/author-OrPudding-orange.svg" alt="Author">
 </p>
 
@@ -62,36 +60,38 @@ OMusic 充分利用了 VelaOS 的原生能力 ，旨在提供流畅、完整的�
 
 ## 🚀 技术栈
 
-- **开发框架**: [VelaOS 快应用](https://iot.mi.com/vela/quickapp/ )
+- **开发框架**: VelaOS 快应用
 - **核心 API**:
   - `@system.audio` - 音频播放
   - `@system.fetch` / `@system.request` - 网络请求
   - `@system.file` - 本地文件系统（用于缓存、下载、配置持久化）
   - `@system.router` - 页面路由
   - `@system.prompt` - 系统提示
-- **第三方 API**: [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi ) (由 `https://163api.qijieya.cn/` 提供服务 )
+- **第三方 API**: NeteaseCloudMusicApi (由 `https://163api.qijieya.cn/` 提供服务 )
 
-## 🛠️ 如何使用
+## 🛠️ 快速上手
 
-1.  使用 VelaOS 开发者工具将本项目编译并推送到您的智能手表设备。
+1.  在您的 VelaOS 智能手表上安装 OMusic 应用。
 2.  打开应用，默认进入播放器页面。
 3.  点击菜单按钮，可以进入 **搜索**、**列表**、**个人中心** 等功能。
 4.  在 **个人中心** -> **登录** 页面，输入您的网易云音乐用户ID，以同步您的个人歌单和收藏。
 5.  在 **设置** 页面，根据您的设备型号和网络环境，调整性能与网络参数以获得最佳体验。
 
-## 📜 开源许可
+## 📜 软件许可与版权
 
-本项目基于 **GNU Affero General Public License v3.0** 开源。
+本项目为商业软件，受版权法及相关国际条约保护。所有权利归 **OrPudding** 所有。
 
-- **AGPL-3.0 License**: 详情请见 [LICENSE](LICENSE) 文件。
+最终用户必须遵守 **[最终用户许可协议 (EULA)](/src/common/eula.json)** 中规定的条款。未经授权，严禁以任何形式复制、分发、修改或进行逆向工程。
+
+- **版权所有**: 详情请见 [LICENSE](./LICENSE) 文件。
 
 本项目使用了以下第三方库/资源，特此感谢：
 
-- **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi )**: Licensed under the **MIT License**.
-- **[Material Symbols](https://fonts.google.com/icons )**: Licensed under the **Apache License 2.0**.
+- **NeteaseCloudMusicApi**: 基于 MIT License 使用。
+- **Material Symbols**: 基于 Apache License 2.0 使用。
 
 ---
 
 <p align="center">
-  由 OrPudding 使用 ❤️ 制作
+  &copy; 2025 OrPudding. 保留所有权利。
 </p>

@@ -96,7 +96,7 @@ import request from '@system.request';
 // **注意**: fetch 模块不再需要，因为我们只保存cookie，不在此页面发起网络请求
 
 // --- 常量定义 (无变化) ---
-const API_BASE = 'https://';
+const API_BASE = 'https://163api.qijieya.cn';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const AVATAR_CACHE_DIR = 'internal://files/avatars/';

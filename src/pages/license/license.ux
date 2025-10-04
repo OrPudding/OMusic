@@ -7,21 +7,6 @@
   
         <div class="license-list">
   
-            <!-- OMusic (本项目) -->
-            <div class="license-capsule" onclick="toggleLicense('agpl')">
-                <div class="capsule-header">
-                    <div class="header-info">
-                        <text class="item-title">OMusic (本软件)</text>
-                        <text class="item-author">OrPudding</text>
-                        <text class="license-name">AGPL 3.0</text>
-                    </div>
-                </div>
-                <div if="{{ showAgpl }}" class="qrcode-section">
-                    <qrcode value="{{ agplUrl }}" class="qrcode-component"></qrcode>
-                    <text class="qrcode-tip">请扫码阅读完整许可协议</text>
-                </div>
-            </div>
-  
             <!-- NeteaseCloudMusicApi -->
             <div class="license-capsule" onclick="toggleLicense('mit')">
                 <div class="capsule-header">

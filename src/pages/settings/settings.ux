@@ -83,7 +83,7 @@
             <div class="setting-item">
                 <text class="item-label">清空全部数据</text>
                 <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
-                <text class="action-btn reset-color" onclick="handleResetApp">彻底重置</text>
+                <text class="action-btn reset-color" onclick="handleClearAllData">彻底重置</text>
             </div>
             <text class="item-desc">将应用恢复到初始安装状态，清除包括登录、授权、设置在内的所有本地数据。</text>
         </div>
@@ -145,6 +145,7 @@ const SETTINGS_FILE_URI = 'internal://files/settings.json';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
 // 预设的档位
 const PRESETS = {
     lyrics: {
@@ -271,138 +272,59 @@ export default {
     toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
     toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
 
-        // **新增**: 清除激活的方法
-        handleClearActivation() {
+    handleClearActivation() {
         prompt.showDialog({
             title: '清除授权',
             message: '您确定要清除本地授权信息吗？清除后需要重新联网激活应用。',
-            buttons: [
-                { text: '取消', color: '#999999' },
-                { text: '确定', color: '#FF9500' } // 橙色按钮
-            ],
-            success: (data) => {
-                if (data.index === 1) { // 确保点击的是“确定”
-                    prompt.showToast({ message: '正在清除授权...' });
-                    file.delete({
-                        uri: LICENSE_FILE_URI,
-                        success: () => {
-                            // 清除全局状态
-                            if (this.$app.$def) {
-                                this.$app.$def.isActivated = false;
-                            }
-                            prompt.showToast({ message: '授权已清除，请重新激活' });
-                            // 强制跳转到 Splash 页面
-                            router.replace({ uri: '/' }); 
-                        },
-                        fail: () => {
-                            // 即使文件不存在，也视为成功
-                            if (this.$app.$def) {
-                                this.$app.$def.isActivated = false;
-                            }
-                            prompt.showToast({ message: '授权已清除，请重新激活' });
-                            router.replace({ uri: '/' });
+            buttons: [{ text: '取消' }, { text: '确定', color: '#FF9500' }],
+            success: () => { // 移除 async
+                prompt.showToast({ message: '正在清除授权...' });
+                file.delete({
+                    uri: LICENSE_FILE_URI,
+                    complete: () => { // 使用 complete 确保无论成功失败都执行
+                        if (this.$app.$def) {
+                            this.$app.$def.isActivated = false;
                         }
-                    });
-                } else {
-                    prompt.showToast({ message: '操作已取消' });
-                }
+                        prompt.showToast({ message: '授权已清除，请重新启动应用' });
+                        // 强制跳转到 Splash 页面
+                        router.replace({ uri: '/pages/splash' });
+                    }
+                });
+            },
+            cancel: () => {
+                prompt.showToast({ message: '操作已取消' });
             }
         });
     },
 
-    handleLogout() {
-        prompt.showDialog({
-            title: '退出登录',
-            message: '您确定要退出登录吗？这将清除您的本地用户数据。',
-            buttons: [
-                { text: '取消', color: '#999999' },
-                { text: '确定', color: '#FF453A' }
-            ],
-            success: async () => {
-                prompt.showToast({ message: '正在退出...' });
-                try {
-                    await Promise.all([
-                        this.deleteFile(PROFILE_FILE_URI),
-                        this.deleteFile(AVATAR_CACHE_URI),
-                        this.deleteFile(COOKIE_FILE_URI)
-                    ]);
-                    if (this.$app.$def.cookieService) {
-                        this.$app.$def.cookieService.cookie = null;
-                    }
-                    prompt.showToast({ message: '已退出登录' });
-                    router.back();
-                } catch (error) {
-                    console.error("退出登录失败:", error);
-                    prompt.showToast({ message: '操作失败，请重试' });
-                }
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            },
-        });
-    },
-    /**
-     * 将 file.delete 包装成一个返回 Promise 的函数
-     */
-     _deleteFilePromise(uri) {
-        return new Promise((resolve) => {
-            file.delete({ uri: uri, success: resolve, fail: resolve });
-        });
-    },
-
-    /**
-     * 1. 退出登录
-     */
     handleLogout() {
         prompt.showDialog({
             title: '退出登录',
             message: '您确定要退出登录吗？这将清除您的本地用户数据。',
             buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-            // **核心修正**: success 回调没有参数，只要执行就代表用户点击了“确定”
-            success: async () => {
-                prompt.showToast({ message: '正在退出登录...' });
-                try {
-                    const filesToClear = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
-                    await Promise.all(filesToClear.map(uri => this._deleteFilePromise(uri)));
-                    
-                    if (this.$app.$def.cookieService) {
-                        this.$app.$def.cookieService.cookie = null;
+            success: () => { // 移除 async
+                prompt.showToast({ message: '正在退出...' });
+                // 开始回调地狱
+                file.delete({
+                    uri: PROFILE_FILE_URI,
+                    complete: () => { // 删除完第一个，在回调里删除第二个
+                        file.delete({
+                            uri: AVATAR_CACHE_URI,
+                            complete: () => { // 删除完第二个，在回调里删除第三个
+                                file.delete({
+                                    uri: COOKIE_FILE_URI,
+                                    complete: () => { // 全部删除完成
+                                        if (this.$app.$def.cookieService) {
+                                            this.$app.$def.cookieService.cookie = null;
+                                        }
+                                        prompt.showToast({ message: '已退出登录' });
+                                        router.back();
+                                    }
+                                });
+                            }
+                        });
                     }
-                    prompt.showToast({ message: '已退出登录' });
-                    router.back();
-                } catch (error) {
-                    console.error("退出登录失败:", error);
-                    prompt.showToast({ message: '操作失败，请重试' });
-                }
-            },
-            // **核心修正**: cancel 回调没有参数，只要执行就代表用户点击了“取消”
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
-
-    /**
-     * 2. 清除授权
-     */
-    handleClearActivation() {
-        prompt.showDialog({
-            title: '清除授权',
-            message: '您确定要清除本地授权信息吗？应用将需要重新联网激活。',
-            buttons: [{ text: '取消' }, { text: '确定', color: '#FF9500' }],
-            success: async () => {
-                prompt.showToast({ message: '正在清除授权...' });
-                try {
-                    await this._deleteFilePromise(LICENSE_FILE_URI);
-                    if (this.$app.$def) {
-                        this.$app.$def.isActivated = false;
-                    }
-                    prompt.showToast({ message: '授权已清除，请重新激活' });
-                    router.replace({ uri: '/' });
-                } catch (error) {
-                    console.error("清除授权失败:", error);
-                    prompt.showToast({ message: '操作失败，请重试' });
-                }
+                });
             },
             cancel: () => {
                 prompt.showToast({ message: '操作已取消' });
@@ -410,39 +332,59 @@ export default {
         });
     },
 
-    /**
-     * 3. 清空全部数据 (彻底重置)
-     */
-    handleResetApp() {
+    handleClearAllData() {
         prompt.showDialog({
-            title: '彻底重置应用',
-            message: '警告：此操作将删除所有本地数据，包括登录、授权和全部设置！',
-            buttons: [{ text: '取消' }, { text: '确定重置', color: '#c70039' }],
-            success: async () => {
-                prompt.showToast({ message: '正在重置应用...' });
-                try {
-                    const allFiles = [
-                        PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI,
-                        LICENSE_FILE_URI,
-                        SETTINGS_FILE_URI
-                    ];
-                    await Promise.all(allFiles.map(uri => this._deleteFilePromise(uri)));
-
+            title: '清空所有数据',
+            message: '【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？',
+            buttons: [{ text: '取消' }, { text: '确定清空', color: '#FF453A' }],
+            success: () => { // 移除 async
+                prompt.showToast({ message: '正在清空所有数据...' });
+                // 开始更深的回调地狱
+                this.deleteFile(PROFILE_FILE_URI, () => {
+                this.deleteFile(AVATAR_CACHE_URI, () => {
+                this.deleteFile(COOKIE_FILE_URI, () => {
+                this.deleteFile(LICENSE_FILE_URI, () => {
+                this.deleteFile(SETTINGS_FILE_URI, () => {
+                this.deleteDirectory(PLAYLIST_CACHE_DIR, () => {
+                    // 全部完成
                     if (this.$app.$def) {
                         this.$app.$def.isActivated = false;
                         if (this.$app.$def.cookieService) {
                             this.$app.$def.cookieService.cookie = null;
                         }
                     }
-                    prompt.showToast({ message: '应用已重置' });
-                    router.replace({ uri: '/' });
-                } catch (error) {
-                    console.error("重置应用失败:", error);
-                    prompt.showToast({ message: '操作失败，请重试' });
-                }
+                    prompt.showToast({ message: '所有数据已清空，请重启应用' });
+                    router.replace({ uri: '/pages/splash' });
+                });
+                });
+                });
+                });
+                });
+                });
             },
             cancel: () => {
                 prompt.showToast({ message: '操作已取消' });
+            }
+        });
+    },
+
+    // 辅助函数：纯回调版本
+    deleteFile(uri, callback) {
+        file.delete({
+            uri: uri,
+            complete: () => {
+                if (callback) callback();
+            }
+        });
+    },
+
+    // 辅助函数：纯回调版本
+    deleteDirectory(uri, callback) {
+        file.rmdir({
+            uri: uri,
+            recursive: true, // 递归删除
+            complete: () => {
+                if (callback) callback();
             }
         });
     },

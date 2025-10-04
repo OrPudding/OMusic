@@ -60,7 +60,7 @@ import prompt from '@system.prompt';
 import request from '@system.request';
 
 // --- 常量定义 (无变化) ---
-const API_USER_ACCOUNT = 'https:///user/account';
+const API_USER_ACCOUNT = 'https://163api.qijieya.cn/user/account';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const DEFAULT_AVATAR = '/common/icon/user.png';
 const AVATAR_CACHE_DIR = 'internal://files/avatars/';
