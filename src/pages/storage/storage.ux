@@ -1,0 +1,497 @@
+<template>
+  <!-- 容器结构保持不变 -->
+  <scroll id="songListScroll" class="list-container" scroll-y="true" bounces="true" 
+  onscrolltop="handleScrollTop" 
+  onscrollbottom="handleScrollBottom">
+      
+      <!-- 1. 顶部 Header (无变化) -->
+      <div class="header">
+          <text class="time-display">{{currentTime}}</text>
+          <text class="title" onclick="goBack">‹存储管理</text>
+      </div>
+
+      <!-- 2. 存储空间概览 (无变化) -->
+      <div class="storage-overview">
+          <text class="storage-text">{{ usedStorageText }} / {{ totalStorageText }}</text>
+          <progress class="storage-progress" type="horizontal" percent="{{ usedPercent }}"></progress>
+          <div class="storage-details">
+              <div class="detail-item">
+                  <div class="color-box music-color"></div>
+                  <text class="detail-text">歌曲: {{ musicSizeText }}</text>
+              </div>
+              <div class="detail-item">
+                  <div class="color-box lyrics-color"></div>
+                  <text class="detail-text">歌词: {{ lyricsSizeText }}</text>
+              </div>
+              <div class="detail-item">
+                  <div class="color-box free-color"></div>
+                  <text class="detail-text">可用: {{ availableStorageText }}</text>
+              </div>
+          </div>
+      </div>
+      
+      <!-- 3. 列表内容 -->
+      <div class="list-content">
+          <div for="{{(index, item) in displaySongList}}" class="song-item">
+             <text class="item-index">{{ item.displayIndex }}</text>
+             <div class="song-info">
+                 <text class="song-title">{{ item.name }}</text>
+                 <text class="song-artist">{{ item.artists }}</text>
+                 
+                 <!-- 核心修改：新增文件大小显示区域 -->
+                 <div class="file-size-details">
+                     <text class="size-tag music">{{ formatSize(item.musicFileSize, 'MB') }}</text>
+                     <text class="size-tag lyric">{{ formatSize(item.lyricFileSize, 'KB') }}</text>
+                 </div>
+
+             </div>
+             <div class="delete-btn-wrapper" onclick="deleteSong(item)">
+                 <image class="delete-btn" src="/common/icon/cancel.png"></image>
+             </div>
+          </div>
+      </div>
+
+      <!-- 4. 底部提示 (无变化) -->
+      <text class="loading-tip" if="{{ isLoading }}">正在计算存储...</text>
+      <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">没有已下载的歌曲</text>
+      <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已显示全部</text>
+
+  </scroll>
+</template>
+
+<style>
+  /* --- 复用您提供的 list.css 样式 --- */
+  .list-container {
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      align-items: center;
+      background-color: black;
+  }
+  .header {
+      width: 100%;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+  }
+  .time-display {
+      font-size: 28px;
+      font-weight: bold;
+      color: #ffffff;
+      padding-top: 5px;
+      text-align: center;
+  }
+  .title {
+      font-size: 32px;
+      padding: 5px;
+      text-align: center;
+      font-weight: bold;
+      color: #fff;
+  }
+  .list-content {
+      flex-direction: column;
+      padding-bottom: 60px;
+  }
+  .song-item {
+      padding: 0 25px;
+      width: 360px;
+      /* 增加高度以容纳新的大小信息 */
+      height: 140px; 
+      margin: 5px;
+      background-color: rgba(255, 255, 255, 0.06);
+      border-radius: 36px;
+      justify-content: space-between;
+      align-items: center;
+  }
+  .item-index {
+      text-align: center;
+      font-size: 28px;
+      color: rgba(255, 255, 255, 0.6);
+      width: 50px;
+  }
+  .song-info {
+      width: 200px;
+      flex-direction: column;
+      justify-content: center; 
+  }
+  .song-title {
+      font-size: 26px;
+      color: #fff;
+      lines: 1;
+      text-overflow: ellipsis;
+  }
+  .song-artist {
+      font-size: 22px;
+      color: #888;
+      lines: 1;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+  }
+  .delete-btn-wrapper {
+      width: 80px;
+      height: 140px; /* 匹配父容器高度 */
+      justify-content: center;
+      align-items: center;
+  }
+  .delete-btn {
+      width: 64px;
+      height: 64px;
+  }
+  .loading-tip {
+      width: 100%;
+      text-align: center;
+      color: #888;
+      font-size: 24px;
+      padding: 30px;
+  }
+  @media screen and (shape: rect) {
+      .header {
+          flex-direction: row-reverse;
+          padding-top: 10px;
+          justify-content:space-around
+      }
+      .time-display {
+          font-size: 32px;
+      }
+  }
+
+  /* --- 存储概览部分的样式 (无变化) --- */
+  .storage-overview {
+      display: flex;
+      flex-direction: column;
+      margin: 10px 25px 20px;
+      padding: 15px;
+      background-color: #1c1c1e;
+      border-radius: 20px;
+      width: 360px;
+  }
+  .storage-text {
+      font-size: 24px;
+      color: #ffffff;
+      font-weight: bold;
+      margin-bottom: 10px;
+  }
+  .storage-progress {
+      width: 100%;
+      height: 12px;
+      stroke-width: 12px;
+      color: #3ae1ff;
+      background-color: #333;
+  }
+  .storage-details {
+      flex-direction: column;
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      margin-top: 15px;
+  }
+  .detail-item {
+      display: flex;
+      align-items: center;
+      font-size: 20px;
+      color: #cccccc;
+  }
+  .detail-text {
+      font-size: 20px;
+      color: #cccccc;
+  }
+  .color-box {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 8px;
+  }
+  .music-color { background-color: #3ae1ff; }
+  .lyrics-color { background-color: rgba(58, 225, 255, 0.5); }
+  .free-color { background-color: #555555; }
+
+  /* --- 核心修改：新增文件大小详情的样式 --- */
+  .file-size-details {
+      display: flex;
+      flex-direction: row;
+      margin-top: 6px;
+  }
+  .size-tag {
+      font-size: 18px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      margin-right: 8px;
+  }
+  .size-tag.music {
+      background-color: rgba(58, 225, 255, 0.2);
+      color: #3ae1ff;
+  }
+  .size-tag.lyric {
+      background-color: rgba(200, 200, 200, 0.2);
+      color: #cccccc;
+  }
+</style>
+
+<script>
+import router from "@system.router";
+import file from "@system.file";
+import prompt from "@system.prompt";
+import device from "@system.device";
+
+// --- 文件服务封装 (无变化) ---
+const fileService = {
+  _promisify(fn, options) {
+      return new Promise((resolve, reject) => {
+          fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
+      });
+  },
+  async readJson(uri, defaultValue = null) {
+      try {
+          const data = await this._promisify(file.readText, { uri });
+          return JSON.parse(data.text);
+      } catch (error) {
+          if (error.code !== 301) console.error(`[FileService] readJson 失败: ${uri}`, error);
+          return defaultValue;
+      }
+  },
+  async writeJson(uri, data) {
+      try {
+          await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
+          return true;
+      } catch (error) {
+          console.error(`[FileService] writeJson 失败: ${uri}`, error);
+          return false;
+      }
+  },
+  async delete(uri) {
+      try {
+          await this._promisify(file.delete, { uri });
+          return true;
+      } catch (error) {
+          if (error.code !== 301) console.error(`[FileService] delete 失败: ${uri}`, error);
+          return false;
+      }
+  },
+  async get(uri) {
+      try {
+          return await this._promisify(file.get, { uri });
+      } catch (error) {
+          if (error.code !== 301) console.error(`[FileService] get 失败: ${uri}`, error);
+          return null;
+      }
+  },
+  async list(uri) {
+      try {
+          const result = await this._promisify(file.list, { uri });
+          return result.fileList || [];
+      } catch (error) {
+          if (error.code !== 301) console.error(`[FileService] list 失败: ${uri}`, error);
+          return [];
+      }
+  }
+};
+
+// --- 常量定义 (无变化) ---
+const DIR_MUSIC = 'internal://files/music/';
+const DIR_LYRICS = 'internal://files/lyrics/';
+const FILE_DOWNLOADED_SONGS = 'internal://files/downloaded_songs.json';
+
+export default {
+  private: {
+      // 存储信息
+      totalStorage: 0,
+      availableStorage: 0,
+      musicSize: 0,
+      lyricsSize: 0,
+      // 列表数据
+      fullSongList: [],
+      displaySongList: [],
+      // 虚拟列表参数
+      WINDOW_SIZE: 30,
+      PAGE_SIZE: 15,
+      ITEM_HEIGHT: 150, // 增加了列表项高度，同步更新
+      displayStartIndex: 0,
+      hasMoreUp: false,
+      hasMoreDown: true,
+      // 状态
+      isLoading: true,
+      isScrolling: false,
+      currentTime: "00:00",
+      pageTitle: "存储管理",
+  },
+
+  computed: {
+      usedStorage() { return this.totalStorage - this.availableStorage; },
+      usedPercent() { return this.totalStorage > 0 ? Math.round((this.usedStorage / this.totalStorage) * 100) : 0; },
+      totalStorageText() { return this.formatSize(this.totalStorage); },
+      availableStorageText() { return this.formatSize(this.availableStorage); },
+      usedStorageText() { return this.formatSize(this.usedStorage); },
+      musicSizeText() { return this.formatSize(this.musicSize); },
+      lyricsSizeText() { return this.formatSize(this.lyricsSize); }
+  },
+
+  onInit() {
+      this.updateTime();
+      setInterval(() => this.updateTime(), 1000 * 60);
+  },
+
+  onShow() {
+      this.loadData();
+  },
+
+  updateTime() {
+      const now = new Date();
+      this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  },
+
+  async loadData() {
+      if (this.isLoading && this.fullSongList.length > 0) return;
+      this.isLoading = true;
+
+      try {
+          const [downloadedMeta] = await Promise.all([
+              fileService.readJson(FILE_DOWNLOADED_SONGS, {}),
+              this.getDeviceStorage(),
+          ]);
+
+          const sourceData = Object.values(downloadedMeta);
+
+          // --- 核心修改：并行获取所有文件的精确大小 ---
+          const songsWithSizes = await Promise.all(sourceData.map(async (song, index) => {
+              const musicFile = song.localUri ? await fileService.get(song.localUri) : null;
+              const lyricFile = song.localLyricUri ? await fileService.get(song.localLyricUri) : null;
+              return {
+                  ...song,
+                  originalIndex: index + 1,
+                  musicFileSize: musicFile ? musicFile.length : 0,
+                  lyricFileSize: lyricFile ? lyricFile.length : 0,
+              };
+          }));
+
+          this.fullSongList = songsWithSizes;
+          
+          // --- 重新计算总大小 ---
+          this.musicSize = this.fullSongList.reduce((sum, song) => sum + song.musicFileSize, 0);
+          this.lyricsSize = this.fullSongList.reduce((sum, song) => sum + song.lyricFileSize, 0);
+
+          this.updateDisplayList(0);
+          this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
+
+      } catch (error) {
+          console.error("加载存储数据失败:", error);
+          prompt.showToast({ message: "加载信息失败" });
+          this.hasMoreDown = false;
+      } finally {
+          this.isLoading = false;
+      }
+  },
+
+  getDeviceStorage() {
+      return new Promise((resolve) => {
+          device.getTotalStorage({
+              success: (data) => { this.totalStorage = data.totalStorage; },
+              fail: () => { console.error("获取总存储空间失败"); },
+              complete: () => {
+                  device.getAvailableStorage({
+                      success: (data) => { this.availableStorage = data.availableStorage; },
+                      fail: () => { console.error("获取可用存储空间失败"); },
+                      complete: resolve,
+                  });
+              },
+          });
+      });
+  },
+
+  async deleteSong(songToDelete) {
+      const fullIndex = this.fullSongList.findIndex(item => item.id === songToDelete.id);
+      if (fullIndex === -1) return;
+
+      // 从乐观更新UI中获取待减去的大小
+      const musicFileSize = songToDelete.musicFileSize || 0;
+      const lyricFileSize = songToDelete.lyricFileSize || 0;
+
+      this.fullSongList.splice(fullIndex, 1);
+      this.updateDisplayList(this.displayStartIndex);
+      prompt.showToast({ message: '已删除' });
+
+      // 更新存储数据
+      this.musicSize -= musicFileSize;
+      this.lyricsSize -= lyricFileSize;
+      this.availableStorage += (musicFileSize + lyricFileSize);
+
+      try {
+          const downloaded = await fileService.readJson(FILE_DOWNLOADED_SONGS, {});
+          const songInfo = downloaded[String(songToDelete.id)];
+          if (!songInfo) return;
+
+          delete downloaded[String(songToDelete.id)];
+          await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
+
+          if (songInfo.localUri) await fileService.delete(songInfo.localUri);
+          if (songInfo.localLyricUri) await fileService.delete(songInfo.localLyricUri);
+          this.loadData();
+
+      } catch (error) {
+          console.error(`删除歌曲 ${songToDelete.id} 失败:`, error);
+          prompt.showToast({ message: '删除失败，将刷新' });
+          this.loadData();
+      }
+  },
+
+  updateDisplayList(startIndex) {
+      this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullSongList.length - this.PAGE_SIZE));
+      const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullSongList.length);
+      
+      this.displaySongList = this.fullSongList.slice(this.displayStartIndex, endIndex).map((song, index) => ({
+          ...song,
+          displayIndex: this.displayStartIndex + index + 1,
+      }));
+      this.hasMoreDown = endIndex < this.fullSongList.length;
+  },
+
+  handleScrollTop() {
+      if (this.isScrolling || !this.hasMoreUp) return;
+      this.isScrolling = true;
+      const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
+      if (prevStartIndex < 0) {
+          this.isScrolling = false;
+          return;
+      }
+      this.updateDisplayList(prevStartIndex);
+      const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
+      this.$element('songListScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
+      setTimeout(() => { this.isScrolling = false; }, 100);
+  },
+
+  handleScrollBottom() {
+      if (this.isScrolling || !this.hasMoreDown) return;
+      
+      if (this.displayStartIndex + this.PAGE_SIZE < this.fullSongList.length) {
+          this.isScrolling = true;
+          const nextStartIndex = this.displayStartIndex + this.PAGE_SIZE;
+          this.updateDisplayList(nextStartIndex);
+          const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
+          this.$element('songListScroll').scrollBy({ top: -scrollOffset, behavior: 'instant' });
+          setTimeout(() => { this.isScrolling = false; }, 100);
+      }
+  },
+
+  // --- 核心修改：增强 formatSize 函数以支持指定单位 ---
+  formatSize(bytes, forceUnit = null) {
+      if (bytes < 0) bytes = 0;
+      if (bytes === 0) return `0 ${forceUnit || 'B'}`;
+      
+      const k = 1024;
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      
+      let i;
+      if (forceUnit && units.includes(forceUnit)) {
+          i = units.indexOf(forceUnit);
+      } else {
+          i = Math.floor(Math.log(bytes) / Math.log(k));
+      }
+      
+      const value = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+      return `${value} ${units[i]}`;
+  },
+
+  goBack() {
+      router.back();
+  }
+};
+</script>

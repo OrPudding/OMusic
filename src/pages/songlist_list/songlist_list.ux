@@ -1,27 +1,35 @@
 <template>
-  <scroll class="page-container" scroll-y="true" bounces="true">
-      <!-- 标题改为动态绑定 -->
-      <div class="header" onclick="goBack">
-        <text class="time-display">{{ currentTime }}</text>
-        <text class="title">‹{{ pageTitle }}</text>
-        </div>
-        <text class="loading-tip" if="{{ isLoading }}">正在刷新...</text>
-        <text class="loading-tip" if="{{ !isLoading && playlists.length === 0 }}">
-            没有公开的歌单或加载失败
-        </text>
-
-      <div class="grid-scroll">
+    <!-- 严格遵循 list.ux 的模板结构 -->
+    <scroll id="playlistScroll" class="page-container" scroll-y="true" bounces="true" 
+        onscrolltop="handleScrollTop" 
+        onscrollbottom="handleScrollBottom">
         
-          <div class="playlist-grid">
-              <div class="playlist-item" for="{{ playlists }}" onclick="goToSongList($item.id)">
-                  <text class="item-name">{{ $item.name }}</text>
-                  <text class="item-track-count">{{ $item.trackCount }} 首</text>
-              </div>
-          </div>
-      </div>
-  </scroll>
+        <div class="header" onclick="goBack">
+            <text class="time-display">{{ currentTime }}</text>
+            <text class="title">‹{{ pageTitle }}</text>
+        </div>
+        
+        <!-- 列表内容区域 -->
+        <div class="list-content">
+            <!-- 循环 displayPlaylist，这是虚拟列表的核心 -->
+            <div for="{{(index, item) in displayPlaylist}}" class="playlist-item" onclick="goToSongList(item.id)">
+                <div class="item-info">
+                    <text class="item-name">{{ item.name }}</text>
+                    <text class="item-track-count">{{ item.trackCount }} 首</text>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态提示 -->
+        <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
+        <text class="loading-tip" if="{{ !isLoading && fullPlaylist.length === 0 }}">列表为空</text>
+        <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullPlaylist.length > 0 }}">已加载全部</text>
+
+    </scroll>
 </template>
+
 <style>
+    /* 样式调整为垂直列表样式，而不是网格 */
     .page-container {
         width: 100%;
         height: 100%;
@@ -49,16 +57,12 @@
         font-weight: bold;
         color: #fff;
     }
-    .grid-scroll {
-        width: 100%;
-        margin-bottom: 120px;
-    }
-    .playlist-grid {
-        width: 100%;
-        padding: 10px;
+    .list-content {
         flex-direction: row;
         flex-wrap: wrap;
-        justify-content: space-around;
+        padding-bottom: 60px;
+        width: 100%;
+        align-items: center; /* 让列表项居中 */
     }
     .playlist-item {
         width:45%;
@@ -68,11 +72,8 @@
         background-color: rgba(255, 255, 255, 0.06);
         border-radius: 20px;
     }
-    .item-cover {
-        width: 170px;
-        height: 170px;
-        border-radius: 20px;
-        background-color: #333;
+    .item-info {
+        flex-direction: column;
     }
     .item-name {
         font-size: 24px;
@@ -86,6 +87,11 @@
         color: rgba(255, 255, 255, 0.6);
         margin-top: 4px;
     }
+    .arrow-icon {
+        width: 36px;
+        height: 36px;
+        color: #555;
+    }
     .loading-tip {
         width: 100%;
         text-align: center;
@@ -94,26 +100,27 @@
         padding: 30px;
     }
     @media screen and (shape: rect) {
-    .header {
-        padding-top: 10px;
-      flex-direction: row-reverse;
-      justify-content:space-around
+        .header {
+            padding-top: 10px;
+            flex-direction: row-reverse;
+            justify-content:space-around
+        }
+        .time-display {
+            font-size: 32px;
+        }
     }
-    .time-display {
-        font-size: 32px;
-    }
-  }
 </style>
 <script>
 import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
-// **注意**: 不再需要直接导入 fetch
 
 const API_BASE = 'https://163api.qijieya.cn';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
+const SETTINGS_FILE_URI = 'internal://files/settings.json';
 
+// 文件服务封装 (无变化 )
 const fileService = {
     _promisify(fn, options ) {
         return new Promise((resolve, reject) => {
@@ -141,9 +148,7 @@ const fileService = {
     async ensureDirExists(uri) {
         try {
             await this._promisify(file.mkdir, { uri });
-        } catch (error) {
-            // 忽略目录已存在的错误
-        }
+        } catch (error) { /* 忽略目录已存在的错误 */ }
     }
 };
 
@@ -153,123 +158,204 @@ export default {
     },
 
     private: {
-        playlists: [],
+        // --- 严格对齐 list.ux 的数据模型 ---
+        fullPlaylist: [],
+        displayPlaylist: [],
+        
+        WINDOW_SIZE: 30,
+        PAGE_SIZE: 10,      // 网格布局，每页加载10个，即5行
+        ITEM_HEIGHT: 180,   // 估算的网格项行高 (item height + margin)
+        TOTAL_LIMIT: 200,
+        API_PAGE_SIZE: 20,  // 每次网络请求获取20个
+        
+        displayStartIndex: 0,
         isLoading: false,
+        isScrolling: false,
+        hasMoreUp: false,
+        hasMoreDown: true,
+
         pageTitle: '用户歌单',
         currentTime: '00:00',
     },
 
     async onInit() {
         await fileService.ensureDirExists(USER_PLAYLISTS_DIR);
-        this.loadUserPlaylistsWithCache();
+        await this.applySettings();
         this.updateTime();
-        setInterval(() => {
-            this.updateTime();
-        }, 1000);
+        setInterval(() => this.updateTime(), 1000 * 60);
+    },
+
+    onShow() {
+        this.loadData();
+    },
+
+    async applySettings() {
+        const settings = await fileService.readJson(SETTINGS_FILE_URI);
+        if (settings) {
+            if (settings.performance) {
+                this.WINDOW_SIZE = settings.performance.windowSize || this.WINDOW_SIZE;
+                this.PAGE_SIZE = (settings.performance.pageSize * 2) || this.PAGE_SIZE; // 适配网格
+            }
+            if (settings.network) {
+                this.TOTAL_LIMIT = settings.network.totalLimit || this.TOTAL_LIMIT;
+                this.API_PAGE_SIZE = settings.network.apiPageSize || this.API_PAGE_SIZE;
+            }
+        }
     },
 
     updateTime() {
         const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        this.currentTime = `${hours}:${minutes}`;
+        this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
-    async loadUserPlaylistsWithCache() {
+    // --- 严格参考您的 loadData 逻辑 ---
+    async loadData() {
         if (this.isLoading) return;
+
         this.isLoading = true;
-
-        const userId = this.uid || await this.getUserIdFromLocal();
-        if (!userId) {
-            prompt.showToast({ message: '未指定用户ID' });
-            this.isLoading = false;
-            return;
-        }
-
-        const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
-
-        const cachedData = await fileService.readJson(cacheFileUri, null);
-        if (cachedData) {
-            console.log(`从缓存加载用户 ${userId} 的歌单。`);
-            this.playlists = cachedData.playlists;
-            this.pageTitle = cachedData.pageTitle;
-        } else {
-            prompt.showToast({ message: '正在加载...' });
-        }
+        this.fullPlaylist = [];
+        this.displayPlaylist = [];
+        this.hasMoreDown = true;
 
         try {
-            // **核心修改 1**: 获取全局请求服务
-            const request = this.$app.$def.requestService;
-            if (!request) throw new Error('内部服务错误');
-
-            // **核心修改 2**: 移除不被支持的 timestamp 参数
-            const url = `${API_BASE}/user/playlist?uid=${userId}`;
-            console.log("Requesting user playlists with URL:", url);
-
-            // **核心修改 3**: 使用全局服务发起请求
-            const response = await request.fetch({ url });
-
-            if (response.status === 'success') {
-                const newPlaylists = response.data?.playlist;
-
-                if (newPlaylists && newPlaylists.length > 0) {
-                    const creatorName = newPlaylists[0].creator?.nickname;
-                    const newPageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
-                    const newFormattedPlaylists = newPlaylists.map(pl => ({
-                        id: pl.id,
-                        name: pl.name,
-                        trackCount: pl.trackCount,
-                    }));
-
-                    const newDataToCache = {
-                        pageTitle: newPageTitle,
-                        playlists: newFormattedPlaylists,
-                    };
-
-                    if (JSON.stringify(cachedData) !== JSON.stringify(newDataToCache)) {
-                        console.log(`用户 ${userId} 的歌单有更新，刷新UI并写入缓存。`);
-                        this.playlists = newFormattedPlaylists;
-                        this.pageTitle = newPageTitle;
-                        await fileService.writeJson(cacheFileUri, newDataToCache);
-                    } else {
-                        console.log(`用户 ${userId} 的歌单无更新。`);
-                    }
-                } else if (!cachedData) {
-                    prompt.showToast({ message: '未找到该用户的公开歌单' });
-                }
-            } else {
-                // **核心修改 4**: 抛出从全局服务获取的、更具体的错误信息
-                throw new Error(response.message || '未知错误');
-            }
+            await this.fetchPlaylistsFromNetwork();
         } catch (error) {
-            console.error("获取用户歌单失败:", error);
-            if (!cachedData) {
-                prompt.showToast({ message: `加载失败: ${error.message}` });
-            }
+            console.error("加载歌单数据源失败:", error);
+            prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
+            this.hasMoreDown = false;
         } finally {
             this.isLoading = false;
         }
     },
 
-    async getUserIdFromLocal() {
-        try {
-            const data = await new Promise((resolve, reject) => {
-                file.readText({ uri: PROFILE_FILE_URI, success: resolve, fail: reject });
-            });
-            const profile = JSON.parse(data.text);
-            return profile?.userId;
-        } catch (e) {
-            return null;
+    // --- 严格参考您的 fetchSonglistFromNetwork 逻辑 ---
+    async fetchPlaylistsFromNetwork() {
+        const userId = this.uid || await this.getUserIdFromLocal();
+        if (!userId) {
+            this.isLoading = false;
+            this.hasMoreDown = false;
+            throw new Error("未提供用户ID");
         }
+
+        const request = this.$app.$def.requestService;
+        if (!request) {
+            this.isLoading = false;
+            this.hasMoreDown = false;
+            throw new Error("内部服务错误: requestService 未找到");
+        }
+
+        const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
+        
+        // 尝试从缓存加载
+        const cachedData = await fileService.readJson(cacheFileUri);
+        if (cachedData) {
+            this.fullPlaylist = cachedData.playlists;
+            this.pageTitle = cachedData.pageTitle;
+            this.updateDisplayList(0);
+            console.log(`已从缓存加载 ${this.fullPlaylist.length} 个歌单。`);
+        }
+
+        // 从网络获取更新
+        let allPlaylists = [];
+        let hasMore = true;
+        let offset = 0;
+
+        while (hasMore && allPlaylists.length < this.TOTAL_LIMIT) {
+            const url = `${API_BASE}/user/playlist?uid=${userId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
+            
+            try {
+                const response = await request.fetch({ url });
+                if (response.status !== 'success') throw new Error(response.message);
+
+                const newPlaylists = response.data?.playlist;
+                if (newPlaylists && newPlaylists.length > 0) {
+                    const formatted = newPlaylists.map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.trackCount }));
+                    allPlaylists.push(...formatted);
+                    
+                    // 实时更新UI
+                    this.fullPlaylist = [...allPlaylists];
+                    this.updateDisplayList(this.displayStartIndex);
+
+                    offset += newPlaylists.length;
+                    if (newPlaylists.length < this.API_PAGE_SIZE) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            } catch (error) {
+                console.error("分页获取歌单失败:", error);
+                hasMore = false;
+                if (!cachedData) throw error; // 只有在完全没有缓存时才向上抛出错误
+            }
+        }
+        
+        if (this.fullPlaylist.length > 0) {
+            const creatorName = this.fullPlaylist[0].creator?.nickname; // 假设API返回creator
+            this.pageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
+        }
+        
+        // 异步更新缓存
+        fileService.writeJson(cacheFileUri, {
+            pageTitle: this.pageTitle,
+            playlists: this.fullPlaylist,
+        });
+    },
+
+    // --- 严格复制您 list.ux 的虚拟列表核心方法 ---
+    updateDisplayList(startIndex) {
+        this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullPlaylist.length - this.PAGE_SIZE));
+        const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullPlaylist.length);
+        
+        this.displayPlaylist = this.fullPlaylist.slice(this.displayStartIndex, endIndex);
+
+        this.hasMoreUp = this.displayStartIndex > 0;
+        this.hasMoreDown = endIndex < this.fullPlaylist.length;
+    },
+
+    handleScrollTop() {
+        if (this.isScrolling || !this.hasMoreUp) return;
+        this.isScrolling = true;
+        const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
+        if (prevStartIndex < 0) {
+            this.isScrolling = false;
+            return;
+        }
+        this.updateDisplayList(prevStartIndex);
+        
+        // 适配网格布局，滚动距离是 行数 * 行高
+        const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
+        this.$element('playlistScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
+        setTimeout(() => { this.isScrolling = false; }, 100);
+    },
+
+    handleScrollBottom() {
+        if (this.isScrolling || !this.hasMoreDown) return;
+        
+        // 只有当本地数据还有未显示的，才执行窗口滑动
+        if (this.displayStartIndex + this.PAGE_SIZE < this.fullPlaylist.length) {
+            this.isScrolling = true;
+            const nextStartIndex = this.displayStartIndex + this.PAGE_SIZE;
+            
+            this.updateDisplayList(nextStartIndex);
+            
+            // 适配网格布局，滚动距离是 行数 * 行高
+            const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
+            this.$element('playlistScroll').scrollBy({ top: -scrollOffset, behavior: 'instant' });
+            
+            setTimeout(() => { this.isScrolling = false; }, 100);
+        }
+        // 注意：网络加载的懒加载由 fetchPlaylistsFromNetwork 的循环实现，这里只负责UI层面的窗口滑动
+    },
+    // --- 虚拟列表方法结束 ---
+
+    async getUserIdFromLocal() {
+        const profile = await fileService.readJson(PROFILE_FILE_URI);
+        return profile?.userId;
     },
 
     goToSongList(songlistId) {
         router.push({
             uri: '/pages/list',
-            params: {
-                listType: 'songlist',
-                songlistId: songlistId,
-            }
+            params: { listType: 'songlist', songlistId: songlistId }
         });
     },
 
@@ -277,3 +363,4 @@ export default {
         router.back();
     }
 };
+</script>

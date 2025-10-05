@@ -1,290 +1,260 @@
 <template>
-  <div class="volume">
-    <!-- 控制音量按钮 -->
-    <div class="volume-bar-container">
-      <image class="action-icon" src="/common/icon/minus.png" onclick="changeVolume(-1)"></image>
-      <div class="volume-progress-container">
-        <progress class="volume-progress" percent="{{volume}}"></progress>
+    <div class="volume">
+      <!-- 音量控制 (无变化) -->
+      <div class="volume-bar-container">
+        <image class="action-icon" src="/common/icon/minus.png" onclick="changeVolume(-1)"></image>
+        <div class="volume-progress-container">
+          <progress class="volume-progress" percent="{{volume}}"></progress>
+        </div>
+        <image class="action-icon" src="/common/icon/plus.png" onclick="changeVolume(1)"></image>
       </div>
-      <image class="action-icon" src="/common/icon/plus.png" onclick="changeVolume(1)"></image>
-    </div>
-
-    <!-- 操作控制 -->
-    <div class="control-container">
-      <!-- 下载图标：根据 downloadState 动态显示 -->
-      <image class="icon" src="{{ downloadIcon }}" onclick="handleDownloadClick"></image>
-      <!-- 收藏图标 -->
-      <image class="icon" id="favoriteIcon" src="{{ favoriteIcon }}" onclick="toggleFavorite"></image>
-    </div>
-
-    <!-- 返回播放页面 -->
-    <div class="cancel-container">
-      <image class="action-icon" src="/common/icon/cancel.png" onclick="goBack"></image>
-    </div>
-  </div>
-</template>
-<script>
-// pages/volume/index.js
-
-import router from "@system.router";
-import audio from "@system.audio";
-import file from "@system.file";
-import prompt from "@system.prompt";
-// request 和 fetch 不再需要，因为下载逻辑已移走
-// import request from "@system.request";
-// import fetch from "@system.fetch";
-
-// --- 1. 常量与配置 ---
-const CONSTANTS = {
-    // 只保留需要用到的常量
-    DIR_MUSIC: 'internal://files/music/', // 用于创建目录
-    DIR_LYRICS: 'internal://files/lyrics/', // 用于创建目录
-    FILE_FAVORITES: 'internal://files/favorites.json',
-    FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
-};
-
-export default {
-    private: {
-        volume: 0,
-        currentSong: null,
-        favorites: {},
-        isFavorited: false,
-        downloadedSongs: {},
-        // downloadState 仍然需要，用于显示正确的图标
-        downloadState: 'not_downloaded',
-        // isDownloadingLocked 不再需要，因为本页面不处理下载过程
-        // isDownloadingLocked: false,
-    },
   
-    computed: {
-        downloadIcon() {
-            const icons = {
-                // 'downloading' 状态由 player 页面管理，但 volume 页可以显示，以防用户快速返回
-                downloading: '/common/icon/downloading.png',
-                downloaded: '/common/icon/downloaded.png',
-                not_downloaded: '/common/icon/download.png',
-            };
-            return icons[this.downloadState] || icons.not_downloaded;
-        },
-        favoriteIcon() {
-            return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
-        }
-    },
+      <!-- 操作控制 -->
+      <div class="control-container">
+        <!-- 收藏图标 (所有屏幕都显示) -->
+        <image class="icon" id="favoriteIcon" src="{{ favoriteIcon }}" onclick="toggleFavorite"></image>
+  
+          <image class="icon" src="{{ downloadIcon }}" onclick="handleDownloadClick"></image>
+          <image class="icon" src="{{ playModeIcon }}" onclick="handlePlayModeClick"></image>
 
-    // protected 中 currentSong 是从外部传入的，保持不变
-    protected: {
-        currentSong: {}
-    },
-
-    onInit() {
-        this.volume = audio.volume * 100;
-        
-        // 解析传入的歌曲数据，逻辑保持不变
-        let songData = this.currentSong;
-        // 简化循环解析逻辑，避免死循环
-        for (let i = 0; i < 5 && typeof songData === 'string'; i++) {
-            try {
-                songData = JSON.parse(songData);
-            } catch (e) {
-                prompt.showToast({ message: '无法加载歌曲信息' });
-                router.back();
-                return;
-            }
-        }
-        this.currentSong = songData;
-
-        if (!this.currentSong || !this.currentSong.id) {
-            prompt.showToast({ message: '歌曲信息无效' });
-            router.back();
-            return;
-        }
-
-        // 确保目录存在，逻辑保持不变
-        file.mkdir({ uri: CONSTANTS.DIR_MUSIC, complete: () => {
-            file.mkdir({ uri: CONSTANTS.DIR_LYRICS, complete: () => {
-                this.loadInitialState();
-            }});
-        }});
-    },
-
-// volume.js
-
-// ...
-
-async onShow() {
-    // 重新加载下载列表，以更新可能在后台完成的下载状态
-    await this.loadDownloadedSongs();
-    this.updateDownloadStatus();
-},
-
-// ...
-
-async loadDownloadedSongs() {
-    try {
-        const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_DOWNLOADED_SONGS, success: resolve, fail: reject }));
-        this.downloadedSongs = JSON.parse(data.text || '{}');
-    } catch (e) {
-        this.downloadedSongs = {};
-    }
-},
-
-// ...
-
-updateDownloadStatus() {
-    if (this.currentSong) {
-        const songId = this.currentSong.id;
-        // 检查下载状态，包括 player 页面可能设置的 'downloading' 状态
-        const downloadedInfo = this.downloadedSongs[songId];
-        if (downloadedInfo) {
-            this.downloadState = downloadedInfo.downloadStatus === 'downloading' ? 'downloading' : 'downloaded';
-        } else {
-            this.downloadState = 'not_downloaded';
-        }
-    }
-},
-
-
-    async loadInitialState() {
-        // 使用 Promise.all 并行加载收藏和下载列表
-        await Promise.all([
-            this.loadFavorites(),
-            this.loadDownloadedSongs()
-        ]);
-        this.updateFavoriteStatus();
-        this.updateDownloadStatus();
-    },
-
-    async loadFavorites() {
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri: CONSTANTS.FILE_FAVORITES, success: resolve, fail: reject }));
-            this.favorites = JSON.parse(data.text || '{}');
-        } catch (e) {
-            this.favorites = {};
-        }
-    },
-
-    updateFavoriteStatus() {
-        if (this.currentSong) {
-            this.isFavorited = !!this.favorites[this.currentSong.id];
-        }
-    },
-
-
-    changeVolume(direction) {
-        const newVolume = this.volume + (direction * 10);
-        this.volume = Math.max(0, Math.min(100, newVolume));
-        audio.volume = this.volume / 100;
-    },
-
-    toggleFavorite() {
-        if (!this.currentSong) return;
-        const { id } = this.currentSong;
-        if (this.isFavorited) {
-            delete this.favorites[id];
-            prompt.showToast({ message: '已取消收藏' });
-        } else {
-            // 存储完整的歌曲信息
-            this.favorites[id] = this.currentSong;
-            prompt.showToast({ message: '已收藏' });
-        }
-        this.isFavorited = !this.isFavorited;
-        // 异步写入文件，不阻塞UI
-        file.writeText({ uri: CONSTANTS.FILE_FAVORITES, text: JSON.stringify(this.favorites, null, 2) });
-    },
-
-    goBack() {
-        router.back();
-    },
-
-    /**
-     * **核心修改**: 处理下载点击事件
-     * 不再执行下载，而是通过路由参数通知播放器页面执行下载任务。
-     */
-    handleDownloadClick() {
-        if (!this.currentSong) {
-            prompt.showToast({ message: '歌曲信息无效' });
-            return;
-        }
-        if (this.downloadState === 'downloaded') {
-            prompt.showToast({ message: '歌曲已下载' });
-            return;
-        }
-        if (this.downloadState === 'downloading') {
-            prompt.showToast({ message: '正在下载中，请稍候...' });
-            return;
-        }
-
-        // 通知用户即将开始下载
-        prompt.showToast({ message: '即将开始下载...' });
-
-        // 返回到播放器页面，并传递一个参数 `triggerDownload=true`
-        router.push({
-            uri: '/pages/player',
-            params: {
-                triggerDownload: true
-            }
-        });
-    },
-
-    // 所有旧的下载相关方法 (executeDownload, fetchSongAndLyric, saveLyricFile, downloadSongFile, moveSongFile, handleDownloadError)
-    // 都已从该文件中移除。
-};
-</script>
-
-</script>
-
-<style>
-.volume {
-  width: 100%;
-  height: 100%;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  background-color: #000;
-}
-
-.volume-bar-container {
-  width: 80%;
-  height: 80px;
-  justify-content: space-around;
-  align-items: center;
-  background-color: #2a2a2a;
-  border-radius: 70px;
-}
-.volume-progress-container {
-  width: 50%;
-  height: 30px;
-  justify-content: center;
-  align-items: center;
-}
-
-.action-icon {
-  width: 60px;
-  height: 60px;
-}
-.control-container {
-  margin-top: 20px;
-  width: 80%;
-  justify-content: space-around;
-  align-items: center;
-}
-.icon {
-  width: 80px;
-  height: 80px;
-}
-
-.volume-progress {
-  color: #3ae1ff;
-  stroke-width: 30px;
-  layer-color: rgba(255, 255, 255, 0.1);
-}
-
-.cancel-container {
-  position: absolute;
-  width: 100px;
-  height: 100px;
-  bottom: 18px;
-  justify-content: center;
-  align-items: center;
-}
-</style>
+      </div>
+  
+      <!-- 返回按钮 (无变化) -->
+      <div class="cancel-container">
+        <image class="action-icon" src="/common/icon/cancel.png" onclick="goBack"></image>
+      </div>
+    </div>
+  </template>
+  
+  <script>
+  import router from "@system.router";
+  import audio from "@system.audio";
+  import file from "@system.file";
+  import prompt from "@system.prompt";
+  
+  const CONSTANTS = {
+      FILE_FAVORITES: 'internal://files/favorites.json',
+      FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
+  };
+  
+  const fileService = {
+      _promisify(fn, options) {
+          return new Promise((resolve, reject) => {
+              fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
+          });
+      },
+      async readJson(uri, defaultValue = null) {
+          try {
+              const data = await this._promisify(file.readText, { uri });
+              return JSON.parse(data.text);
+          } catch (e) { return defaultValue; }
+      },
+      async writeJson(uri, data) {
+          try {
+              await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
+              return true;
+          } catch (e) { return false; }
+      },
+  };
+  
+  export default {
+      private: {
+          volume: 0,
+          currentSong: null,
+          favorites: {},
+          isFavorited: false,
+          downloadedSongs: {},
+          downloadState: 'not_downloaded',
+          screenShape: 'circle',
+          playMode: 0,
+      },
+    
+      computed: {
+          downloadIcon() {
+              const icons = {
+                  downloading: '/common/icon/downloading.png',
+                  downloaded: '/common/icon/downloaded.png',
+                  not_downloaded: '/common/icon/download.png',
+              };
+              return icons[this.downloadState] || icons.not_downloaded;
+          },
+          favoriteIcon() {
+              return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
+          },
+          playModeIcon() {
+              const icons = [
+                  '/common/icon/loop.png',
+                  '/common/icon/single-loop.png',
+                  '/common/icon/random.png'
+              ];
+              return icons[this.playMode] || icons[0];
+          }
+      },
+  
+      protected: {
+          currentSong: {},
+          screenShape: 'circle',
+          playMode: 0,
+          isDownloading: false,
+      },
+  
+      async onInit() {
+          this.volume = audio.volume * 100;
+          
+          this.screenShape = this.screenShape || 'circle';
+          this.playMode = this.playMode || 0;
+          
+          let songData = this.currentSong;
+          try {
+              if (typeof songData === 'string') songData = JSON.parse(songData);
+          } catch (e) {
+              prompt.showToast({ message: '歌曲信息错误' });
+              router.back();
+              return;
+          }
+          this.currentSong = songData;
+  
+          if (!this.currentSong || !this.currentSong.id) {
+              prompt.showToast({ message: '歌曲信息无效' });
+              router.back();
+              return;
+          }
+  
+          await this.loadInitialState();
+      },
+  
+      async onShow() {
+          await this.loadInitialState();
+      },
+  
+      async loadInitialState() {
+          const [favorites, downloadedSongs] = await Promise.all([
+              fileService.readJson(CONSTANTS.FILE_FAVORITES, {}),
+              fileService.readJson(CONSTANTS.FILE_DOWNLOADED_SONGS, {}),
+          ]);
+  
+          this.favorites = favorites;
+          this.downloadedSongs = downloadedSongs;
+  
+          this.updateFavoriteStatus();
+          this.updateDownloadStatus();
+      },
+  
+      updateFavoriteStatus() {
+          if (this.currentSong) {
+              this.isFavorited = !!this.favorites[this.currentSong.id];
+          }
+      },
+  
+      updateDownloadStatus() {
+          if (this.isDownloading) {
+              this.downloadState = 'downloading';
+          } else if (this.currentSong && this.downloadedSongs[this.currentSong.id]) {
+              this.downloadState = 'downloaded';
+          } else {
+              this.downloadState = 'not_downloaded';
+          }
+      },
+  
+      changeVolume(direction) {
+          const newVolume = this.volume + (direction * 10);
+          this.volume = Math.max(0, Math.min(100, newVolume));
+          audio.volume = this.volume / 100;
+      },
+  
+      toggleFavorite() {
+          if (!this.currentSong) return;
+          const { id } = this.currentSong;
+          if (this.isFavorited) {
+              delete this.favorites[id];
+              prompt.showToast({ message: '已取消收藏' });
+          } else {
+              this.favorites[id] = { id: this.currentSong.id, name: this.currentSong.name, artists: this.currentSong.artists };
+              prompt.showToast({ message: '已收藏' });
+          }
+          this.isFavorited = !this.isFavorited;
+          fileService.writeJson(CONSTANTS.FILE_FAVORITES, this.favorites);
+      },
+  
+      handleDownloadClick() {
+          if (this.downloadState === 'downloaded') {
+              prompt.showToast({ message: '歌曲已下载' });
+              return;
+          }
+          if (this.downloadState === 'downloading') {
+              prompt.showToast({ message: '正在下载中...' });
+              return;
+          }
+          prompt.showToast({ message: '即将开始下载...' });
+          router.push({
+              uri: '/pages/player',
+              params: { triggerDownload: true }
+          });
+      },
+  
+      handlePlayModeClick() {
+          prompt.showToast({ message: '切换播放模式' });
+          router.push({
+              uri: '/pages/player',
+              params: { triggerPlayModeToggle: true }
+          });
+      },
+  
+      goBack() {
+          router.back();
+      },
+  };
+  </script>
+  
+  <style>
+  .volume {
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background-color: #000;
+  }
+  .volume-bar-container {
+    width: 80%;
+    height: 80px;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #2a2a2a;
+    border-radius: 70px;
+  }
+  .volume-progress-container {
+    width: 50%;
+    height: 30px;
+    justify-content: center;
+    align-items: center;
+  }
+  .action-icon {
+    width: 60px;
+    height: 60px;
+  }
+  .control-container {
+    margin-top: 20px;
+    width: 80%;
+    justify-content: space-around; /* 改为居中 */
+    align-items: center;
+  }
+  .icon {
+    width: 80px;
+    height: 80px;
+  }
+  .volume-progress {
+    color: #3ae1ff;
+    stroke-width: 30px;
+    layer-color: rgba(255, 255, 255, 0.1);
+  }
+  .cancel-container {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    bottom: 18px;
+    justify-content: center;
+    align-items: center;
+  }
+  </style>
+  

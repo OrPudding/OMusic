@@ -87,6 +87,9 @@
       "pages/settings": {
         "component": "settings"
       },
+      "pages/storage": {
+        "component": "storage"
+      },
       "pages/login": {
         "component": "login"
       },

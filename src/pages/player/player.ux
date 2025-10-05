@@ -48,18 +48,29 @@
 
 		<!-- 底部操作 (未展开时显示) -->
 		<div class="footer" if="{{ !expend }}">
-			<image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions" />
-			<image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu" />
+		    <div class="footer-content-rect" if="{{ screenShape === 'rect' }}">
+                <image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions"></image>
+                <image class="footer-icon" src="{{ downloadIcon }}" onclick="initiateDownload"></image>
+                <image class="footer-icon" src="{{ playModeIcon }}" onclick="togglePlayMode"></image>
+                <image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu"></image>
+            </div>
+        
+            <!-- 圆屏 (circle) 或其他布局：只显示音量和列表两个按钮 -->
+            <div class="footer-content-circle" else>
+                <image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions"></image>
+                <image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu"></image>
+            </div>
 		</div>
 	</div>
 </template>
 <script>
 import router from "@system.router";
 import fetch from "@system.fetch";
-import audio from "@system.audio";
+import audio, { src } from "@system.audio";
 import file from "@system.file";
 import prompt from '@system.prompt';
 import request from '@system.request';
+import device from '@system.device';
 
 // --- 1. 常量定义 ---
 const CONSTANTS = {
@@ -104,13 +115,17 @@ export default {
         lyrics: [],
         expend: false,
         downloadedSongs: {},
-        settings: { lyrics: { japaneseMode: 'translation', englishMode: 'translation' } },
+        settings: { lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', 
+        englishMode: 'translation' } },
         cookie: null,
         isDownloadingLocked: false,
         isChangingSong: false,
         wasRestored: false,
         retryCount: 0,
         isEnding: false,
+        screenShape: 'circle',
+        playMode: 0,
+        songBeingDownloaded: null,
     },
 
     protected: {
@@ -119,6 +134,7 @@ export default {
         songId: null,
         songInfo: null,
         triggerDownload: false,
+        triggerPlayModeToggle: false,
     },
 
     computed: {
@@ -129,115 +145,150 @@ export default {
             const duration = this.currSong?.duration || 0;
             return `${this.second2time(this.playerState.playDuration)}/${this.second2time(duration)}`;
         },
+        downloadIcon() {
+        const icons = {
+            downloading: '/common/icon/downloading.png', // 假设您有这个图标
+            downloaded: '/common/icon/downloaded.png',
+            not_downloaded: '/common/icon/download.png',
+        };
+        
+        if (!this.currSong) {
+            return icons.not_downloaded;
+        }
+
+        // 检查下载任务是否正在进行
+        if (this.isDownloadingLocked && this.currSong.id === (this.songBeingDownloaded?.id)) {
+             return icons.downloading;
+        }
+
+        // 检查歌曲是否已在下载列表中
+        if (this.downloadedSongs[this.currSong.id]) {
+            return icons.downloaded;
+        }
+
+        return icons.not_downloaded;
+    },
+
+    playModeIcon() {
+        const icons = [
+            '/common/icon/loop.png',
+            '/common/icon/single-loop.png',
+            '/common/icon/random.png'
+        ];
+        return icons[this.playMode] || icons[0];
+    },
 
         /**
-         * **核心修改**: 实现智能歌词显示逻辑
+          实现智能歌词显示逻辑
          */
-        visibleLyrics() {
-            if (!this.lyrics || this.lyrics.length === 0) {
-                return [{ text: '暂无歌词', className: 'lyric-line current-lyric' }];
-            }
+         visibleLyrics() {
+        if (!this.lyrics || this.lyrics.length === 0) {
+            return [{ text: '暂无歌词', className: 'lyric-line current-lyric' }];
+        }
 
-            const lines = [];
-            const currentLineData = this.lyrics[this.playerState.currentLyricIndex];
-            if (!currentLineData) {
-                return [{ text: '歌词加载中...', className: 'lyric-line current-lyric' }];
-            }
+        const lines = [];
+        const currentLineData = this.lyrics[this.playerState.currentLyricIndex];
+        if (!currentLineData) {
+            return [{ text: '歌词加载中...', className: 'lyric-line current-lyric' }];
+        }
 
-            // --- 1. 展开状态 (逻辑不变) ---
-            if (this.expend) {
-                const offsets = [-2, -1, 0, 1, 2, 3, 4];
-                for (const offset of offsets) {
-                    const index = this.playerState.currentLyricIndex + offset;
-                    if (index >= 0 && index < this.lyrics.length) {
-                        const lineData = this.lyrics[index];
-                        const isCurrent = offset === 0;
-                        
-                        lines.push({ 
-                            text: lineData.original || lineData.text || '', 
-                            className: `lyric-line ${isCurrent ? 'current-lyric' : 'secondary-lyric'}` 
-                        });
+        // --- 1. 展开状态 (逻辑不变) ---
+        if (this.expend) {
+            const offsets = [-2, -1, 0, 1, 2, 3, 4];
+            for (const offset of offsets) {
+                const index = this.playerState.currentLyricIndex + offset;
+                if (index >= 0 && index < this.lyrics.length) {
+                    const lineData = this.lyrics[index];
+                    const isCurrent = offset === 0;
+                    
+                    lines.push({ 
+                        text: lineData.original || lineData.text || '', 
+                        className: `lyric-line ${isCurrent ? 'current-lyric' : 'secondary-lyric'}` 
+                    });
 
-                        if (isCurrent) {
-                            const extraText = this.getExtraLyricText(lineData);
-                            if (extraText) {
-                                lines.push({ text: extraText, className: 'lyric-line extra-lyric' });
-                            }
+                    if (isCurrent) {
+                        const extraText = this.getExtraLyricText(lineData);
+                        if (extraText) {
+                            lines.push({ text: extraText, className: 'lyric-line extra-lyric' });
                         }
                     }
                 }
-                return lines;
             }
-
-            // --- 2. 未展开状态 (全新智能逻辑) ---
-            
-            // 判断是否应该显示附加歌词
-            const extraText = this.getExtraLyricText(currentLineData);
-            const shouldShowExtra = !!extraText;
-
-            // a) 如果是中文歌，或外文歌设置为"仅原文"，则显示上、中、下三行
-            if (!shouldShowExtra) {
-                const offsets = [-1, 0, 1];
-                for (const offset of offsets) {
-                    const index = this.playerState.currentLyricIndex + offset;
-                    if (index >= 0 && index < this.lyrics.length) {
-                        const lineData = this.lyrics[index];
-                        const isCurrent = offset === 0;
-                        lines.push({
-                            text: lineData.original || lineData.text || '',
-                            className: `lyric-line ${isCurrent ? 'current-lyric' : 'secondary-lyric'}`
-                        });
-                    }
-                }
-            } 
-            // b) 如果需要显示翻译或罗马音，则只显示当前行和附加行
-            else {
-                // 当前主歌词
-                lines.push({
-                    text: currentLineData.original || currentLineData.text || '',
-                    className: 'lyric-line current-lyric'
-                });
-                // 附加歌词
-                lines.push({
-                    text: extraText,
-                    className: 'lyric-line extra-lyric'
-                });
-            }
-            
             return lines;
         }
+
+        // --- 2. 未展开状态 (全新智能逻辑) ---
+        
+        const extraText = this.getExtraLyricText(currentLineData);
+        const shouldShowExtra = !!extraText;
+
+        // a) 如果是中文歌，或外文歌设置为"仅原文"，则进入此分支
+        if (!shouldShowExtra) {
+            // **核心修改点：根据屏幕形状决定显示的行数**
+            const offsets = this.screenShape === 'rect' 
+                ? [-2, -1, 0, 1, 2]  // 方屏：显示5行
+                : [-1, 0, 1];        // 其他屏幕 (如圆形)：显示3行
+
+            for (const offset of offsets) {
+                const index = this.playerState.currentLyricIndex + offset;
+                if (index >= 0 && index < this.lyrics.length) {
+                    const lineData = this.lyrics[index];
+                    const isCurrent = offset === 0;
+                    lines.push({
+                        text: lineData.original || lineData.text || '',
+                        className: `lyric-line ${isCurrent ? 'current-lyric' : 'secondary-lyric'}`
+                    });
+                }
+            }
+        } 
+        // b) 如果需要显示翻译或罗马音，则只显示当前行和附加行 (逻辑不变)
+        else {
+            lines.push({
+                text: currentLineData.original || currentLineData.text || '',
+                className: 'lyric-line current-lyric'
+            });
+            lines.push({
+                text: extraText,
+                className: 'lyric-line extra-lyric'
+            });
+        }
+        
+        return lines;
+    }
     },
 
-    async onInit() {
-        if (this.$app.$def.isActivated === false) {
+// player.ux -> onInit
+async onInit() {
+    if (this.$app.$def.isActivated === false) {
         console.warn("Page Guard: 未授权，强制跳转到 Splash 页面。");
         router.replace({ uri: '/pages/splash' });
-        return;}
-        console.log("Player onInit: 应用状态:", this.$app.$def.isActivated);
-        console.log("Player onInit: 页面实例创建。");
-        this.bindAudioEvents();
-        await this.loadSettings();
-        await this.loadCookie();
-        await this.loadDownloadedSongs();
-        this.wasRestored = await this.onRestoreState();
-        if (!this.wasRestored) {
-            console.log("未恢复状态，执行标准初始化流程...");
-            await this.loadListFromFile();
-            if (this.songInfo && typeof this.songInfo === 'string') {
-                try { this.songInfo = JSON.parse(this.songInfo); } catch (e) { this.songInfo = null; }
-            }
-            if (this.songInfo && this.songInfo.id) {
-                this.songId = this.songInfo.id;
-            }
-        }
-    },
+        return;
+    }
+    console.log("Player onInit: 页面实例创建。");
+    this.bindAudioEvents();
+    await this.loadSettings();
+    await this.loadCookie();
+    await this.loadDownloadedSongs();
+    this.getDeviceInfo();
+    
+    // 状态恢复逻辑保持不变，这能让用户直接打开时看到上次的歌曲信息
+    this.wasRestored = await this.onRestoreState();
+    
+    // 核心修改：移除 onInit 中解析 songInfo 和 songId 的逻辑
+    // 这些现在完全交给 onRefresh 处理
+    if (!this.wasRestored) {
+        console.log("未恢复状态，执行标准初始化流程...");
+        await this.loadListFromFile();
+    }
+},
 
-    onReady() {
-        console.log("Player onReady.");
-        if (!this.wasRestored) {
-            this.startLogic();
-        }
-    },
+// player.ux -> onReady
+onReady() {
+    console.log("Player onReady.");
+    // 核心修改：移除对 startLogic() 的调用。
+    // 页面就绪后，不再自动播放。
+    // 如果状态被恢复，UI会显示歌曲信息，等待用户交互。
+},
     
     async onShow() {
         console.log("Player onShow: 页面显示，同步数据。");
@@ -252,38 +303,48 @@ export default {
         }
     },
 
-    async onRefresh(query) {
-        console.log('Player onRefresh with params:', JSON.stringify(query));
-        if (this.isDownloadingLocked) {
-            prompt.showToast({ message: '正在下载，请稍后操作' });
-            return;
-        }
-        if (query && query.triggerDownload) {
-            await this.loadDownloadedSongs();
-            this.initiateDownload();
-            return;
+// player.ux -> onRefresh
+async onRefresh(query) {
+    console.log('Player onRefresh with params:', JSON.stringify(query));
+    if (this.isDownloadingLocked) {
+        prompt.showToast({ message: '正在下载，请稍后操作' });
+        return;
+    }
+    if (query && query.triggerDownload) {
+        await this.loadDownloadedSongs();
+        this.initiateDownload();
+        return;
+    }
+        // 核心修改：如果有 triggerPlayModeToggle，先切换播放模式
+        if (query && query.triggerPlayModeToggle) {
+            this.togglePlayMode();
         }
 
-        // **核心修改**: 接收 songId 和 songInfo
-        if (query && query.songId) {
-            this.songId = query.songId;
-            
-            if (query.songInfo) {
-                try { 
-                    this.songInfo = JSON.parse(query.songInfo); 
-                } catch(e) { 
-                    console.error("解析 onRefresh 传入的 songInfo 失败:", e);
-                    this.songInfo = null; 
-                }
-            } else {
-                // 如果没有 songInfo，这是一个不符合预期的调用，但我们仍要处理
-                this.songInfo = null;
-                console.warn(`onRefresh 调用缺少 songInfo 参数 for songId: ${this.songId}`);
+    // 核心修改：这里是“点击播放”场景的唯一入口
+    if (query && query.songId) {
+        // 停止当前可能正在播放的音频，准备播放新的
+        audio.stop();
+        this.playerState.isPlaying = false;
+
+        this.songId = query.songId;
+        
+        if (query.songInfo) {
+            try { 
+                this.songInfo = JSON.parse(query.songInfo); 
+            } catch(e) { 
+                console.error("解析 onRefresh 传入的 songInfo 失败:", e);
+                this.songInfo = null; 
             }
-
-            this.startLogic();
+        } else {
+            this.songInfo = null; 
+            console.warn(`onRefresh 调用缺少 songInfo 参数 for songId: ${this.songId}`);
         }
-    },
+
+        // 调用 startLogic 开始获取 URL 并播放
+        this.startLogic();
+    }
+},
+
 
     onHide() {
         console.log("Player onHide: 页面被隐藏。");
@@ -307,111 +368,188 @@ export default {
             prompt.showToast({ message: '正在下载，请勿退出' });
             return true;
         }
+        this.onSaveState
         return false;
     },
 
-    async onSaveState() {
-        if (!this.currSong) return;
-        const stateToSave = {
-            lastSongId: this.currSong.id,
-            lastPlayDuration: this.playerState.playDuration,
-            timestamp: new Date().getTime(),
-        };
-        await fileService.writeJson(CONSTANTS.FILE_PLAYER_STATE, stateToSave);
-        console.log(`播放器状态已保存: ${this.currSong.name} at ${this.playerState.playDuration.toFixed(2)}s`);
-    },
+// player.ux -> onSaveState
+async onSaveState() {
+    if (!this.currSong) return;
+    
+    // 核心修改：增加保存 audio.src
+    const stateToSave = {
+        lastSongId: this.currSong.id,
+        lastPlayDuration: this.playerState.playDuration,
+        playMode: this.playMode,
+        src: audio.src, // 保存当前的播放链接
+        timestamp: new Date().getTime(),
+    };
+    
+    await fileService.writeJson(CONSTANTS.FILE_PLAYER_STATE, stateToSave);
+    console.log(`播放器状态已保存: ${this.currSong.name} at ${this.playerState.playDuration.toFixed(2)}s`);
+},
+// player.ux -> onRestoreState
+async onRestoreState() {
+    const savedState = await fileService.readJson(CONSTANTS.FILE_PLAYER_STATE);
+    // 增加一个时间戳检查，例如，超过12小时的状态就认为是过期的
+    const isStateExpired = savedState?.timestamp ? (new Date().getTime() - savedState.timestamp > 12 * 3600 * 1000) : true;
 
-    async onRestoreState() {
-        const savedState = await fileService.readJson(CONSTANTS.FILE_PLAYER_STATE);
-        if (savedState && savedState.lastSongId) {
-            console.log("检测到已保存的播放器状态，正在恢复...");
-            await this.loadListFromFile();
-            const lastIndex = this.playList.findIndex(song => song.id === savedState.lastSongId);
-            if (lastIndex > -1) {
-                this.currentIndex = lastIndex;
-                const song = this.playList[this.currentIndex];
-                this.currSong = song;
-                const downloadedInfo = this.downloadedSongs[song.id];
-                const src = downloadedInfo?.localUri;
-                if (src) {
-                    this.currSong = { ...song, ...downloadedInfo };
-                    audio.oncanplay = () => {
-                        console.log("oncanplay 触发，安全设置 currentTime:", savedState.lastPlayDuration);
-                        audio.currentTime = savedState.lastPlayDuration;
-                        this.playerState.playDuration = savedState.lastPlayDuration;
-                        this.updateLyric();
-                        audio.oncanplay = null; 
-                    };
-                    audio.src = src;
-                    this.fetchLyric(song.id);
-                    prompt.showToast({ message: "播放状态已恢复" });
-                    return true;
-                }
-            }
-        }
-        console.log("无有效状态可恢复。");
-        return false;
-    },
-
-
-    async startLogic() {
+    if (savedState && savedState.lastSongId && !isStateExpired) {
+        console.log("检测到有效的播放器状态，正在恢复...");
+        
+        this.playMode = savedState.playMode || 0;
         await this.loadListFromFile();
-        await this.loadDownloadedSongs();
 
-        if (this.songId) {
-            const index = this.playList.findIndex(item => item && item.id == this.songId);
+        if (this.playMode === 2) {
+            this.generateShuffledList(false);
+        }
 
-            if (index !== -1) {
-                this.currentIndex = index;
-            } else {
-                // **关键**: 现在我们可以依赖 this.songInfo 了
-                if (this.songInfo && this.songInfo.id) {
-                    console.log("歌曲不在列表中，使用传入的 songInfo 添加到列表首位。");
-                    this.playList.unshift(this.songInfo);
-                    this.currentIndex = 0;
-                    await fileService.writeJson(CONSTANTS.FILE_PLAY_LIST, this.playList);
-                } else {
-                    // 兜底：如果调用方真的没传 songInfo，我们只能提示并播放第一首
-                    prompt.showToast({ message: '歌曲信息不完整，已为您播放第一首' });
-                    this.currentIndex = 0;
-                }
+        const lastIndex = this.playList.findIndex(song => song.id === savedState.lastSongId);
+        if (lastIndex > -1) {
+            this.currentIndex = lastIndex;
+            if (this.playMode === 2) {
+                const shuffledIdx = this.shuffledPlayList.indexOf(this.currentIndex);
+                if (shuffledIdx > -1) this.shuffledIndex = shuffledIdx;
             }
+            
+            const song = this.playList[this.currentIndex];
+            this.currSong = song;
+            
+            // 核心逻辑修正
+            const downloadedInfo = this.downloadedSongs[song.id];
+            const isLocal = !!downloadedInfo?.localUri;
+            const savedSrc = savedState.src;
+
+            // 场景1：如果是本地文件，则恢复播放进度
+            if (isLocal) {
+                console.log("恢复本地歌曲状态...");
+                this.currSong = { ...song, ...downloadedInfo };
+                audio.oncanplay = () => {
+                    console.log("oncanplay (local): 设置 currentTime:", savedState.lastPlayDuration);
+                    audio.currentTime = savedState.lastPlayDuration;
+                    this.playerState.playDuration = savedState.lastPlayDuration;
+                    this.updateLyric();
+                    audio.oncanplay = null;
+                };
+                audio.src = downloadedInfo.localUri;
+                this.fetchLyric(song.id);
+                prompt.showToast({ message: "播放状态已恢复" });
+                return true;
+            }
+            
+            // 场景2：如果是网络歌曲，只恢复UI，不设置src，不播放
+            console.log("恢复网络歌曲UI，但不自动播放。");
+            this.fetchLyric(song.id); // 只加载歌词
+            this.playerState.playDuration = savedState.lastPlayDuration; // 恢复进度条UI
+            // **关键**：不设置 audio.src，不设置 audio.currentTime
+            // 这样 togglePlay 在用户点击时会触发 startLogic 重新获取链接
+            
+            return true;
+        }
+    }
+    
+    if (isStateExpired) console.log("播放状态已过期。");
+    else console.log("无有效状态可恢复。");
+    
+    return false;
+},
+
+
+
+    // 新增：获取设备信息的方法
+getDeviceInfo() {
+    device.getInfo({
+        success: (data) => {
+            if (data.screenShape) {
+                console.log(`设备屏幕形状: ${data.screenShape}`);
+                this.screenShape = data.screenShape;
+            }
+        },
+        fail: (data, code) => {
+            console.error(`获取设备信息失败, code = ${code}`);
+        }
+    });
+},
+
+
+// player.ux -> startLogic
+async startLogic() {
+    await this.loadListFromFile();
+    await this.loadDownloadedSongs();
+
+    if (this.songId) {
+        const index = this.playList.findIndex(item => item && item.id == this.songId);
+
+        if (index !== -1) {
+            this.currentIndex = index;
         } else {
-            this.currentIndex = 0;
+            if (this.songInfo && this.songInfo.id) {
+                console.log("歌曲不在列表中，使用传入的 songInfo 添加到列表首位。");
+                this.playList.unshift(this.songInfo);
+                this.currentIndex = 0;
+                await fileService.writeJson(CONSTANTS.FILE_PLAY_LIST, this.playList);
+                
+                // --- 核心修改：列表变更后，如果是随机模式，重新生成随机列表 ---
+                if (this.playMode === 2) {
+                    this.generateShuffledList(true);
+                }
+            } else {
+                prompt.showToast({ message: '歌曲信息不完整，已为您播放第一首' });
+                this.currentIndex = 0;
+            }
         }
+    } else {
+        this.currentIndex = 0;
+    }
 
-        if (!this.playList || this.playList.length === 0) {
-            prompt.showToast({ message: '播放列表为空' });
-            return;
-        }
+    if (!this.playList || this.playList.length === 0) {
+        prompt.showToast({ message: '播放列表为空' });
+        return;
+    }
 
-        this.playCurrent();
-    },
+    this.playCurrent();
+},
+
 
     /**
      * **新增**: 辅助方法，用于获取附加歌词文本
      * @param {object} lineData - 当前歌词行的数据对象
      * @returns {string} - 附加歌词文本，如果没有则返回空字符串
      */
-    getExtraLyricText(lineData) {
-        if (!lineData) return '';
-        let extraText = '';
-        if (this.playerState.lyricType === 'japanese') {
-            switch (this.settings.lyrics.japaneseMode) {
-                case 'translation':
-                    extraText = lineData.translation || '';
-                    break;
-                case 'romaji':
-                    extraText = lineData.romaji || '';
-                    break;
+// player.ux -> getExtraLyricText()
+getExtraLyricText(lineData) {
+    if (!lineData) return '';
+    let extraText = '';
+
+    // 确保 settings.lyrics 存在，避免出错
+    const lyricSettings = this.settings.lyrics || {};
+
+    switch (this.playerState.lyricType) {
+        case 'japanese':
+            if (lyricSettings.japaneseMode === 'translation') {
+                extraText = lineData.translation || '';
+            } else if (lyricSettings.japaneseMode === 'romaji') {
+                extraText = lineData.romaji || '';
             }
-        } else if (this.playerState.lyricType === 'english') {
-            if (this.settings.lyrics.englishMode === 'translation') {
+            break;
+        
+        // --- 核心修改：新增对 cantonese 类型的处理 ---
+        case 'cantonese':
+            if (lyricSettings.cantoneseMode === 'romaji') {
+                extraText = lineData.romaji || '';
+            }
+            break;
+
+        case 'english':
+            if (lyricSettings.englishMode === 'translation') {
                 extraText = lineData.translation || '';
             }
-        }
-        return extraText;
-    },
+            break;
+    }
+    
+    return extraText;
+},
+
 
     initiateDownload() {
         if (!this.currSong) { prompt.showToast({ message: '歌曲信息无效，无法下载' }); return; }
@@ -649,25 +787,49 @@ export default {
     },
 
     playOrPause() {
+        if (!this.currSong) {
+        prompt.showToast({ message: '没有可播放的歌曲' });
+        return;
+    }
+
+    // --- 核心修正点 ---
+    // 检查 audio.src 是否为空。如果为空，说明是状态恢复后首次点击播放。
+    if (!audio.src) {
+        console.log("首次播放（或状态恢复后播放），调用 startLogic 获取播放链接。");
+        // 调用 startLogic 会获取有效的 src 并自动开始播放。
+        this.startLogic(); 
+        return; // 立即返回，因为 startLogic 会处理后续的播放状态
+    }
         if (!this.currSong || this.isChangingSong) return;
         this.playerState.isPlaying ? audio.pause() : audio.play();
     },
 
     change(dir) {
-        if (this.isChangingSong) {
-            prompt.showToast({ message: '正在切歌...' });
-            return;
-        }
-        if (!this.playList || this.playList.length === 0) return;
-        if (this.playList.length === 1) {
-            prompt.showToast({ message: '单曲循环' });
-            this.playCurrent();
-            return;
-        }
-        const newIndex = (this.currentIndex + dir + this.playList.length) % this.playList.length;
-        this.currentIndex = newIndex;
+    if (this.isChangingSong) {
+        prompt.showToast({ message: '正在切歌...' });
+        return;
+    }
+    if (!this.playList || this.playList.length === 0) return;
+
+    if (this.playList.length === 1) {
+        prompt.showToast({ message: '单曲循环' });
         this.playCurrent();
-    },
+        return;
+    }
+
+    switch (this.playMode) {
+        case 0: // 列表循环
+        case 1: // 单曲循环（切歌时表现同列表循环）
+            this.currentIndex = (this.currentIndex + dir + this.playList.length) % this.playList.length;
+            break;
+        case 2: // 随机播放
+            this.shuffledIndex = (this.shuffledIndex + dir + this.shuffledPlayList.length) % this.shuffledPlayList.length;
+            this.currentIndex = this.shuffledPlayList[this.shuffledIndex];
+            break;
+    }
+    
+    this.playCurrent();
+},
 
     onSliderChange(e) {
         if (this.playerState.isPlaying || audio.duration > 0) {
@@ -679,9 +841,43 @@ export default {
     toggleLyricExpend() { this.expend = !this.expend; },
 
     goToSongActions() {
-        if (this.isDownloadingLocked) { prompt.showToast({ message: '正在下载，请稍后' }); return; }
         if (!this.currSong) { prompt.showToast({ message: '当前无播放歌曲' }); return; }
-        router.push({ uri: "/pages/volume", params: { currentSong: JSON.stringify(this.currSong) } });
+        router.push({ 
+            uri: "/pages/volume", 
+            params: { 
+                currentSong: JSON.stringify(this.currSong),
+                // 新增：传递屏幕形状信息
+                screenShape: this.screenShape,
+                playMode: this.playMode
+            } 
+        });
+    },
+
+    togglePlayMode() {
+        this.playMode = (this.playMode + 1) % 3;
+        const modeText = ['列表循环', '单曲循环', '随机播放'];
+        prompt.showToast({ message: modeText[this.playMode] });
+
+        if (this.playMode === 2) {
+            this.generateShuffledList(true); // 切换到随机模式时，立即生成并定位
+        }
+    },
+
+    // --- 核心修改：新增生成随机列表的方法 ---
+    generateShuffledList(locateCurrent = true) {
+        console.log("生成新的随机播放列表...");
+        this.shuffledPlayList = Array.from(this.playList.keys());
+        
+        for (let i = this.shuffledPlayList.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.shuffledPlayList[i], this.shuffledPlayList[j]] = [this.shuffledPlayList[j], this.shuffledPlayList[i]];
+        }
+
+        if (locateCurrent) {
+            const currentShuffledIndex = this.shuffledPlayList.indexOf(this.currentIndex);
+            this.shuffledIndex = (currentShuffledIndex !== -1) ? currentShuffledIndex : 0;
+        }
+        console.log("随机列表已生成, 当前随机索引:", this.shuffledIndex);
     },
 
     goToMenu() {
@@ -741,22 +937,33 @@ export default {
         return result;
     },
 
-    mergeLyrics(original, translation, romaji) {
-        const createMap = (arr) => new Map(arr.map(item => [item.time.toFixed(3), item.text]));
-        if (romaji && translation) {
-            this.playerState.lyricType = 'japanese';
-            const transMap = createMap(translation), romaMap = createMap(romaji);
-            this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)), romaji: romaMap.get(line.time.toFixed(3)) }));
-        } else if (translation) {
-            this.playerState.lyricType = 'english';
-            const transMap = createMap(translation);
-            this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)) }));
-        } else {
-            this.playerState.lyricType = 'chinese';
-            this.lyrics = original.map(line => ({ time: line.time, original: line.text }));
-        }
-        if (this.lyrics.length === 0) this.lyrics = [{ time: 0, text: '暂无歌词' }];
-    },
+// player.ux -> mergeLyrics()
+mergeLyrics(original, translation, romaji) {
+    const createMap = (arr) => new Map(arr.map(item => [item.time.toFixed(3), item.text]));
+    
+    if (romaji && translation) {
+        this.playerState.lyricType = 'japanese';
+        const transMap = createMap(translation), romaMap = createMap(romaji);
+        this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)), romaji: romaMap.get(line.time.toFixed(3)) }));
+    } 
+    // --- 核心修改：新增对“仅罗马音”情况的处理 ---
+    else if (romaji && !translation) {
+        this.playerState.lyricType = 'cantonese'; // 识别为粤语类型
+        const romaMap = createMap(romaji);
+        this.lyrics = original.map(line => ({ time: line.time, original: line.text, romaji: romaMap.get(line.time.toFixed(3)) }));
+    }
+    else if (translation) {
+        this.playerState.lyricType = 'english';
+        const transMap = createMap(translation);
+        this.lyrics = original.map(line => ({ time: line.time, original: line.text, translation: transMap.get(line.time.toFixed(3)) }));
+    } else {
+        this.playerState.lyricType = 'chinese';
+        this.lyrics = original.map(line => ({ time: line.time, original: line.text }));
+    }
+
+    if (this.lyrics.length === 0) this.lyrics = [{ time: 0, text: '暂无歌词' }];
+},
+
 
     updateLyric() {
         if (!this.lyrics || this.lyrics.length === 0) return;
@@ -767,64 +974,83 @@ export default {
         if (finalIndex !== this.playerState.currentLyricIndex) this.playerState.currentLyricIndex = finalIndex;
     },
 
-    bindAudioEvents() {
-        audio.onplay = () => {
-            this.playerState.isPlaying = true;
-            this.isChangingSong = false;
-            this.isEnding = false; // 每次开始播放时，重置准备切歌的状态
-            console.log("Event: onplay, isChangingSong and isEnding set to false.");
-        };
+// player.ux -> bindAudioEvents
+bindAudioEvents() {
+    audio.onplay = () => {
+        this.playerState.isPlaying = true;
+        this.isChangingSong = false;
+        this.isEnding = false; // 每次开始播放时，重置准备切歌的状态
+        console.log("Event: onplay, isChangingSong and isEnding set to false.");
+    };
 
-        audio.onpause = () => {
-            this.playerState.isPlaying = false;
-        };
+    audio.onpause = () => {
+        this.playerState.isPlaying = false;
+    };
 
-        audio.onstop = () => {
-            this.playerState.isPlaying = false;
-            this.isChangingSong = false;
-            this.isEnding = false; // 停止时也重置状态
-            console.log("Event: onstop, isChangingSong and isEnding set to false.");
-        };
+    audio.onstop = () => {
+        this.playerState.isPlaying = false;
+        this.isChangingSong = false;
+        this.isEnding = false; // 停止时也重置状态
+        console.log("Event: onstop, isChangingSong and isEnding set to false.");
+    };
 
-        audio.ontimeupdate = () => {
-            // 优先处理“即将结束并切歌”的逻辑
-            // 当 isEnding 为 true 且时间到达歌曲末尾（误差1秒内）时执行
-            if (this.isEnding && audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
-                console.log(`ontimeupdate: Reached end of track (currentTime: ${audio.currentTime}). Changing song now.`);
-                this.isEnding = false; // 切歌前重置标志位，防止重复触发
-                this.change(1);
-                return; // 退出，避免执行下面的歌词更新
-            }
-
-            // 原有的歌词更新逻辑
-            if (!this.isChangingSong) {
-                this.playerState.playDuration = audio.currentTime;
-                this.updateLyric();
-            }
-        };
-
-        audio.onended = () => {
-            console.log(`Event: onended triggered. CurrentTime: ${audio.currentTime}, Duration: ${audio.duration}`);
-
-            // 检查是否在正常时间（最后1秒内）触发
-            if (audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
-                console.log("onended: Playback complete. Changing song directly.");
-                this.change(1);
+    audio.ontimeupdate = () => {
+        // 优先处理“即将结束并切歌”的逻辑
+        // 当 isEnding 为 true 且时间到达歌曲末尾（误差1秒内）时执行
+        if (this.isEnding && audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
+            console.log(`ontimeupdate: Reached end of track (currentTime: ${audio.currentTime}). Changing song now.`);
+            this.isEnding = false; // 切歌前重置标志位，防止重复触发
+            
+            // 根据播放模式决定行为
+            if (this.playMode === 1) { // 单曲循环
+                this.playCurrent();
             } else {
-                // 如果是提前触发，则设置标志位，等待 ontimeupdate 来完成切歌
-                console.warn("onended: Triggered prematurely. Setting isEnding flag to true.");
-                console.log("fuck xiaomi's stupid audio.onended");
-                prompt.showToast("fuck xiaomi's stupid audio.onended");
-                this.isEnding = true;
+                this.change(1);
             }
-        };
+            this.playerState.playDuration = audio.currentTime;
+            this.updateLyric();
+            return; // 退出，避免执行下面的歌词更新
+        }
 
-        audio.onerror = () => {
-            console.error("Audio player error occurred.");
-            this.isEnding = false; // 发生错误时也应重置状态
-            this.handlePlaybackError("播放器发生错误");
-        };
-    },
+        // 原有的歌词更新逻辑
+        if (!this.isChangingSong) {
+            this.playerState.playDuration = audio.currentTime;
+            this.updateLyric();
+        }
+    };
+
+    // 核心修改：应用您提供的 onended bug 修复逻辑
+    audio.onended = () => {
+        console.log(`Event: onended triggered. CurrentTime: ${audio.currentTime}, Duration: ${audio.duration}`);
+
+        // 检查是否在正常时间（最后1秒内）触发
+        if (audio.duration > 0 && audio.currentTime >= audio.duration - 1) {
+            console.log("onended: Playback complete. Changing song directly.");
+            
+            // 根据播放模式决定行为
+            if (this.playMode === 1) { // 单曲循环
+                this.playCurrent();
+            } else {
+                this.change(1);
+            }
+        } else {
+            // 如果是提前触发，则设置标志位，等待 ontimeupdate 来完成切歌
+            console.warn("onended: Triggered prematurely. Setting isEnding flag to true.");
+            // 您可以保留或移除这个 toast，用于调试
+            console.error("onended: Triggered prematurely. Setting isEnding flag to true.");
+            console.error("fuck xiaomi's stupid audio.onended")
+            prompt.showToast({message:"rw5设备,修正提前切歌"});
+            this.isEnding = true;
+        }
+    };
+
+    audio.onerror = () => {
+        console.error("Audio player error occurred.");
+        this.isEnding = false; // 发生错误时也应重置状态
+        this.handlePlaybackError("播放器发生错误");
+    };
+},
+
 
 
     async loadSettings() {
@@ -1001,6 +1227,7 @@ export default {
 }
 
 .play-progress {
+    width: 80%;
 	selected-color: #3ae1ff;
 	block-color: #ffffff;
 	padding-left: 0px;
@@ -1045,28 +1272,47 @@ export default {
 	height: 80px;
 }
 
+.footer {
+	height: 75px;
+	width: 100%; /* 让 footer 占满宽度以容纳内部容器 */
+	justify-content: center; /* 让内部容器居中 */
+	align-items: center;
+}
+
+/* 新增：方屏 footer 内部容器样式 */
+.footer-content-rect {
+    width: 90%; /* 在方屏上使用更宽的布局 */
+    justify-content: space-around;
+    align-items: center;
+}
+
+/* 新增：圆屏 footer 内部容器样式 (即您原来的 .footer 样式) */
+.footer-content-circle {
+    width: 320px;
+    justify-content: space-around;
+    align-items: center;
+}
+
 .footer-icon {
   width: 64px;
   height: 64px;
 }
 
-.footer {
-	height: 75px;
-	width: 320px;
-	justify-content: space-around;
-	align-items: center;
-}
 
 @media screen and (shape: rect) {
     .lyrics-container {
-        height: 140px;
+        height: 180px;
     }
     .lyrics-container-expended {
-        height: 360px;
+        height: 394px;
     }
     .current-lyric {
   lines: -1;
   text-overflow: ellipsis;
+}
+.progress {
+	height: 60px;
+	width: 400px;
 }
 }
 </style>

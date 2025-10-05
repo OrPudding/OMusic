@@ -11,13 +11,19 @@
                 <text class="item-label">日语歌词</text>
                 <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
             </div>
-            <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，如日语、韩语。</text>
+            <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。</text>
+
+            <div class="setting-item">
+                <text class="item-label">粤语歌词</text>
+                <text class="item-value-btn" onclick="toggleCantoneseLyricMode">{{ cantoneseLyricModeText }}</text>
+            </div>
+            <text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
             
             <div class="setting-item">
                 <text class="item-label">英文歌词</text>
                 <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
             </div>
-            <text class="item-desc">适用于仅提供原文和翻译的歌曲，如英语、法语等。</text>
+            <text class="item-desc">适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。</text>
   
             <text class="category-title">列表性能</text>
             <div class="setting-item">
@@ -57,11 +63,7 @@
                 <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
             </div>
             <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
-
-            <!-- ======================================================== -->
-            <!--  重构后的“危险区域”                                    -->
-            <!-- ======================================================== -->
-            <text class="category-title">危险区域</text>
+            <text class="category-title">危险操作</text>
 
             <!-- 退出登录 -->
             <div class="setting-item">
@@ -150,6 +152,7 @@ const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
 const PRESETS = {
     lyrics: {
         japaneseMode: ['translation', 'romaji', 'original'],
+        cantoneseMode: ['romaji', 'original'], 
         englishMode: ['translation', 'original'],
     },
     performance: {
@@ -196,6 +199,10 @@ export default {
         japaneseLyricModeText() {
             const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' };
             return map[this.settings.lyrics.japaneseMode] || '未知';
+        },
+        cantoneseLyricModeText() {
+            const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' };
+            return map[this.settings.lyrics.cantoneseMode] || '未知';
         },
         englishLyricModeText() {
             const map = { 'translation': '显示翻译', 'original': '仅显示原文' };
@@ -263,6 +270,7 @@ export default {
     },
 
     toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
+    toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
     toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
     toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
     togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
