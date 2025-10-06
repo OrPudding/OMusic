@@ -185,58 +185,81 @@ getDeviceIdentifier(callbacks) {
     // =================== 其他原有逻辑 ==================================
     // ===================================================================
 
-        requestService: {
-        async loadCookie() {
-            try {
-                const data = await new Promise((resolve, reject) => {
-                    file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: reject });
-                });
-                const cookieText = data.text;
-                if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
-                    console.log("有效的 Cookie 已加载。");
-                    return cookieText.trim();
-                } else {
-                    console.warn("cookie.txt 内容无效或格式不正确，视为未登录。");
-                    return null;
-                }
-            } catch (e) {
+// 在 app.js 或您的服务定义文件中
+requestService: {
+    /**
+     * @description 从文件加载 Cookie。这个方法本身没有问题。
+     */
+    async loadCookie() {
+        try {
+            const data = await new Promise((resolve, reject) => {
+                file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: (data, code) => {
+                    // 文件不存在是正常情况，不应视为 reject
+                    if (code === 301) resolve({ text: null });
+                    else reject({ data, code });
+                }});
+            });
+            const cookieText = data.text;
+            if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
+                console.log("有效的 Cookie 已从文件加载。");
+                return cookieText.trim();
+            } else {
+                // 文件内容无效或为空，也视为未登录
                 return null;
             }
-        },
-        async fetch(options) {
-            try {
-                const cookie = await this.loadCookie();
-                let url = options.url;
-                if (cookie) {
-                    const connector = url.includes('?') ? '&' : '?';
-                    url = `${url}${connector}cookie=${encodeURIComponent(cookie)}`;
-                }
-                console.log(`Requesting URL: ${url}`);
-                const response = await new Promise((resolve, reject) => {
-                    fetch.fetch({
-                        ...options,
-                        url: url,
-                        header: {},
-                        responseType: 'text',
-                        success: resolve,
-                        fail: (data, code) => reject({ data, code }),
-                    });
-                });
-                if (response.code === 200) {
-                    try {
-                        const jsonData = JSON.parse(response.data);
-                        return { status: 'success', data: jsonData };
-                    } catch (e) {
-                        return { status: 'fail', message: 'JSON解析失败', data: response.data };
-                    }
-                } else {
-                    return { status: 'fail', message: `网络错误, code: ${response.code}`, code: response.code };
-                }
-            } catch (error) {
-                return { status: 'fail', message: error.message || '未知请求异常', data: error.data, code: error.code };
-            }
+        } catch (e) {
+            // 其他读取错误
+            return null;
         }
     },
+
+    /**
+     * @description 【【【最终修正版】】】
+     * @param {object} options - 请求选项，包含 url, method, data 等
+     * @param {string} [options.cookie] - 【关键】一个临时的、高优先级的 Cookie
+     */
+    async fetch(options) {
+        try {
+            // 【核心修正】: 决定本次请求到底使用哪个 Cookie
+            // 1. 优先使用 options 中临时传入的 cookie (用于登录流程)
+            // 2. 如果没有临时的，再从文件加载全局的 cookie (用于常规请求)
+            const cookieForRequest = options.cookie || await this.loadCookie();
+            
+            let url = options.url;
+            if (cookieForRequest) {
+                const connector = url.includes('?') ? '&' : '?';
+                url = `${url}${connector}cookie=${encodeURIComponent(cookieForRequest)}`;
+            }
+
+            console.log(`Requesting URL: ${url}`);
+            
+            const response = await new Promise((resolve, reject) => {
+                fetch.fetch({
+                    ...options,
+                    url: url,
+                    header: {}, // 确保 header 为空对象，避免潜在问题
+                    responseType: 'text',
+                    success: resolve,
+                    fail: (data, code) => reject({ data, code }),
+                });
+            });
+
+            if (response.code === 200) {
+                try {
+                    const jsonData = JSON.parse(response.data);
+                    return { status: 'success', data: jsonData };
+                } catch (e) {
+                    return { status: 'fail', message: 'JSON解析失败', data: response.data };
+                }
+            } else {
+                return { status: 'fail', message: `网络错误, code: ${response.code}`, code: response.code };
+            }
+        } catch (error) {
+            return { status: 'fail', message: error.message || '未知请求异常', data: error.data, code: error.code };
+        }
+    }
+},
+
 
     resetDownloadingStatusOnLaunch() {
         console.info('开始检查并重置下载状态...');

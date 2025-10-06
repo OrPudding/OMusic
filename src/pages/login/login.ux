@@ -56,7 +56,6 @@
 </template>
 
 <style>
-/* ... (样式无变化) ... */
 .page-container { width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; background-color: #000000; }
 .header { width: 100%; flex-direction: column; justify-content: center; align-items: center; }
 .time-display { font-size: 28px; color: #ffffff; font-weight: bold; padding-top: 5px; text-align: center; }
@@ -93,10 +92,12 @@ import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
 import request from '@system.request';
-// **注意**: fetch 模块不再需要，因为我们只保存cookie，不在此页面发起网络请求
 
-// --- 常量定义 (无变化) ---
-const API_BASE = 'https://163api.qijieya.cn';
+// --- 常量定义 ---
+// 【修正】恢复被我愚蠢删除的 API_BASE 常量
+const API_BASE = 'https://163api.qijieya.cn'; 
+const API_USER_ACCOUNT = `${API_BASE}/user/account`;
+const API_USER_DETAIL = `${API_BASE}/user/detail?uid=`;
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const AVATAR_CACHE_DIR = 'internal://files/avatars/';
@@ -111,14 +112,13 @@ export default {
         currentTime: "00:00",
     },
 
-    onInit(  ) {
+    onInit( ) {
         this.updateTime();
         setInterval(() => this.updateTime(), 1000);
         file.mkdir({ uri: AVATAR_CACHE_DIR });
     },
 
     onShow() {
-        console.log("Login page onShow: 初始化或刷新 Interconnect 逻辑。");
         this.initializeInterconnect();
     },
 
@@ -131,9 +131,7 @@ export default {
 
     updateTime() {
         const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        this.currentTime = `${hours}:${minutes}`;
+        this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
     initializeInterconnect() {
@@ -143,20 +141,15 @@ export default {
             this.connectionIcon = '/common/icon/error.png';
             return;
         }
-
         connect.onmessage = (data) => {
-            console.log(`Login page received message: ${data.data}`);
             const musicUCookie = data.data;
-
             if (musicUCookie && musicUCookie.startsWith('MUSIC_U=')) {
                 prompt.showToast({ message: '接收到登录凭证！' });
-                // **核心修改**: 只保存Cookie，不获取用户信息
-                this.handleCookieSave(musicUCookie);
+                this.performLoginWithCookie(musicUCookie);
             } else {
                 prompt.showToast({ message: '同步数据格式错误' });
             }
         };
-
         connect.getReadyState({
             success: (data) => {
                 this.connectionStatus = data.status === 1 ? '连接成功，等待同步...' : '连接已断开';
@@ -170,21 +163,36 @@ export default {
     },
 
     /**
-     * **核心新增**: 处理Cookie保存和后续流程
+     * @description 【Cookie 登录流程】
+     * 收到 Cookie 后，调用 /user/account 获取当前登录者的信息。
      */
-    async handleCookieSave(cookie) {
+    async performLoginWithCookie(cookie) {
         try {
-            this.connectionStatus = '正在保存凭证...';
-            await this.saveCookie(cookie);
+            this.connectionStatus = '正在验证凭证...';
+            const requestService = this.$app.$def.requestService;
+            if (!requestService) throw new Error("内部服务错误");
+
+            const response = await requestService.fetch({
+                url: API_USER_ACCOUNT,
+                cookie: cookie
+            });
+
+            if (response.status !== 'success' || response.data?.code !== 200) {
+                throw new Error(`凭证无效或已过期: ${response.data?.code}`);
+            }
+            const profile = response.data.profile;
+            if (!profile) throw new Error("无法从凭证中获取用户信息");
+
+            this.connectionStatus = '正在同步信息...';
+            await this.processAndSaveProfile(profile, cookie);
 
             this.connectionStatus = '登录成功！';
             this.connectionIcon = '/common/icon/success.png';
-            prompt.showToast({ message: '登录成功！用户信息将在下次启动时更新。' });
-
+            prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
             setTimeout(() => router.back(), 1500);
 
         } catch (error) {
-            console.error("保存Cookie失败:", error);
+            console.error("Cookie登录流程失败:", error);
             const errorMessage = error.message || '未知错误';
             this.connectionStatus = `登录失败: ${errorMessage}`;
             this.connectionIcon = '/common/icon/error.png';
@@ -192,13 +200,70 @@ export default {
         }
     },
 
+    /**
+     * @description 【UID 登录流程】
+     * 用户输入 UID 后，调用 /user/detail 获取该用户的信息。
+     */
+    async confirmUid() {
+        if (!this.uidInput) { prompt.showToast({ message: "请输入用户ID" }); return; }
+        prompt.showToast({ message: "正在验证用户ID..." });
+        
+        try {
+            const requestService = this.$app.$def.requestService;
+            if (!requestService) throw new Error("内部服务错误");
+
+            const url = `${API_USER_DETAIL}${this.uidInput}`;
+            const response = await requestService.fetch({ url });
+
+            if (response.status !== 'success' || response.data?.code !== 200) {
+                throw new Error(`网络请求失败`);
+            }
+            const profile = response.data.profile;
+            if (!profile) throw new Error("用户ID无效或不存在");
+
+            await this.processAndSaveProfile(profile, null);
+            
+            prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
+            setTimeout(() => router.back(), 1000);
+
+        } catch (error) {
+            console.error("手动验证用户详情失败:", error);
+            prompt.showToast({ message: error.message || "验证失败，请检查网络" });
+        }
+    },
+
+    /**
+     * @description 统一的 Profile 处理和保存函数
+     * @param {object} profile - 从 API 获取的 profile 对象
+     * @param {string|null} cookie - 如果是 Cookie 登录，则传入 cookie 字符串
+     */
+    async processAndSaveProfile(profile, cookie) {
+        const localAvatarPath = await this.downloadAndCacheAvatar(profile.avatarUrl);
+        
+        const userProfileToSave = {
+            userId: profile.userId,
+            nickname: profile.nickname,
+            avatarUrl: localAvatarPath || '/common/icon/default_avatar.png',
+        };
+
+        const saveTasks = [
+            this.saveProfileToFile(userProfileToSave)
+        ];
+
+        if (cookie) {
+            saveTasks.push(this.saveCookie(cookie));
+        }
+
+        await Promise.all(saveTasks);
+    },
+
+    // --- 辅助函数 ---
     saveCookie(cookieString) {
         return new Promise((resolve, reject) => {
             file.writeText({
                 uri: COOKIE_FILE_URI,
                 text: cookieString,
                 success: () => {
-                    console.log("Cookie保存成功！");
                     if (this.$app.$def.cookieService) {
                         this.$app.$def.cookieService.cookie = cookieString;
                     }
@@ -207,61 +272,6 @@ export default {
                 fail: (data, code) => reject(new Error(`保存Cookie失败, code: ${code}`)),
             });
         });
-    },
-
-    back() {
-        router.back();
-    },
-
-    // --- 手动输入UID相关方法 (保持不变) ---
-    toggleUidInput(show) {
-        this.showUidInput = show;
-        if (!show) {
-            this.uidInput = '';
-        }
-    },
-    handleKeyPress(key) {
-        if (key === '退格') {
-            this.uidInput = this.uidInput.slice(0, -1);
-        } else if (this.uidInput.length < 15) {
-            this.uidInput += key;
-        }
-    },
-    async confirmUid() {
-        if (!this.uidInput) {
-            prompt.showToast({ message: "请输入用户ID" });
-            return;
-        }
-        prompt.showToast({ message: "正在验证用户ID..." });
-        
-        try {
-            // **注意**: 手动输入流程依然需要 fetch，所以需要从全局服务获取
-            const request = this.$app.$def.requestService;
-            if (!request) throw new Error("内部服务错误");
-
-            const url = `${API_BASE}/user/detail?uid=${this.uidInput}`;
-            const response = await request.fetch({ url });
-
-            if (response.status !== 'success') throw new Error(response.message || `网络请求失败, code: ${response.code}`);
-
-            const profile = response.data?.profile;
-            if (profile) {
-                const localAvatarPath = await this.downloadAndCacheAvatar(profile.avatarUrl);
-                const userProfile = {
-                    userId: profile.userId,
-                    nickname: profile.nickname,
-                    avatarUrl: localAvatarPath || '/common/icon/default_avatar.png',
-                };
-                await this.saveProfileToFile(userProfile);
-                prompt.showToast({ message: `欢迎你, ${profile.nickname}` });
-                setTimeout(() => router.back(), 1000);
-            } else {
-                prompt.showToast({ message: "用户ID无效或不存在" });
-            }
-        } catch (error) {
-            console.error("手动验证用户详情失败:", error);
-            prompt.showToast({ message: "验证失败，请检查网络" });
-        }
     },
     downloadAndCacheAvatar(remoteUrl) {
         return new Promise((resolve) => {
@@ -297,5 +307,9 @@ export default {
             });
         });
     },
+    
+    back() { router.back(); },
+    toggleUidInput(show) { this.showUidInput = show; if (!show) this.uidInput = ''; },
+    handleKeyPress(key) { if (key === '退格') { this.uidInput = this.uidInput.slice(0, -1); } else if (this.uidInput.length < 15) { this.uidInput += key; } },
 };
 </script>

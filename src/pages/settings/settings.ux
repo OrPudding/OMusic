@@ -377,36 +377,37 @@ export default {
         });
     },
 
-    handleLogout() {
-        prompt.showDialog({
-            title: '退出登录',
-            message: '您确定要退出登录吗？这将清除您的本地用户数据。',
-            buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-            success: () => {
-                prompt.showToast({ message: '正在退出...' });
-                const filesToDelete = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
-                let deleteCount = filesToDelete.length;
-                
-                const onComplete = () => {
-                    deleteCount--;
-                    if (deleteCount === 0) {
-                        if (this.$app.$def.cookieService) {
-                            this.$app.$def.cookieService.cookie = null;
-                        }
-                        prompt.showToast({ message: '已退出登录' });
-                        router.back();
-                    }
-                };
+// settings.ux <script>
+handleLogout() {
+    prompt.showDialog({
+        title: '退出登录',
+        message: '您确定要退出登录吗？这将清除您的本地用户数据。',
+        buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
+        success: () => {
+            prompt.showToast({ message: '正在退出...' });
+            
+            // 【这样就足够了】: 只需删除文件，requestService 会在下次 fetch 时自动发现
+            const filesToDelete = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
+            let deleteCount = filesToDelete.length;
+            
+            const onComplete = () => {
+                deleteCount--;
+                if (deleteCount === 0) {
+                    prompt.showToast({ message: '已退出登录' });
+                    router.replace({ uri: '/pages/user' }); 
+                }
+            };
 
-                filesToDelete.forEach(uri => {
-                    file.delete({ uri: uri, complete: onComplete });
-                });
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
+            filesToDelete.forEach(uri => {
+                file.delete({ uri: uri, complete: onComplete });
+            });
+        },
+        cancel: () => {
+            prompt.showToast({ message: '操作已取消' });
+        }
+    });
+},
+
 
     handleClearAllData() {
         prompt.showDialog({
