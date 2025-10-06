@@ -1,10 +1,14 @@
 <template>
-    <scroll class="menu-container" scroll-y="true" bounces="true">
+    <!-- 启用下拉刷新，并绑定事件 -->
+    <scroll class="menu-container" scroll-y="true" bounces="true" 
+            onscrolltop="handleRefresh">
+        
         <div class="header" onclick="goBack">
             <text class="time-display">{{ currentTime }}</text>
             <text class="title">‹个人中心</text>
         </div>
 
+        <!-- 用户信息区域的点击事件保持不变，作为另一种刷新方式 -->
         <div class="user-profile-item" onclick="handleProfileClick">
             <image class="avatar" src="{{ avatarUrl }}"></image>
             <div class="user-info">
@@ -59,7 +63,6 @@
     }
   }
 </style>
-
 <script>
 import router from '@system.router';
 import file from '@system.file';
@@ -69,7 +72,7 @@ import request from '@system.request';
 // --- 常量定义 (无变化) ---
 const API_USER_ACCOUNT = 'https://163api.qijieya.cn/user/account';
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
-const DEFAULT_AVATAR = '/common/icon/user.png';
+const DEFAULT_AVATAR = '/common/icon.png';
 const AVATAR_CACHE_DIR = 'internal://files/avatars/';
 const LOCAL_AVATAR_URI = `${AVATAR_CACHE_DIR}user_avatar.png`;
 
@@ -85,14 +88,15 @@ export default {
     onInit( ) {
         this.updateTime();
         setInterval(() => this.updateTime(), 1000);
-        // onInit 只加载本地缓存，保证快速显示
+        // onInit 只加载本地缓存，保证快速显示，这部分逻辑非常棒，保持不变
         this.loadUserProfileFromLocal();
     },
 
-    onShow() {
-        // 每次进入页面，都尝试从网络更新用户信息
-        this.updateUserProfileFromServer();
-    },
+    // **核心改动 1: 移除 onShow 方法**
+    // onShow() {
+    //     // 移除自动更新，避免打扰用户
+    //     // this.updateUserProfileFromServer();
+    // },
 
     updateTime() {
         const now = new Date();
@@ -101,64 +105,82 @@ export default {
         this.currentTime = `${hours}:${minutes}`;
     },
     
-// profile.ux
-async updateUserProfileFromServer() {
-    if (this.isUpdating) return;
-    this.isUpdating = true;
+    /**
+     * **核心改动 2: 新增下拉刷新处理函数**
+     * @param {object} e - 事件对象，包含 { refreshing: true }
+     */
+    handleRefresh(e) {
+        if (e.refreshing) {
+            console.log("触发了下拉刷新...");
+            // 调用更新函数，并传入一个回调，用于在结束后收起刷新动画
+            this.updateUserProfileFromServer(() => {
+                // $element('ID') 是获取组件实例的方法，假设你的 <scroll> 没有指定id，
+                // 但通常框架会提供一种方式来控制refresher的状态。
+                // 如果您的框架有更直接的API（如 this.$refs.scroll.finishPullToRefresh()），请使用那个。
+                // 这是一个示意性的调用。
+                this.$root().postMessage({
+                    type: 'refresher.state.change',
+                    data: { refreshing: false }
+                });
+                console.log("刷新动画已收起。");
+            });
+        }
+    },
 
-    try {
-        const requestService = this.$app.$def.requestService;
-        
-        if (!requestService) {
-            // ... (处理 requestService 未准备好的情况)
+    /**
+     * **核心改动 3: 修改 updateUserProfileFromServer 签名**
+     * @param {function} [onComplete] - 操作完成后的回调函数，用于收起刷新动画等
+     */
+    async updateUserProfileFromServer(onComplete) {
+        if (this.isUpdating) {
+            if (onComplete) onComplete(); // 如果正在更新，直接结束，并收起动画
             return;
         }
-        
-        // **关键步骤**: 调用我们刚刚强化的 loadCookie 方法
-        const cookie = await requestService.loadCookie();
-        
-        // **关键判断**: 这里的 if 判断现在变得无比强大
-        if (cookie) {
-            // 只有当 loadCookie 返回了格式正确的 "MUSIC_U=..." 字符串时，
-            // 这里的代码块才会被执行。
-            console.log("已登录 (Cookie模式)，开始从网络更新用户信息...");
-            
-            const url = `${API_USER_ACCOUNT}`;
-            const response = await requestService.fetch({ url });
+        this.isUpdating = true;
 
-            if (response.status !== 'success' || response.data?.code !== 200) {
-                throw new Error(response.message || `API错误码: ${response.data?.code}`);
+        try {
+            const requestService = this.$app.$def.requestService;
+            if (!requestService) {
+                console.log("Request service not ready.");
+                return;
+            }
+            
+            const cookie = await requestService.loadCookie();
+            
+            if (cookie) {
+                console.log("已登录，开始从网络更新用户信息...");
+                const url = `${API_USER_ACCOUNT}`;
+                const response = await requestService.fetch({ url });
+
+                if (response.status !== 'success' || response.data?.code !== 200) {
+                    throw new Error(response.message || `API错误码: ${response.data?.code}`);
+                }
+
+                const profile = response.data.profile;
+                if (!profile) throw new Error("返回的用户信息为空");
+
+                await this.updateLocalProfile(profile);
+                prompt.showToast({ message: "用户信息已更新" });
+
+            } else {
+                console.log("未检测到有效 Cookie，无需网络更新。");
+                // 如果是未登录状态下拉刷新，可以给一个提示
+                prompt.showToast({ message: "您还未登录" });
             }
 
-            const profile = response.data.profile;
-            if (!profile) throw new Error("返回的用户信息为空");
-
-            await this.updateLocalProfile(profile);
-            prompt.showToast({ message: "用户信息已更新" });
-
-        } else {
-            // **关键分支**: 任何导致 loadCookie 返回 null 的情况，都会进入这里：
-            // 1. cookie.txt 文件不存在。
-            // 2. cookie.txt 文件为空。
-            // 3. cookie.txt 文件内容格式不正确（例如，用户粘贴错了）。
-            //
-            // 此时，我们做的就是从本地加载旧的 profile (可能是UID登录的，也可能没有)，
-            // 这完全符合预期，避免了不必要的网络请求和错误提示。
-            console.log("未检测到有效 Cookie，仅从本地加载用户信息。");
-            this.loadUserProfileFromLocal();
-        }
-
-    } catch (error) {
-        console.error("更新用户信息失败:", error);
-        prompt.showToast({ message: "信息更新失败，可尝试切换到小米运动健康连接", duration: 4000 });
-    } finally {
-        if (this.$app.$def.requestService) {
+        } catch (error) {
+            console.error("更新用户信息失败:", error);
+            prompt.showToast({ message: "信息更新失败，请检查网络", duration: 3000 });
+        } finally {
             this.isUpdating = false;
+            // **确保 onComplete 回调在最后被调用**
+            if (onComplete) {
+                onComplete();
+            }
         }
-    }
-},
+    },
 
-
+    // ... 其他方法 (updateLocalProfile, loadUserProfileFromLocal, 等) 保持不变 ...
     async updateLocalProfile(newProfile) {
         const localAvatarPath = await this.downloadAndCacheAvatar(newProfile.avatarUrl);
         const userProfileToSave = {
@@ -211,66 +233,48 @@ async updateUserProfileFromServer() {
             router.push({ uri: '/pages/login' });
         } else {
             prompt.showToast({ message: '正在刷新用户信息...' });
+            // 点击头像刷新时，不需要收起动画，所以不传回调
             this.updateUserProfileFromServer();
         }
     },
 
-// profile.ux -> downloadAndCacheAvatar (修正后)
-downloadAndCacheAvatar(remoteUrl) {
-    return new Promise((resolve) => {
-        if (!remoteUrl) {
-            resolve(null);
-            return;
-        }
-        const thumbnailUrl = remoteUrl + (remoteUrl.includes('?') ? '&param=100y100' : '?param=100y100');
+    downloadAndCacheAvatar(remoteUrl) {
+        return new Promise((resolve) => {
+            if (!remoteUrl) {
+                resolve(null);
+                return;
+            }
+            const thumbnailUrl = remoteUrl + (remoteUrl.includes('?') ? '&param=100y100' : '?param=100y100');
 
-        request.download({
-            url: thumbnailUrl,
-            success: (task) => {
-                request.onDownloadComplete({
-                    token: task.token,
-                    success: (data) => {
-                        // 核心修正：在移动新文件前，先删除旧文件
-                        file.delete({
-                            uri: LOCAL_AVATAR_URI, // 'internal://files/avatars/user_avatar.png'
-                            // 使用 complete 回调，确保无论旧文件是否存在，都会继续执行移动操作
-                            complete: () => {
-                                file.move({
-                                    srcUri: data.uri, // 下载的临时文件
-                                    dstUri: LOCAL_AVATAR_URI,
-                                    success: () => {
-                                        // 移动成功，返回新的头像路径
-                                        resolve(LOCAL_AVATAR_URI);
-                                    },
-                                    fail: () => {
-                                        // 移动失败，返回 null
-                                        resolve(null);
-                                    },
-                                });
-                            }
-                        });
-                    },
-                    fail: () => resolve(null), // 下载完成回调失败
-                });
-            },
-            fail: () => resolve(null), // 下载任务创建失败
+            request.download({
+                url: thumbnailUrl,
+                success: (task) => {
+                    request.onDownloadComplete({
+                        token: task.token,
+                        success: (data) => {
+                            file.delete({
+                                uri: LOCAL_AVATAR_URI,
+                                complete: () => {
+                                    file.move({
+                                        srcUri: data.uri,
+                                        dstUri: LOCAL_AVATAR_URI,
+                                        success: () => resolve(LOCAL_AVATAR_URI),
+                                        fail: () => resolve(null),
+                                    });
+                                }
+                            });
+                        },
+                        fail: () => resolve(null),
+                    });
+                },
+                fail: () => resolve(null),
+            });
         });
-    });
-},
-
-
-    goToSettings() {
-        router.push({ uri: '/pages/settings' });
     },
 
-    goToStorage() {
-        router.push({ uri: '/pages/storage' });
-    },
-    goToAbout() {
-        router.push({ uri: '/pages/about' });
-    },
-    goBack() {
-        router.back();
-    }
+    goToSettings() { router.push({ uri: '/pages/settings' }); },
+    goToStorage() { router.push({ uri: '/pages/storage' }); },
+    goToAbout() { router.push({ uri: '/pages/about' }); },
+    goBack() { router.back(); }
 };
 </script>

@@ -82,13 +82,16 @@
               return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
           },
           playModeIcon() {
-              const icons = [
-                  '/common/icon/loop.png',
-                  '/common/icon/single-loop.png',
-                  '/common/icon/random.png'
-              ];
-              return icons[this.playMode] || icons[0];
-          }
+        if (this.isFmMode === "true") {
+                return '/common/icon/fm.png'; // 假设您有一个FM图标
+            }
+        const icons = [
+            '/common/icon/loop.png',
+            '/common/icon/single-loop.png',
+            '/common/icon/random.png'
+        ];
+        return icons[this.playMode] || icons[0];
+    },
       },
   
       protected: {
@@ -96,6 +99,7 @@
           screenShape: 'circle',
           playMode: 0,
           isDownloading: false,
+          isFmMode: false,
       },
   
       async onInit() {

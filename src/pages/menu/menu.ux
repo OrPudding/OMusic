@@ -1,10 +1,10 @@
 <template>
-  <div class="menu-container">
+  <scroll class="menu-container" scroll-y="true" bounces="true">
     <div class="header" onclick="back">
     <text class="time-display">{{currentTime}}</text>
     <text class="title">‹主菜单</text>
     </div>
-    <scroll class="menu-list" bounces="true">
+    <div class="menu-list">
       <div class="menu-item" onclick="goToSearch">
         <text class="item-text">搜索</text>
       </div>
@@ -17,14 +17,22 @@
       <div class="menu-item" onclick="goToLike">
         <text class="item-text">我的收藏</text>
       </div>
+      <!-- 新增：私人FM -->
+      <div class="menu-item" onclick="goToPersonalFM">
+        <text class="item-text">私人FM</text>
+      </div>
+      <!-- 新增：每日推荐 -->
+      <div class="menu-item" onclick="goToDailyRecommend">
+        <text class="item-text">每日推荐</text>
+      </div>
       <div class="menu-item" onclick="goToSongList">
         <text class="item-text">我的歌单</text>
       </div>
       <div class="menu-item" onclick="goToUser">
         <text class="item-text">个人中心</text>
       </div>
-    </scroll>
-  </div>
+    </div>
+  </scroll>
 </template>
 
 <script>
@@ -99,6 +107,24 @@ export default {
       }
     });
   },
+  // 跳转到"私人FM"
+  goToPersonalFM() {
+    router.push({
+      uri: "/pages/list",
+      params: {
+        listType: 'personal_fm'
+      }
+    });
+  },
+  // 跳转到"每日推荐"
+  goToDailyRecommend() {
+    router.push({
+      uri: "/pages/list",
+      params: {
+        listType: 'daily_recommend'
+      }
+    });
+  },
 
   goToSongList() {
     router.push({
@@ -148,6 +174,7 @@ export default {
   width: 360px;
   flex-direction: row;
   flex-wrap: wrap;
+  padding-bottom: 80px;
 }
 
 .menu-item {
@@ -175,5 +202,8 @@ export default {
     .time-display {
         font-size: 32px;
     }
+    .menu-list {
+  padding-bottom: 0px;
+}
   }
 </style>

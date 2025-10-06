@@ -9,10 +9,10 @@
         </div>
                     <!-- "播放全部" 按钮 (已移除触摸事件) -->
                     <div class="play-all-button" 
-                    if="{{ (listType === 'downloadlist' || listType === 'songlist') && fullSongList.length > 0 }}" 
+                    if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" 
                     onclick="playAll">
                    <image class="play-all-icon" src="/common/icon/play.png"></image>
-                   <text class="play-all-text">播放全部</text>
+                   <text class="play-all-text">{{ listType === 'personal_fm' ? '开启FM' : '播放全部' }}</text>
                </div>
 
                <!-- 核心修改：新增“添加到收藏”按钮 -->
@@ -347,17 +347,22 @@ export default {
         }
     },
 
+    updatePageTitle() {
+        const titles = {
+            'downloadlist': "已下载",
+            'songlist': "歌单详情",
+            'favorites': "我的收藏",
+            'playlist': "播放列表",
+            'daily_recommend': "每日推荐", // 新增
+            'personal_fm': "私人FM",     // 新增
+        };
+        this.pageTitle = titles[this.listType] || "播放列表";
+    },
+
+
     updateTime() {
         const now = new Date();
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    },
-
-    updatePageTitle() {
-        const titles = {
-            'downloadlist': "已下载", 'songlist': "歌单详情",
-            'favorites': "我的收藏", 'playlist': "播放列表",
-        };
-        this.pageTitle = titles[this.listType] || "播放列表";
     },
 
     async loadData() {
@@ -374,6 +379,13 @@ export default {
 
             let sourceData = [];
             switch (this.listType) {
+                case 'daily_recommend': // 新增日推逻辑
+                    await this.fetchDailyRecommendSongs(downloadedIds);
+                    return; // 方法内部会处理所有逻辑
+                
+                case 'personal_fm': // 新增FM逻辑
+                    await this.fetchPersonalFmSongs(downloadedIds);
+                    return; // 方法内部会处理所有逻辑
                 case 'downloadlist':
                     sourceData = Object.values(downloadedMeta);
                     break;
@@ -400,6 +412,70 @@ export default {
         } catch (error) {
             console.error("加载数据源失败:", error);
             prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
+            this.hasMoreDown = false;
+        } finally {
+            this.isLoading = false;
+        }
+    },
+
+
+    // --- 3. 新增获取日推歌曲的方法 ---
+    async fetchDailyRecommendSongs(downloadedIds) {
+        const request = this.$app.$def.requestService;
+        if (!request) throw new Error("内部服务错误: requestService 未找到");
+
+        try {
+            const response = await request.fetch({ url: 'https://163api.qijieya.cn/recommend/songs' });
+            if (response.data.code !== 200 || !response.data.data.dailySongs) {
+                throw new Error(response.message || '返回数据格式不正确');
+            }
+
+            const songs = response.data.data.dailySongs;
+            this.fullSongList = songs.map(s => ({
+                id: s.id,
+                name: s.name,
+                artists: s.ar.map(a => a.name).join(' / '),
+                isDownloaded: downloadedIds.has(String(s.id))
+            }));
+
+            this.updateDisplayList(0);
+            this.hasMoreDown = false; // 日推一次性加载完
+
+        } catch (error) {
+            console.error("获取每日推荐失败:", error);
+            prompt.showToast({ message: '获取每日推荐失败，请确认cookie登录和网络状态稍后重试' });
+            this.hasMoreDown = false;
+        } finally {
+            this.isLoading = false;
+        }
+    },
+
+    // --- 4. 新增获取私人FM歌曲的方法 ---
+    async fetchPersonalFmSongs(downloadedIds) {
+        const request = this.$app.$def.requestService;
+        if (!request) throw new Error("内部服务错误: requestService 未找到");
+
+        try {
+            const url = `https://163api.qijieya.cn/personal_fm?timestamp=${new Date().getTime()}`;
+            const response = await request.fetch({ url });
+            if (!response.data.data) {
+                throw new Error(response.message || '返回数据格式不正确');
+            }
+
+            const songs = response.data.data;
+            this.fullSongList = songs.map(s => ({
+                id: s.id,
+                name: s.name,
+                artists: s.artists.map(a => a.name).join(' / '),
+                isDownloaded: downloadedIds.has(String(s.id))
+            }));
+
+            this.updateDisplayList(0);
+            this.hasMoreDown = true; // FM模式理论上可以无限加载
+
+        } catch (error) {
+            console.error("获取私人FM失败:", error);
+            prompt.showToast({ message: '获取私人FM失败，请确认cookie登录和网络状态稍后重试' });
             this.hasMoreDown = false;
         } finally {
             this.isLoading = false;
@@ -587,106 +663,6 @@ export default {
         }
     },
 
-    async fetchSonglistFromNetwork(downloadedIds) {
-        if (!this.songlistId) {
-            this.isLoading = false;
-            this.hasMoreDown = false;
-            throw new Error("未提供歌单ID");
-        }
-
-        // 确保 downloadedIds 是一个有效的 Set，即使上层忘记传递
-        if (!(downloadedIds instanceof Set)) {
-            console.warn("fetchSonglistFromNetwork 未收到有效的 downloadedIds Set，将使用空 Set。");
-            downloadedIds = new Set();
-        }
-
-        const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
-        const request = this.$app.$def.requestService;
-        if (!request) {
-            this.isLoading = false;
-            this.hasMoreDown = false;
-            throw new Error("内部服务错误: requestService 未找到");
-        }
-
-        // 步骤 1: 尝试从缓存加载初始数据
-        const cachedList = await fileService.readJson(cacheFileUri, null);
-        let allSongs = [];
-
-        if (cachedList && Array.isArray(cachedList)) {
-            // 如果有缓存，先用缓存数据填充列表，并合并下载状态
-            allSongs = cachedList.map(song => ({
-                ...song,
-                isDownloaded: downloadedIds.has(String(song.id))
-            }));
-            this.fullSongList = [...allSongs];
-            this.updateDisplayList(0);
-            console.log(`已从缓存加载 ${allSongs.length} 首歌曲，并合并下载状态。`);
-        }
-
-        // 步骤 2: 从网络获取新数据（增量或全新）
-        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
-        let offset = allSongs.length; // 从已有歌曲的末尾开始获取
-        let hasMore = true;
-
-        // 循环获取 ，直到没有更多歌曲或达到上限
-        while (hasMore && allSongs.length < this.TOTAL_LIMIT) {
-            const url = `${BASE_URL}?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
-            
-            try {
-                const response = await request.fetch({ url });
-
-                if (response.status === 'success') {
-                    const songs = response.data?.songs;
-                    if (songs && songs.length > 0) {
-                        // 步骤 3: 处理并合并新获取的歌曲数据
-                        const newSongs = songs.map(s => ({
-                            id: s.id,
-                            name: s.name,
-                            artists: s.ar.map(a => a.name).join(' / '),
-                            isDownloaded: downloadedIds.has(String(s.id)) // 使用传入的 Set 进行判断
-                        }));
-
-                        allSongs.push(...newSongs);
-                        
-                        // 实时更新UI
-                        this.fullSongList = [...allSongs];
-                        this.updateDisplayList(this.displayStartIndex);
-                        
-                        // 异步更新缓存，不阻塞UI
-                        // 注意：缓存中不保存 isDownloaded 状态
-                        fileService.writeJson(cacheFileUri, this.fullSongList.map(({ isDownloaded, ...rest }) => rest));
-                        console.log(`已获取并缓存 ${this.fullSongList.length} 首歌曲。`);
-
-                        offset += songs.length;
-                        if (songs.length < this.API_PAGE_SIZE) {
-                            hasMore = false;
-                            this.hasMoreDown = false;
-                        } else {
-                            this.hasMoreDown = true;
-                        }
-                    } else {
-                        hasMore = false;
-                        this.hasMoreDown = false;
-                    }
-                } else {
-                    throw new Error(response.message || '未知网络错误');
-                }
-            } catch (error) {
-                console.error("分页获取歌单失败:", error);
-                prompt.showToast({ message: '网络请求失败，请稍后重试' });
-                hasMore = false;
-                this.hasMoreDown = false;
-                if (!cachedList) {
-                    throw error;
-                }
-            }
-        }
-        
-        if (this.fullSongList.length === 0) {
-            prompt.showToast({ message: '歌单为空或加载失败' });
-        }
-    },
-
     /**
      * **最终修正**: 移除所有与 event 相关的参数和调用
      */
@@ -787,6 +763,11 @@ export default {
             prompt.showToast({ message: '列表为空，无法播放' });
             return;
         }
+                // 对于私人FM，播放全部就是启动FM模式
+                if (this.listType === 'personal_fm') {
+            this.play(this.fullSongList[0].id); // 调用play方法，它会处理FM逻辑
+            return;
+        }
         prompt.showToast({ message: '即将替换播放列表并播放...' });
         const success = await fileService.writeJson(this.listFileUri, this.fullSongList);
         if (!success) {
@@ -807,10 +788,28 @@ export default {
     },
 
 
+    // --- 5. 修改播放逻辑 ---
     async play(songId) {
+        // 对于私人FM，点击任何歌曲都应该启动FM模式
+        if (this.listType === 'personal_fm') {
+            prompt.showToast({ message: '即将开启私人FM...' });
+            router.push({
+                uri: "/pages/player",
+                params: {
+                    // 传递一个明确的标志给播放器
+                    startFmMode: true,
+                    // 可以选择传递当前点击的歌曲作为第一首
+                    songId: songId, 
+                    songInfo: JSON.stringify(this.fullSongList.find(s => s.id === songId))
+                },
+            });
+            return;
+        }
+
+        // 其他列表类型的播放逻辑保持不变
         const songToPlay = this.fullSongList.find(song => song.id === songId);
         if (!songToPlay) {
-            prompt.showToast({ message: '找不到歌曲信息或歌曲已删除成功' });
+            prompt.showToast({ message: '找不到歌曲信息或歌曲已删除' });
             return;
         }
 

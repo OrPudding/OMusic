@@ -11,7 +11,7 @@
           <image class="app-icon" src="/common/icon.png"></image>
           <div class="app-details">
               <text class="app-name">OMusic</text>
-              <text class="app-version">v1.0</text>
+              <text class="app-version">v1.1</text>
           </div>
       </div>
 
@@ -26,6 +26,11 @@
           <div class="content-item">
             <text class="item-label">协助开发</text>
             <text class="item-value">Manus AI</text>
+          </div>
+          
+          <div class="content-item">
+            <text class="item-label">协助测试</text>
+            <text class="item-value">xinghengCN</text>
           </div>
           <!-- 开源许可，可点击 -->
           <div class="content-item" onclick="goToLicense">

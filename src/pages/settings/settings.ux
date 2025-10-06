@@ -24,6 +24,20 @@
                 <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
             </div>
             <text class="item-desc">适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。</text>
+
+            <text class="category-title">音质设置</text>
+            <div class="setting-item">
+                <text class="item-label">在线播放音质</text>
+                <text class="item-value-btn" onclick="toggleOnlineQuality">{{ settings.audioQuality.online }}kbps</text>
+            </div>
+            <text class="item-desc">在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。</text>
+    
+            <div class="setting-item">
+                <text class="item-label">下载音质</text>
+                <text class="item-value-btn" onclick="toggleDownloadQuality">{{ settings.audioQuality.download }}kbps</text>
+            </div>
+            <text class="item-desc">下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。</text>
+    
   
             <text class="category-title">列表性能</text>
             <div class="setting-item">
@@ -63,7 +77,15 @@
                 <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
             </div>
             <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
-            <text class="category-title">危险操作</text>
+            <text class="category-title">应用数据</text>
+
+                                    <!-- 清空缓存数据 -->
+                                    <div class="setting-item">
+                                        <text class="item-label">清空缓存数据</text>
+                                        <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
+                                        <text class="action-btn cache-color" onclick="handleClearCache">清空缓存</text>
+                                    </div>
+                                    <text class="item-desc">清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。应用在重新加载时需要重新联网下载资源。</text>
 
             <!-- 退出登录 -->
             <div class="setting-item">
@@ -81,13 +103,14 @@
             </div>
             <text class="item-desc">清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。</text>
 
+
             <!-- 清空全部数据 -->
             <div class="setting-item">
                 <text class="item-label">清空全部数据</text>
                 <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
                 <text class="action-btn reset-color" onclick="handleClearAllData">彻底重置</text>
             </div>
-            <text class="item-desc">将应用恢复到初始安装状态，清除包括登录、授权、设置在内的所有本地数据。</text>
+            <text class="item-desc">将应用恢复到初始安装状态，清除包括缓存、登录、授权、设置、已下载的音乐和歌词在内的所有本地数据。</text>
         </div>
     </scroll>
 </template>
@@ -117,6 +140,10 @@
         font-weight: bold;
         text-align: center;
     }
+    .cache-color {
+        background-color: rgba(255, 204, 0, 0.2); /* 黄色背景 */
+        color: #FFCC00; /* 亮黄色文字 */
+    }
     .logout-color {
         background-color: rgba(255, 59, 48, 0.2); /* 红色背景 */
         color: #FF453A; /* 亮红色文字 */
@@ -135,7 +162,6 @@
         .time-display { font-size: 32px; }
     }
 </style>
-
 <script>
 import router from '@system.router';
 import file from '@system.file';
@@ -148,12 +174,18 @@ const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
-// 预设的档位
+const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
+
+// ... (PRESETS, private, computed, onInit, updateTime, load/save settings, toggle methods - 保持不变)
 const PRESETS = {
     lyrics: {
         japaneseMode: ['translation', 'romaji', 'original'],
         cantoneseMode: ['romaji', 'original'], 
         englishMode: ['translation', 'original'],
+    },
+    audioQuality: {
+        online: [64, 128, 192, 320, 990],
+        download: [64, 128, 192, 320]
     },
     performance: {
         windowSize: [20, 30, 40],
@@ -163,7 +195,6 @@ const PRESETS = {
         totalLimit: [50, 200, 500],
         apiPageSize: [20, 50, 100],
     },
-    // **新增**: 搜索设置的档位
     search: {
         totalLimit: [10, 25, 50],
         apiPageSize: [5, 10, 25],
@@ -173,25 +204,12 @@ const PRESETS = {
 export default {
     private: {
         currentTime: '00:00',
-        // 默认设置，作为加载失败时的备用
         settings: {
-            lyrics: {
-                japaneseMode: 'translation',
-                englishMode: 'translation',
-            },
-            performance: {
-                windowSize: 30,
-                pageSize: 15,
-            },
-            network: {
-                totalLimit: 200,
-                apiPageSize: 50,
-            },
-            // **新增**: 搜索的默认设置
-            search: {
-                totalLimit: 25,
-                apiPageSize: 10,
-            }
+            lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
+            audioQuality: { online: 64, download: 128 },
+            performance: { windowSize: 30, pageSize: 15 },
+            network: { totalLimit: 200, apiPageSize: 50 },
+            search: { totalLimit: 25, apiPageSize: 10 }
         },
     },
 
@@ -229,17 +247,17 @@ export default {
             success: (data) => {
                 try {
                     const loadedSettings = JSON.parse(data.text);
-                    // 深层合并，防止因新增设置项导致旧版配置文件出错
                     this.settings = {
                         ...this.settings,
                         ...loadedSettings,
                         lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
+                        audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) },
                         performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
                         network: { ...this.settings.network, ...(loadedSettings.network || {}) },
-                        search: { ...this.settings.search, ...(loadedSettings.search || {}) }, // **新增**: 合并搜索设置
+                        search: { ...this.settings.search, ...(loadedSettings.search || {}) },
                     };
                 } catch (e) {
-                    console.error("解析设置文件失败，将保存默认设置。");
+                    console.error("解析设置文件失败，将保存默认设置。", e);
                     this.saveSettings();
                 }
             },
@@ -254,10 +272,8 @@ export default {
         file.writeText({
             uri: SETTINGS_FILE_URI,
             text: JSON.stringify(this.settings, null, 2),
-            success: () => {
-            },
-            fail: () => {
-            }
+            success: () => console.log('设置已保存。'),
+            fail: (data, code) => console.error(`保存设置失败, code=${code}`)
         });
     },
 
@@ -272,29 +288,85 @@ export default {
     toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
     toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
     toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
+    toggleOnlineQuality() { this._toggleSetting('audioQuality', 'online', PRESETS.audioQuality.online); },
+    toggleDownloadQuality() { this._toggleSetting('audioQuality', 'download', PRESETS.audioQuality.download); },
     toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
     togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
     toggleTotalLimit() { this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit); },
     toggleApiPageSize() { this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize); },
-    // **新增**: 切换搜索设置的方法
     toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
     toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
+
+    // --- 新增方法 ---
+    handleClearCache() {
+        prompt.showDialog({
+            title: '清除缓存',
+            message: '您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像。',
+            buttons: [{ text: '取消' }, { text: '确定', color: '#007AFF' }], // 使用蓝色作为非危险操作的确认色
+            success: () => {
+                prompt.showToast({ message: '正在清除缓存...' });
+
+                const itemsToClear = [
+                    { uri: AVATAR_CACHE_URI, type: 'file' },
+                    { uri: PLAYLIST_CACHE_DIR, type: 'dir' },
+                    { uri: USER_PLAYLISTS_DIR, type: 'dir' }
+                ];
+                let itemsCount = itemsToClear.length;
+                let hasFailed = false;
+
+                const onComplete = () => {
+                    itemsCount--;
+                    if (itemsCount === 0) {
+                        if (!hasFailed) {
+                            prompt.showToast({ message: '缓存已清除' });
+                        } else {
+                            prompt.showToast({ message: '部分缓存清除失败，可能缓存不存在，这是正常的' });
+                        }
+                    }
+                };
+
+                const onFail = (uri, code) => {
+                    hasFailed = true;
+                    console.error(`清除 ${uri} 失败, code=${code}`);
+                };
+
+                itemsToClear.forEach(item => {
+                    if (item.type === 'file') {
+                        file.delete({
+                            uri: item.uri,
+                            complete: onComplete,
+                            fail: (data, code) => onFail(item.uri, code)
+                        });
+                    } else if (item.type === 'dir') {
+                        file.rmdir({
+                            uri: item.uri,
+                            recursive: true,
+                            complete: onComplete,
+                            fail: (data, code) => onFail(item.uri, code)
+                        });
+                    }
+                });
+            },
+            cancel: () => {
+                prompt.showToast({ message: '操作已取消' });
+            }
+        });
+    },
 
     handleClearActivation() {
         prompt.showDialog({
             title: '清除授权',
             message: '您确定要清除本地授权信息吗？清除后需要重新联网激活应用。',
             buttons: [{ text: '取消' }, { text: '确定', color: '#FF9500' }],
-            success: () => { // 移除 async
+            success: () => {
                 prompt.showToast({ message: '正在清除授权...' });
                 file.delete({
                     uri: LICENSE_FILE_URI,
-                    complete: () => { // 使用 complete 确保无论成功失败都执行
+                    complete: () => {
                         if (this.$app.$def) {
                             this.$app.$def.isActivated = false;
                         }
                         prompt.showToast({ message: '授权已清除，请重新启动应用' });
-                        // 强制跳转到 Splash 页面
                         router.replace({ uri: '/pages/splash' });
                     }
                 });
@@ -310,28 +382,24 @@ export default {
             title: '退出登录',
             message: '您确定要退出登录吗？这将清除您的本地用户数据。',
             buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-            success: () => { // 移除 async
+            success: () => {
                 prompt.showToast({ message: '正在退出...' });
-                // 开始回调地狱
-                file.delete({
-                    uri: PROFILE_FILE_URI,
-                    complete: () => { // 删除完第一个，在回调里删除第二个
-                        file.delete({
-                            uri: AVATAR_CACHE_URI,
-                            complete: () => { // 删除完第二个，在回调里删除第三个
-                                file.delete({
-                                    uri: COOKIE_FILE_URI,
-                                    complete: () => { // 全部删除完成
-                                        if (this.$app.$def.cookieService) {
-                                            this.$app.$def.cookieService.cookie = null;
-                                        }
-                                        prompt.showToast({ message: '已退出登录' });
-                                        router.back();
-                                    }
-                                });
-                            }
-                        });
+                const filesToDelete = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
+                let deleteCount = filesToDelete.length;
+                
+                const onComplete = () => {
+                    deleteCount--;
+                    if (deleteCount === 0) {
+                        if (this.$app.$def.cookieService) {
+                            this.$app.$def.cookieService.cookie = null;
+                        }
+                        prompt.showToast({ message: '已退出登录' });
+                        router.back();
                     }
+                };
+
+                filesToDelete.forEach(uri => {
+                    file.delete({ uri: uri, complete: onComplete });
                 });
             },
             cancel: () => {
@@ -345,29 +413,22 @@ export default {
             title: '清空所有数据',
             message: '【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？',
             buttons: [{ text: '取消' }, { text: '确定清空', color: '#FF453A' }],
-            success: () => { // 移除 async
+            success: () => {
                 prompt.showToast({ message: '正在清空所有数据...' });
-                // 开始更深的回调地狱
-                this.deleteFile(PROFILE_FILE_URI, () => {
-                this.deleteFile(AVATAR_CACHE_URI, () => {
-                this.deleteFile(COOKIE_FILE_URI, () => {
-                this.deleteFile(LICENSE_FILE_URI, () => {
-                this.deleteFile(SETTINGS_FILE_URI, () => {
-                this.deleteDirectory(PLAYLIST_CACHE_DIR, () => {
-                    // 全部完成
-                    if (this.$app.$def) {
-                        this.$app.$def.isActivated = false;
-                        if (this.$app.$def.cookieService) {
-                            this.$app.$def.cookieService.cookie = null;
+                this.ClearAllData({
+                    success: () => {
+                        if (this.$app.$def) {
+                            this.$app.$def.isActivated = false;
+                            if (this.$app.$def.cookieService) {
+                                this.$app.$def.cookieService.cookie = null;
+                            }
                         }
+                        prompt.showToast({ message: '所有数据已清空，请重启应用' });
+                        router.replace({ uri: '/pages/splash' });
+                    },
+                    fail: (data, code) => {
+                        prompt.showToast({ message: `清空数据失败，错误码: ${code}` });
                     }
-                    prompt.showToast({ message: '所有数据已清空，请重启应用' });
-                    router.replace({ uri: '/pages/splash' });
-                });
-                });
-                });
-                });
-                });
                 });
             },
             cancel: () => {
@@ -376,23 +437,60 @@ export default {
         });
     },
 
-    // 辅助函数：纯回调版本
-    deleteFile(uri, callback) {
-        file.delete({
-            uri: uri,
-            complete: () => {
-                if (callback) callback();
-            }
-        });
-    },
+    ClearAllData({ success, fail, complete }) {
+        const baseUri = 'internal://files/';
+        console.log('开始清除所有数据...');
 
-    // 辅助函数：纯回调版本
-    deleteDirectory(uri, callback) {
-        file.rmdir({
-            uri: uri,
-            recursive: true, // 递归删除
-            complete: () => {
-                if (callback) callback();
+        file.list({
+            uri: baseUri,
+            success: (data) => {
+                const fileList = data.fileList;
+                if (fileList.length === 0) {
+                    if (success) success();
+                    if (complete) complete();
+                    return;
+                }
+
+                let itemsToDelete = fileList.length;
+                let hasFailed = false;
+
+                const checkCompletion = () => {
+                    itemsToDelete--;
+                    if (itemsToDelete === 0 && !hasFailed) {
+                        if (success) success();
+                        if (complete) complete();
+                    }
+                };
+
+                const failOnce = (errData, errCode, itemUri) => {
+                    if (!hasFailed) {
+                        hasFailed = true;
+                        console.error(`删除 ${itemUri} 失败, code=${errCode}。`);
+                        if (fail) fail(errData, errCode);
+                        if (complete) complete();
+                    }
+                };
+
+                fileList.forEach(item => {
+                    if (hasFailed) return;
+                    if (item.uri.endsWith('/')) {
+                        file.rmdir({
+                            uri: item.uri, recursive: true,
+                            success: () => { checkCompletion(); },
+                            fail: (d, c) => failOnce(d, c, item.uri)
+                        });
+                    } else {
+                        file.delete({
+                            uri: item.uri,
+                            success: () => { checkCompletion(); },
+                            fail: (d, c) => failOnce(d, c, item.uri)
+                        });
+                    }
+                });
+            },
+            fail: (data, code) => {
+                if (fail) fail(data, code);
+                if (complete) complete();
             }
         });
     },

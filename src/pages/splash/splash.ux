@@ -150,6 +150,7 @@
         },
 
         onInit() {
+            this.initializeDataFiles(() => {
         console.log("Splash.onInit: 初始化 Splash 页面。");
         this.updateTime();
         setInterval(() => { this.updateTime(); }, 1000);
@@ -163,7 +164,7 @@
         this.checkEulaStatus();
                             }
         }, 500);
-
+        })
     },
 
         // ==================== 最终修正点 1: 回归到回调函数模式 ====================
@@ -330,6 +331,64 @@
             this.afdianPurchaseUrl = appDef.AFDIAN_PURCHASE_URL || 'https://afdian.com';
             this.verificationState = 'failed';
         },
+
+    /**
+     * @description
+     * 检查并初始化应用所需的核心数据文件。
+     * 如果文件不存在，则创建具有合适初始内容的文件。
+     */
+     initializeDataFiles(onComplete) {
+        // **扩展文件列表和初始内容**
+        const filesToEnsure = [
+            { uri: 'internal://files/downloaded_songs.json', initialContent: '[]' },
+            { uri: 'internal://files/play_list.json', initialContent: '[]' },
+            { uri: 'internal://files/cookie.txt', initialContent: '' }, // Cookie文件初始为空字符串
+            { uri: 'internal://files/user_profile.json', initialContent: '{}' } // 用户信息初始为空对象
+        ];
+
+        let filesChecked = 0;
+        const totalFiles = filesToEnsure.length;
+
+        if (totalFiles === 0) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const checkCompletion = () => {
+            filesChecked++;
+            if (filesChecked === totalFiles && onComplete) {
+                onComplete();
+            }
+        };
+
+        console.log(`准备检查和初始化 ${totalFiles} 个核心数据文件...`);
+
+        filesToEnsure.forEach(fileInfo => {
+            file.access({
+                uri: fileInfo.uri,
+                success: () => {
+                    console.log(`文件已存在: ${fileInfo.uri}`);
+                    checkCompletion();
+                },
+                fail: () => {
+                    console.log(`文件不存在，正在创建: ${fileInfo.uri}`);
+                    file.writeText({
+                        uri: fileInfo.uri,
+                        text: fileInfo.initialContent, // **使用指定的初始内容**
+                        encoding: 'UTF-8',
+                        success: () => {
+                            console.log(`文件创建成功: ${fileInfo.uri}`);
+                            checkCompletion();
+                        },
+                        fail: (data, code) => {
+                            console.error(`创建文件 ${fileInfo.uri} 失败, code = ${code}`);
+                            checkCompletion(); // 即使失败也要继续，防止阻塞
+                        }
+                    });
+                }
+            });
+        });
+    },
 
 // 在 splash.ux 中
 retryActivation() {
