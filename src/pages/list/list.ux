@@ -33,11 +33,13 @@
                   - "多选"按钮现在是内容的一部分，位于滚动区顶部。
                   - 只在特定列表类型且列表不为空时显示。
                 -->
+                  <!--
                 <div class="header-action-btn-wrapper select-mode-btn" 
                      if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'favorites') && fullSongList.length > 0 && !isMultiSelectMode }}" 
                      onclick="toggleMultiSelectMode">
                     <text class="header-action-btn-text">批量管理</text>
                 </div>
+            -->
             </div>
             
             <!-- 列表内容 -->
@@ -79,12 +81,13 @@
             <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
         </scroll>
 
-        <!-- 【核心修改】底部操作栏现在是绝对定位 -->
+        <!-- 【核心修改】底部操作栏现在是绝对定位
         <div class="multi-select-footer" if="{{ isMultiSelectMode }}">
             <text class="footer-text-button download" onclick="downloadSelectedSongs">下载</text>
             <text class="footer-text-button delete" onclick="deleteSelectedSongs">删除</text>
             <text class="footer-text-button cancel" onclick="toggleMultiSelectMode">取消</text>
         </div>
+         -->
     </div>
 </template>
 <style>
@@ -564,7 +567,7 @@ export default {
         }
         
         // 异步更新缓存
-        fileService.writeJson(cacheFileUri, this.fullSongList.map(({ isDownloaded, ...rest }) => rest));
+        fileService.writeJson(cacheFileUri, this.fullSongList.map(({...rest }) => rest));
     },
 
     // --- 新增：添加到收藏的方法 ---

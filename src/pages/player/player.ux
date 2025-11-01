@@ -42,27 +42,32 @@
                 </div>
             </div>
 
-            <!-- 视图 1: 歌词 -->
-            <div class="swiper-item">
-                <scroll id="lyricsScrollView" class="lyrics-scroll-view" scroll-y="true">
-                    <div class="lyrics-list-padding-top"></div>
-                    
-                    <div
-                        for="{{(index, line) in fullVisibleLyrics}}"
-                        id="lyric-line-{{ index }}"
-                        class="lyric-line-wrapper {{ line.isCurrent ? 'is-current-wrapper' : '' }}"
-                    >
-                        <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}" style="{{ line.dynamicStyle }}">
-                            {{ line.original }}
-                        </text>
-                        <text if="{{ line.isCurrent && line.extra }}" class="lyric-line extra-lyric" style="{{ line.dynamicStyle }}">
-                            {{ line.extra }}
-                        </text>
-                    </div>
-                
-                    <div class="lyrics-list-padding-bottom"></div>
-                </scroll>
-            </div>
+<!-- 视图 1: 歌词 -->
+<div class="swiper-item">
+    <scroll id="lyricsScrollView" class="lyrics-scroll-view" scroll-y="true">
+        <div class="lyrics-list-padding-top"></div>
+        
+        <!-- 【【【性能优化点】】】 -->
+        <!-- 1. 添加 tid 属性，值为一个在数组中唯一的标识符 -->
+        <!-- 2. 我们将在 computed.fullVisibleLyrics 中为每一行歌词生成一个唯一的 line.id -->
+        <div
+            for="{{(index, line) in fullVisibleLyrics}}"
+            tid="line.id" 
+            id="lyric-line-{{ index }}"
+            class="lyric-line-wrapper {{ line.isCurrent ? 'is-current-wrapper' : '' }}"
+        >
+            <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}" style="{{ line.dynamicStyle }}">
+                {{ line.original }}
+            </text>
+            <text if="{{ line.isCurrent && line.extra }}" class="lyric-line extra-lyric" style="{{ line.dynamicStyle }}">
+                {{ line.extra }}
+            </text>
+        </div>
+    
+        <div class="lyrics-list-padding-bottom"></div>
+    </scroll>
+</div>
+
 
             <!-- 视图 2: 评论 -->
             <div class="swiper-item comments-view">
@@ -182,7 +187,7 @@
     height: 64px; 
 }
 
-/* --- 歌词视图样式 --- */
+/* --- 歌词视图样式 (已优化 - 无动画版) --- */
 .lyrics-scroll-view {
     width: 100%;
     height: 100%;
@@ -198,36 +203,41 @@
     align-items: center;
     justify-content: center;
     padding: 3px 0;
-        /* 【新增】为背景色的出现和消失添加过渡效果 */
-        transition: background-color 0.5s ease-out;
+    /* 【移除】移除了 background-color 的 transition */
 }
 .is-current-wrapper {
     background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 24px; /* 圆角应用在 wrapper 上 */
+    border-radius: 24px;
 }
 .lyric-line {
     width: 90%;
     text-align: center;
     lines: -1;
-    transition: opacity 0.5s ease-out, font-size 0.5s ease-out;
+    /* 【移除】移除了所有 transition 属性 */
+    
+    /* 【修改】默认状态：非当前行 */
+    opacity: 0.6; /* 相比动画版，可以稍微调高非当前行的透明度，使其更清晰 */
+    color: #FFFFFF;
+    font-size: 24px;
 }
 
-/* 歌词字体 */
-.secondary-lyric {
-    font-size: 24px; 
-    color: #FFFFFF;
-}
+/* 【修改】当前行的激活状态 */
 .current-lyric {
-    font-size: 26px; 
+    opacity: 1;
+    /* transform: scale(1); */ /* 默认就是1，无需重复定义 */
     color: #3ae1ff;
     font-weight: bold;
+    font-size: 26px;
     padding: 6px 0;
 }
+
 .extra-lyric {
     font-size: 20px;
     color: #FFFFFF;
     padding-bottom: 6px;
+    /* 【移除】移除了淡入动画 */
 }
+
 
 /* --- 评论区占位符 --- */
 .comments-view {
@@ -272,7 +282,6 @@ import app from "@system.app";
 
 // --- 1. 引入新的服务模块 ---
 import apiService from '../../services/api.js';
-import downloadService from '../../services/download.js';
 
 // --- 2. 常量和文件服务封装 (保持不变) ---
 const CONSTANTS = {
@@ -359,22 +368,17 @@ export default {
 
         return this.lyrics.map((line, index) => {
             const isCurrent = index === this.playerState.currentLyricIndex;
-            const distance = Math.abs(index - this.playerState.currentLyricIndex);
-
-            const opacity = Math.max(0.45, 1 - distance * 0.12).toFixed(2);
-            const scale = Math.max(0.9, 1 - distance * 0.04);
             
-            // 更新基础字体大小，以匹配 CSS
-            const baseFontSize = isCurrent 
-                ? (this.screenShape === 'rect' ? 26 : 22) 
-                : (this.screenShape === 'rect' ? 26 : 22);
-            const fontSize = Math.round(baseFontSize * scale);
+            // 【【【性能优化点】】】
+            // 为每个列表项生成一个稳定且唯一的 ID
+            // 使用时间戳和索引结合，确保即使时间戳重复（在某些不规范的lrc文件中），ID依然唯一
+            const uniqueId = `lyric-${line.time}-${index}`;
 
             return {
+                id: uniqueId, // <--- 新增的唯一ID，用于 tid
                 original: line.original || line.text || '',
                 extra: isCurrent ? this.getExtraLyricText(line) : null,
                 isCurrent: isCurrent,
-                dynamicStyle: `opacity: ${opacity}; font-size: ${fontSize}px;`
             };
         });
     },
@@ -528,7 +532,7 @@ async onRefresh(query) {
         this.swiperCurrentIndex = e.index;
         
         // 当用户滑动到歌词页时，主动触发一次滚动，确保位置正确
-        if (this.swiperCurrentIndex === 1) {
+        if (this.swiperCurrentIndex === 1.5) {
             this.scrollToCurrentLyric(); 
         }
     },
@@ -589,7 +593,7 @@ async onRefresh(query) {
 
         prompt.showToast({ message: `开始准备下载: ${this.currSong.name}` });
 
-        downloadService.start(
+        this.$app.$def.downloadService.start(
             this.currSong,
             { cookie: this.cookie, downloadBitrate: this.settings.audioQuality.download },
             {
@@ -898,48 +902,77 @@ async onRefresh(query) {
             index: 1
         });
     },
+/**
+ * 【【【最终优化版 + 提前切换】】】
+ * updateLyric 逻辑，增加了时间范围检查，并实现了提前切换歌词以优化体验。
+ */
+ updateLyric() {
+    // 1. 早期退出：如果歌词数据还没准备好，直接返回，避免无效计算。
+    if (!this.lyrics || this.lyrics.length === 0) {
+        return;
+    }
 
-    // scrollToCurrentLyric 方法保持不变，它已经是正确的
-    scrollToCurrentLyric() {
-        const scrollElement = this.$element('lyricsScrollView');
-        const lineElement = this.$element(`lyric-line-${this.playerState.currentLyricIndex}`);
+    // --- 核心修改点：使用“幽灵时间”进行计算 ---
+    const PRE_SWITCH_OFFSET = 1.5; // 定义一个常量，方便调整提前的秒数（例如提前0.5秒高亮）
+    const currentTime = this.playerState.playDuration;
+    const lookaheadTime = currentTime + PRE_SWITCH_OFFSET; // 我们用这个“幽灵时间”来判断该高亮哪一行
 
-        if (!scrollElement || !lineElement) return;
+    const currentIndex = this.playerState.currentLyricIndex;
+    const currentLine = this.lyrics[currentIndex];
 
-        scrollElement.getBoundingClientRect({
-            success: (scrollRect) => {
-                lineElement.getBoundingClientRect({
-                    success: (lineRect) => {
-                        const targetTopInContainer = scrollRect.height * 0.4;
-                        const lineTopInContainer = lineRect.top - scrollRect.top;
-                        const scrollOffset = lineTopInContainer - targetTopInContainer;
-                        scrollElement.scrollBy({ top: scrollOffset, behavior: 'smooth' });
-                    }
-                });
-            }
-        });
-    },
+    // 2. 时间范围快速检查 (性能优化的关键)
+    //    我们假设下一行歌词存在，并检查“幽灵时间”是否还在当前行的时间范围内。
+    const nextLine = this.lyrics[currentIndex + 1];
+    
+    // 如果下一行存在，并且“幽灵时间”处于 [当前行开始时间, 下一行开始时间) 这个区间内...
+    if (nextLine && lookaheadTime >= currentLine.time && lookaheadTime < nextLine.time) {
+        // ...说明歌词行不需要改变，直接退出。这是最高频的路径，几乎零计算量。
+        return; 
+    }
 
-        /**
-         * updateLyric 逻辑简化，不再需要判断 expend
-         */
-         updateLyric() {
-        if (!this.lyrics || this.lyrics.length === 0) return;
-        const currentTime = this.playerState.playDuration;
-        
-        let newIndex = this.lyrics.findIndex(line => line.time > currentTime + 0.2);
-        if (newIndex === -1) newIndex = this.lyrics.length - 1;
-        else newIndex = Math.max(0, newIndex - 1);
-        
-        if (newIndex !== this.playerState.currentLyricIndex) {
-            this.playerState.currentLyricIndex = newIndex;
-            
-            // 只有当 swiper 在歌词页 (索引1) 时，才执行滚动
-            if (this.swiperCurrentIndex === 1) {
-                this.scrollToCurrentLyric();
-            }
-        }
-    },
+    // 3. 执行完整的查找逻辑 (低频路径)
+    //    只有在“幽灵时间”超出了上述范围，或者已经是最后一行时，才需要重新遍历数组来查找。
+    //    我们查找第一个时间点大于“幽灵时间”的行。
+    let newIndex = this.lyrics.findIndex(line => line.time > lookaheadTime);
+    
+    // 如果没找到（意味着是最后一行），则 newIndex 为 -1。
+    if (newIndex === -1) {
+        // 将索引设置为最后一行。
+        newIndex = this.lyrics.length > 0 ? this.lyrics.length - 1 : 0;
+    } else {
+        // 如果找到了，我们需要的是它前一行（也就是当前应该高亮的行）。
+        newIndex = Math.max(0, newIndex - 1);
+    }
+    
+    // 4. 最终检查与更新UI
+    //    只有在计算出的新索引与当前索引不同时，才更新状态并滚动视图。
+    if (newIndex !== currentIndex) {
+        this.playerState.currentLyricIndex = newIndex;
+        this.scrollToCurrentLyric(); // 触发滚动到高亮行
+    }
+},
+
+
+        // scrollToCurrentLyric 方法保持不变
+        scrollToCurrentLyric() {
+            const scrollElement = this.$element('lyricsScrollView');
+            if (!scrollElement) return;
+            const lineElement = this.$element(`lyric-line-${this.playerState.currentLyricIndex}`);
+            if (!lineElement) return;
+
+            scrollElement.getBoundingClientRect({
+                success: (scrollRect) => {
+                    lineElement.getBoundingClientRect({
+                        success: (lineRect) => {
+                            const targetTopInContainer = scrollRect.height * 0.4;
+                            const lineTopInContainer = lineRect.top - scrollRect.top;
+                            const scrollOffset = lineTopInContainer - targetTopInContainer;
+                            scrollElement.scrollBy({ top: scrollOffset, behavior: 'instant' });
+                        }
+                    });
+                }
+            });
+        },
     // --- 播放器事件绑定 (已补全系统全局控制事件) ---
     bindAudioEvents() {
         // 同步播放/暂停状态

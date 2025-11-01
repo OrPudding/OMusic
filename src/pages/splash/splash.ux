@@ -474,7 +474,7 @@ retryActivation() {
                                 }
                             }, 100);
                         },
-                        fail: (data, code) => {
+                        fail: () => {
                             prompt.showToast({ message: '关键文件写入失败，请检查存储权限。' });
                             this.showFailedState();
                             this.isLoading = false;
@@ -487,7 +487,7 @@ retryActivation() {
                     this.isLoading = false;
                 }
             },
-            fail: (data, code) => {
+            fail: () => {
                 prompt.showToast({ message: '网络连接失败，请检查网络后重试。' });
                 this.showFailedState();
                 this.isLoading = false;

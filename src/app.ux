@@ -24,6 +24,8 @@ export default {
         // 1. 全局 interconnect 实例 (保持不变)
     connectInstance: interconnect.instance(),
 
+    downloadService: downloadService,
+
 
     // --- 服务器和密钥配置 ---
     // !! 替换为你的 服务器 URL

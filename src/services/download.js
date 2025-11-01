@@ -1,4 +1,4 @@
-// src/common/services/download.js
+// src/services/download.js
 
 import request from '@system.request';
 import file from '@system.file';
