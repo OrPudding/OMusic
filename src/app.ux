@@ -5,6 +5,8 @@ import interconnect from "@system.interconnect";
 import crypto from '@system.crypto'; // 验证需要
 import device from '@system.device';   // 验证需要
 
+import downloadService from './services/download.js';
+
 // --- 常量定义 ---
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 const FILE_PLAY_LIST = 'internal://files/play_list.json';
@@ -75,6 +77,11 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
             // 如果验证失败，入口页面 splash.ux 会负责显示引导界面
             // 此处无需做额外操作
         }
+        downloadService.initialize().then(() => {
+            console.log('下载目录初始化成功!');
+        }).catch((error) => {
+            console.error('下载目录初始化失败:', error);
+        });
     },
 
     onDestroy() {

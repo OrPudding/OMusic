@@ -1,165 +1,243 @@
 <template>
-    <scroll class="page-container" scroll-y="true" bounces="true">
+    <!-- FIX: 根组件使用 div，并将滚动限制在内容区，以固定顶栏 -->
+    <div class="page-container">
+        <!-- 1. 固定的顶部栏 -->
         <div class="header" onclick="goBack">
             <text class="time-display">{{ currentTime }}</text>
             <text class="title">‹设置</text>
         </div>
-        <div class="settings-list">
-            <!-- ... 其他设置类别保持不变 ... -->
-            <text class="category-title">歌词显示</text>
-            <div class="setting-item">
-                <text class="item-label">日语歌词</text>
-                <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
-            </div>
-            <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。</text>
 
-            <div class="setting-item">
-                <text class="item-label">粤语歌词</text>
-                <text class="item-value-btn" onclick="toggleCantoneseLyricMode">{{ cantoneseLyricModeText }}</text>
-            </div>
-            <text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
-            
-            <div class="setting-item">
-                <text class="item-label">英文歌词</text>
-                <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
-            </div>
-            <text class="item-desc">适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。</text>
+        <!-- 2. 独立滚动的内容区 -->
+        <scroll class="scroll-wrapper" scroll-y="true" bounces="true">
+            <div class="settings-list">
+                <!-- 歌词显示 -->
+                <text class="category-title">歌词显示</text>
+                <div class="setting-item">
+                    <text class="item-label">日语歌词</text>
+                    <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
+                </div>
+                <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。</text>
 
-            <text class="category-title">音质设置</text>
-            <div class="setting-item">
-                <text class="item-label">在线播放音质</text>
-                <text class="item-value-btn" onclick="toggleOnlineQuality">{{ settings.audioQuality.online }}kbps</text>
-            </div>
-            <text class="item-desc">在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。</text>
-    
-            <div class="setting-item">
-                <text class="item-label">下载音质</text>
-                <text class="item-value-btn" onclick="toggleDownloadQuality">{{ settings.audioQuality.download }}kbps</text>
-            </div>
-            <text class="item-desc">下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。</text>
-    
-  
-            <text class="category-title">列表性能</text>
-            <div class="setting-item">
-                <text class="item-label">列表渲染数量</text>
-                <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
-            </div>
-            <text class="item-desc">影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。</text>
-            
-            <div class="setting-item">
-                <text class="item-label">列表加载步长</text>
-                <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
-            </div>
-            <text class="item-desc">每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。</text>
-            
-            <text class="category-title">网络与加载</text>
-            <div class="setting-item">
-                <text class="item-label">歌单加载总数</text>
-                <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
-            </div>
-            <text class="item-desc">在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。</text>
-            
-            <div class="setting-item">
-                <text class="item-label">网络请求分页</text>
-                <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
-            </div>
-            <text class="item-desc">每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。</text>
-  
-            <text class="category-title">搜索设置</text>
-            <div class="setting-item">
-                <text class="item-label">最大搜索结果</text>
-                <text class="item-value-btn" onclick="toggleSearchTotalLimit">{{ settings.search.totalLimit }}</text>
-            </div>
-            <text class="item-desc">单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。</text>
-            
-            <div class="setting-item">
-                <text class="item-label">搜索请求分页</text>
-                <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
-            </div>
-            <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
-            <text class="category-title">应用数据</text>
+                <div class="setting-item">
+                    <text class="item-label">粤语歌词</text>
+                    <text class="item-value-btn" onclick="toggleCantoneseLyricMode">{{ cantoneseLyricModeText }}</text>
+                </div>
+                <text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
+                
+                <div class="setting-item">
+                    <text class="item-label">英文歌词</text>
+                    <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
+                </div>
+                <text class="item-desc">适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。</text>
 
-                                    <!-- 清空缓存数据 -->
-                                    <div class="setting-item">
-                                        <text class="item-label">清空缓存数据</text>
-                                        <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
-                                        <text class="action-btn cache-color" onclick="handleClearCache">清空缓存</text>
-                                    </div>
-                                    <text class="item-desc">清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。应用在重新加载时需要重新联网下载资源。</text>
+                <!-- 音质设置 -->
+                <text class="category-title">音质设置</text>
+                <div class="setting-item">
+                    <text class="item-label">在线播放音质</text>
+                    <text class="item-value-btn" onclick="toggleOnlineQuality">{{ settings.audioQuality.online }}kbps</text>
+                </div>
+                <text class="item-desc">在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。</text>
+        
+                <div class="setting-item">
+                    <text class="item-label">下载音质</text>
+                    <text class="item-value-btn" onclick="toggleDownloadQuality">{{ settings.audioQuality.download }}kbps</text>
+                </div>
+                <text class="item-desc">下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。</text>
+      
+                <!-- 列表性能 -->
+                <text class="category-title">列表性能</text>
+                <div class="setting-item">
+                    <text class="item-label">列表渲染数量</text>
+                    <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
+                </div>
+                <text class="item-desc">影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。</text>
+                
+                <div class="setting-item">
+                    <text class="item-label">列表加载步长</text>
+                    <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
+                </div>
+                <text class="item-desc">每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。</text>
+                
+                <!-- 网络与加载 -->
+                <text class="category-title">网络与加载</text>
+                <div class="setting-item">
+                    <text class="item-label">歌单加载总数</text>
+                    <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
+                </div>
+                <text class="item-desc">在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。</text>
+                
+                <div class="setting-item">
+                    <text class="item-label">网络请求分页</text>
+                    <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
+                </div>
+                <text class="item-desc">每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。</text>
+      
+                <!-- 搜索设置 -->
+                <text class="category-title">搜索设置</text>
+                <div class="setting-item">
+                    <text class="item-label">最大搜索结果</text>
+                    <text class="item-value-btn" onclick="toggleSearchTotalLimit">{{ settings.search.totalLimit }}</text>
+                </div>
+                <text class="item-desc">单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。</text>
+                
+                <div class="setting-item">
+                    <text class="item-label">搜索请求分页</text>
+                    <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
+                </div>
+                <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
 
-            <!-- 退出登录 -->
-            <div class="setting-item">
-                <text class="item-label">退出当前登录</text>
-                <!-- 使用新的 action-btn 样式，并添加 logout-color 类 -->
-                <text class="action-btn logout-color" onclick="handleLogout">退出登录</text>
+                <!-- 应用数据 -->
+                <text class="category-title">应用数据</text>
+                <div class="setting-item">
+                    <text class="item-label">清空缓存数据</text>
+                    <text class="action-btn cache-color" onclick="handleClearCache">清空缓存</text>
+                </div>
+                <text class="item-desc">清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。</text>
+
+                <div class="setting-item">
+                    <text class="item-label">退出当前登录</text>
+                    <text class="action-btn logout-color" onclick="handleLogout">退出登录</text>
+                </div>
+                <text class="item-desc">仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。</text>
+
+                <div class="setting-item">
+                    <text class="item-label">清除设备授权</text>
+                    <text class="action-btn deauth-color" onclick="handleClearActivation">清除授权</text>
+                </div>
+                <text class="item-desc">清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。</text>
+
+                <div class="setting-item">
+                    <text class="item-label">清空全部数据</text>
+                    <text class="action-btn reset-color" onclick="handleClearAllData">彻底重置</text>
+                </div>
+                <text class="item-desc">将应用恢复到初始安装状态，清除所有本地数据。</text>
             </div>
-            <text class="item-desc">仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。</text>
-
-            <!-- 清除授权 -->
-            <div class="setting-item">
-                <text class="item-label">清除设备授权</text>
-                <!-- 使用新的 action-btn 样式，并添加 deauth-color 类 -->
-                <text class="action-btn deauth-color" onclick="handleClearActivation">清除授权</text>
-            </div>
-            <text class="item-desc">清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。</text>
-
-
-            <!-- 清空全部数据 -->
-            <div class="setting-item">
-                <text class="item-label">清空全部数据</text>
-                <!-- 使用新的 action-btn 样式，并添加 reset-color 类 -->
-                <text class="action-btn reset-color" onclick="handleClearAllData">彻底重置</text>
-            </div>
-            <text class="item-desc">将应用恢复到初始安装状态，清除包括缓存、登录、授权、设置、已下载的音乐和歌词在内的所有本地数据。</text>
-        </div>
-    </scroll>
+        </scroll>
+    </div>
 </template>
-  
 <style>
-    /* ... 原有的 .page-container, .header, .title, .settings-list, .category-title, .setting-item, .item-label, .item-value-btn, .item-desc 样式保持不变 ... */
-    .page-container { width: 100%; height: 100%; flex-direction: column; align-items: center; background-color: black; }
-    .header { width: 100%; flex-direction: column; justify-content: center; align-items: center; }
-    .time-display { font-size: 28px; color: #ffffff; font-weight: bold; padding-top: 5px; text-align: center; }
-    .title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
-    .settings-list { width: 360px; flex-direction: column; align-items: center; padding: 0 0 40px 0; }
-    .category-title { width: 96%; font-size: 26px; font-weight: bold; color: #888; padding: 20px 0 5px 15px; margin-bottom: 10px; }
-    .setting-item { width: 100%; height: 80px; padding: 0 20px; margin: 10px 0; background-color: rgba(255, 255, 255, 0.06); border-radius: 40px; justify-content: space-between; align-items: center; }
-    .item-label { font-weight: bold; font-size: 26px; color: #fff; }
-    .item-value-btn { min-width: 100px; height: 50px; padding: 0 20px; background-color: rgba(58, 225, 255, 0.2); border-radius: 25px; color: #3ae1ff; font-size: 24px; font-weight: bold; text-align: center; }
-    .item-desc { width: 85%; font-size: 20px; color: #666; margin-top: -5px; margin-bottom: 20px; }
+    /* --- 页面整体布局 (最终修正版) --- */
+    .page-container {
+        width: 100%;
+        height: 100%;
+        background-color: black;
+        /* 关键：为子元素的绝对定位提供参考系 */
+        position: relative; 
+    }
 
-    /* ======================================================== */
-    /*  新增：危险操作按钮的统一和专属颜色样式                  */
-    /* ======================================================== */
-    .action-btn {
-        min-width: 120px; /* 统一最小宽度 */
+    /* 关键：使用 fixed 定位将顶栏固定在屏幕顶部 */
+    .header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 90px;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: black; /* 确保顶栏有背景色，不会被下方内容透出 */
+        z-index: 10; /* 确保顶栏在最上层 */
+    }
+    .time-display {
+        font-size: 28px;
+        font-weight: bold;
+        color: #ffffff;
+        padding-top: 5px;
+        text-align: center;
+    }
+    .title {
+        font-size: 32px;
+        padding: 5px;
+        text-align: center;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    /* 关键：滚动区域从顶栏下方开始，并占据剩余全部高度 */
+    .scroll-wrapper {
+        position: absolute;
+        top: 90px; /* 从顶栏高度(90px)的位置开始 */
+        bottom: 0; /* 一直延伸到底部 */
+        left: 0;
+        right: 0;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* --- 设置列表样式 (保持不变) --- */
+    .settings-list {
+        width: 360px;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 0 40px 0;
+    }
+    .category-title {
+        width: 96%;
+        font-size: 26px;
+        font-weight: bold;
+        color: #888;
+        padding: 20px 0 5px 15px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+    .setting-item {
+        width: 100%;
+        height: 80px;
+        padding: 0 20px;
+        margin: 5px 0;
+        background-color: rgba(255, 255, 255, 0.06);
+        border-radius: 40px;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .item-label {
+        font-weight: bold;
+        font-size: 26px;
+        color: #fff;
+    }
+    .item-value-btn {
+        min-width: 100px;
         height: 50px;
         padding: 0 20px;
+        background-color: rgba(58, 225, 255, 0.2);
         border-radius: 25px;
+        color: #3ae1ff;
         font-size: 24px;
         font-weight: bold;
         text-align: center;
     }
-    .cache-color {
-        background-color: rgba(255, 204, 0, 0.2); /* 黄色背景 */
-        color: #FFCC00; /* 亮黄色文字 */
-    }
-    .logout-color {
-        background-color: rgba(255, 59, 48, 0.2); /* 红色背景 */
-        color: #FF453A; /* 亮红色文字 */
-    }
-    .deauth-color {
-        background-color: rgba(255, 149, 0, 0.2); /* 橙色背景 */
-        color: #FF9500; /* 亮橙色文字 */
-    }
-    .reset-color {
-        background-color: rgba(199, 0, 57, 0.2); /* 深红色背景 */
-        color: #c70039; /* 深红色文字 */
+    .item-desc {
+        width: 85%;
+        font-size: 20px;
+        color: #666;
+        margin-top: 5px;
+        margin-bottom: 15px;
     }
 
+    /* --- 危险操作按钮样式 (保持不变) --- */
+    .action-btn { min-width: 120px; height: 50px; padding: 0 20px; border-radius: 25px; font-size: 24px; font-weight: bold; text-align: center; }
+    .cache-color { background-color: rgba(255, 204, 0, 0.2); color: #FFCC00; }
+    .logout-color { background-color: rgba(255, 59, 48, 0.2); color: #FF453A; }
+    .deauth-color { background-color: rgba(255, 149, 0, 0.2); color: #FF9500; }
+    .reset-color { background-color: rgba(199, 0, 57, 0.2); color: #c70039; }
+
+    /* --- 媒体查询 (需要同步调整) --- */
     @media screen and (shape: rect) {
-        .header { padding-top: 10px; flex-direction: row-reverse; justify-content:space-around; }
-        .time-display { font-size: 32px; }
+        .header {
+            height: 65px; /* 顶栏高度变化 */
+            padding-top: 10px;
+            flex-direction: row-reverse;
+            justify-content: space-around;
+        }
+        /* 关键：滚动区域的起始位置也要相应调整 */
+        .scroll-wrapper {
+            top: 65px; /* 与变化后的顶栏高度保持一致 */
+        }
+        .time-display {
+            font-size: 32px;
+            padding-top: 0px;
+        }
     }
 </style>
 <script>

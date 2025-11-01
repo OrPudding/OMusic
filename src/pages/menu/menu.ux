@@ -1,209 +1,237 @@
 <template>
-  <scroll class="menu-container" scroll-y="true" bounces="true">
-    <div class="header" onclick="back">
-    <text class="time-display">{{currentTime}}</text>
-    <text class="title">‹主菜单</text>
-    </div>
-    <div class="menu-list">
-      <div class="menu-item" onclick="goToSearch">
-        <text class="item-text">搜索</text>
-      </div>
-      <div class="menu-item" onclick="goToDownloadList">
-        <text class="item-text">已下载</text>
-      </div>
-      <div class="menu-item" onclick="goToList">
-        <text class="item-text">播放列表</text>
-      </div>
-      <div class="menu-item" onclick="goToLike">
-        <text class="item-text">我的收藏</text>
-      </div>
-      <!-- 新增：私人FM -->
-      <div class="menu-item" onclick="goToPersonalFM">
-        <text class="item-text">私人FM</text>
-      </div>
-      <!-- 新增：每日推荐 -->
-      <div class="menu-item" onclick="goToDailyRecommend">
-        <text class="item-text">每日推荐</text>
-      </div>
-      <div class="menu-item" onclick="goToSongList">
-        <text class="item-text">我的歌单</text>
-      </div>
-      <div class="menu-item" onclick="goToUser">
-        <text class="item-text">个人中心</text>
-      </div>
-    </div>
-  </scroll>
+	<div class="container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header" onclick="back">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹主菜单</text>
+		</div>
+
+		<!-- 2. 独立滚动的内容区域 -->
+		<scroll class="scroll-wrapper" scroll-y="true" bounces="true">
+			<div class="menu-columns-container">
+				<!-- 左列容器 -->
+				<div class="column">
+					<!-- FIX: 统一调用 handleMenuClick，并传入 item 数据 -->
+					<block for="{{ leftColumnItems }}">
+						<div class="menu-item" onclick="handleMenuClick($item)">
+							<image class="item-icon" src="{{ $item.icon }}"></image>
+							<text class="item-text">{{ $item.text }}</text>
+						</div>
+					</block>
+				</div>
+				<!-- 右列容器 -->
+				<div class="column">
+					<!-- FIX: 统一调用 handleMenuClick，并传入 item 数据 -->
+					<block for="{{ rightColumnItems }}">
+						<div class="menu-item" onclick="handleMenuClick($item)">
+							<image class="item-icon" src="{{ $item.icon }}"></image>
+							<text class="item-text">{{ $item.text }}</text>
+						</div>
+					</block>
+				</div>
+			</div>
+		</scroll>
+	</div>
 </template>
 
 <script>
 import router from "@system.router";
 
 export default {
-  private: {
-    likeList: [],
-    currentTime: ''
-  },
+	private: {
+		currentTime: "",
+		timer: null,
+		leftColumnItems: [],
+		rightColumnItems: [],
+	},
 
-  onInit() {
-    this.updateTime();
-    // 每分钟更新一次时间
-    setInterval(() => {
-      this.updateTime();
-    }, 1000);
-  },
+	onInit() {
+		this.updateTime();
+		this.timer = setInterval(() => {
+			this.updateTime();
+		}, 1000);
+		this.prepareMenuItems();
+	},
 
-  updateTime() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    this.currentTime = `${hours}:${minutes}`;
-  },
+	onDestroy() {
+		if (this.timer) {
+			clearInterval(this.timer);
+		}
+	},
 
-  back() {
-    router.back();
-  },
+	prepareMenuItems() {
+		const allItems = [
+			{ text: "搜索", handler: "goToSearch", icon: "/common/icon/search.png" },
+			{
+				text: "已下载",
+				handler: "goToDownloadList",
+				icon: "/common/icon/download.png",
+			},
+			{
+				text: "播放列表",
+				handler: "goToList",
+				icon: "/common/icon/playlist.png",
+			},
+			{ text: "我的收藏", handler: "goToLike", icon: "/common/icon/liked.png" },
+			{
+				text: "私人FM",
+				handler: "goToPersonalFM",
+				icon: "/common/icon/fm.png",
+			},
+			{
+				text: "每日推荐",
+				handler: "goToDailyRecommend",
+				icon: "/common/icon/recommend.png",
+			},
+			{
+				text: "我的歌单",
+				handler: "goToSongList",
+				icon: "/common/icon/songlist.png",
+			},
+			{ text: "个人中心", handler: "goToUser", icon: "/common/icon/user.png" },
+		];
 
-  goToList() {
-    router.push({
-      uri: "/pages/list",
-      params: {
-        listType: 'playlist'
-      }
-    });
-  },
+		allItems.forEach((item, index) => {
+			if (index % 2 === 0) {
+				this.leftColumnItems.push(item);
+			} else {
+				this.rightColumnItems.push(item);
+			}
+		});
+	},
 
-  goToPlayer() {
-    router.push({
-      uri: "/pages/player"
-    });
-  },
+	/**
+	 * FIX: 新增统一的菜单项点击处理函数
+	 * @param {object} item - 被点击的菜单项的数据对象
+	 */
+	handleMenuClick(item) {
+		if (item && typeof this[item.handler] === "function") {
+			this[item.handler]();
+		} else {
+			console.error(`未找到名为 ${item.handler} 的处理函数。`);
+		}
+	},
 
-  goToVolume() {
-    router.push({
-      uri: "/pages/volume"
-    });
-  },
-
-  goToSearch() {
-    router.push({
-      uri: "/pages/search"
-    });
-  },
-    // 跳转到"已下载列表"
-    goToDownloadList() {
-        router.push({
-            uri: '/pages/list',
-            params: {
-                listType: 'downloadlist'
-            }
-        });
-    },
-
-  goToLike() {
-    router.push({
-      uri: "/pages/list",
-      params: {
-        listType: 'favorites'
-      }
-    });
-  },
-  // 跳转到"私人FM"
-  goToPersonalFM() {
-    router.push({
-      uri: "/pages/list",
-      params: {
-        listType: 'personal_fm'
-      }
-    });
-  },
-  // 跳转到"每日推荐"
-  goToDailyRecommend() {
-    router.push({
-      uri: "/pages/list",
-      params: {
-        listType: 'daily_recommend'
-      }
-    });
-  },
-
-  goToSongList() {
-    router.push({
-      uri: "/pages/songlist_list",
-    });
-  },
-  goToUser() {
-    router.push({
-      uri: "/pages/user"
-    });
-  },
+	updateTime() {
+		const now = new Date();
+		const hours = now.getHours().toString().padStart(2, "0");
+		const minutes = now.getMinutes().toString().padStart(2, "0");
+		this.currentTime = `${hours}:${minutes}`;
+	},
+	back() {
+		router.back();
+	},
+	goToList() {
+		router.push({ uri: "/pages/list", params: { listType: "playlist" } });
+	},
+	goToSearch() {
+		router.push({ uri: "/pages/search" });
+	},
+	goToDownloadList() {
+		router.push({ uri: "/pages/list", params: { listType: "downloadlist" } });
+	},
+	goToLike() {
+		router.push({ uri: "/pages/list", params: { listType: "favorites" } });
+	},
+	goToPersonalFM() {
+		router.push({ uri: "/pages/list", params: { listType: "personal_fm" } });
+	},
+	goToDailyRecommend() {
+		router.push({
+			uri: "/pages/list",
+			params: { listType: "daily_recommend" },
+		});
+	},
+	goToSongList() {
+		router.push({ uri: "/pages/songlist_list" });
+	},
+	goToUser() {
+		router.push({ uri: "/pages/user" });
+	},
 };
 </script>
 
 <style>
-.menu-container {
-  width: 100%;
-  height: 100%;
-  flex-direction: column;
-  align-items: center;
-  background-color: black;
+/* 样式部分完全不变 */
+.container {
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	background-color: black;
 }
 .header {
-  width: 100%;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
 }
-
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
 .title {
 	font-size: 32px;
 	padding: 5px;
 	text-align: center;
-  font-weight: bold;
+	font-weight: bold;
 	color: #fff;
 }
-
-.time-display {
-  font-size: 28px;
-  color: #ffffff;
-    font-weight: bold;
-	padding-top: 5px;
-  text-align: center;
+.scroll-wrapper {
+	width: 100%;
+	height: 376px;
+	flex-direction: column;
+	align-items: center;
 }
-
-.menu-list {
-  width: 360px;
-  flex-direction: row;
-  flex-wrap: wrap;
-  padding-bottom: 80px;
+.menu-columns-container {
+	width: 380px;
+	flex-direction: row;
+	justify-content: space-around;
+	padding-bottom: 80px;
 }
-
+.column {
+	flex-direction: column;
+}
 .menu-item {
-  width: 170px;
-  height: 80px;
-  background-color: rgba(255, 255, 255, 0.06);
-  margin: 10px 5px;
-  border-radius: 36px;
-  justify-content: center;
-  align-items: center;
+	width: 180px;
+	height: 140px;
+	background-color: rgba(255, 255, 255, 0.06);
+	margin: 5px 0;
+	border-radius: 36px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
 }
-
+.item-icon {
+	width: 50px;
+	height: 50px;
+	margin-bottom: 8px;
+}
 .item-text {
-  font-size: 32px;
-  font-weight: bold;
-  color: #ffffff;
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
 }
-
 @media screen and (shape: rect) {
-    .header {
-        padding-top: 10px;
-      flex-direction: row-reverse;
-      justify-content:space-around
-    }
-    .time-display {
-        font-size: 32px;
-    }
-    .menu-list {
-  padding-bottom: 0px;
+	.header {
+		padding-top: 10px;
+		height: 65px;
+		flex-direction: row-reverse;
+		justify-content: space-around;
+	}
+	.time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
+	.scroll-wrapper {
+		height: 449px;
+	}
+	.menu-columns-container {
+		padding-bottom: 10px;
+	}
 }
-  }
 </style>

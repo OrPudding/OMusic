@@ -277,7 +277,7 @@
                 },
                 fail: (data, code) => {
                     // 写入失败
-                    prompt.showToast({ message: '状态保存失败，请重试' });
+                    prompt.showToast({ message: '状态保存失败，请清理存储空间，系统会预留一部分无法使用' });
                     console.error(`写入 EULA 状态失败 (code: ${code})`);
                 }
             });

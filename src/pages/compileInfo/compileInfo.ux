@@ -1,0 +1,187 @@
+<template>
+  <div class="container">
+    <!-- 1. 固定的顶部栏 -->
+    <div class="header" onclick="goBack">
+      <text class="time-display">{{ currentTime }}</text>
+      <text class="title">‹编译信息</text>
+    </div>
+
+    <!-- 2. 独立滚动的编译信息列表 -->
+    <list class="info-list" bounces="true">
+      <!-- 循环渲染列表项 -->
+      <list-item for="{{ infoItems }}" type="infoItem" class="info-item">
+        <text class="item-label">{{ $item.label }}</text>
+        <text class="item-value">{{ $item.value }}</text>
+      </list-item>
+    </list>
+  </div>
+</template>
+
+<style>
+  .container {
+    width: 100%;
+    /* FIX: 恢复 height: 100% 为 flex-grow 提供计算基础 */
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    background-color: black;
+  }
+
+  /* 固定的顶部栏样式 (遵循范本) */
+  .header {
+    width: 100%;
+    height: 90px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .time-display {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+    padding-top: 5px;
+    text-align: center;
+  }
+  .title {
+    font-size: 32px;
+    padding: 5px;
+    text-align: center;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  /* --- list 样式 (遵循 <list> 组件法则) --- */
+  .info-list {
+    /* FIX: 恢复使用 flex-grow: 1 */
+    flex-grow: 1;
+    width: 360px;
+    padding-bottom: 80px; 
+  }
+
+  /* --- list-item 样式 (保持不变) --- */
+  .info-item {
+    width: 100%;
+    height: 80px;
+    background-color: rgba(255, 255, 255, 0.06);
+    margin: 5px 0;
+    border-radius: 36px;
+    align-items: center;
+    padding: 0 30px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .item-label {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+  }
+  .item-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* 媒体查询 (应用最终确定的规范) */
+  @media screen and (shape: rect) {
+    .header {
+      /* FIX: 应用最终确定的值 */
+      padding-top: 10px;
+      height: 65px;
+      flex-direction: row-reverse;
+      justify-content: space-around;
+    }
+    .time-display {
+      font-size: 32px;
+      padding-top: 0px; /* 保持关键修正 */
+    }
+    .info-list {
+      padding-bottom: 10px;
+    }
+    /* FIX: list 组件不需要手动限制高度，移除这里的 height 覆盖 */
+  }
+</style>
+
+<script>
+  import router from '@system.router';
+  import file from '@system.file';
+
+  export default {
+    private: {
+      currentTime: '00:00',
+      infoItems: [
+        { label: '构建工具版本', value: '加载中...' },
+        { label: '编译时间', value: '加载中...' },
+        { label: 'Node.js 版本', value: '加载中...' },
+        { label: '编译平台', value: '加载中...' },
+        { label: '系统架构', value: '加载中...' }
+      ]
+    },
+
+    onInit() {
+      this.updateTime();
+      this.timer = setInterval(this.updateTime, 1000);
+      this.loadBuildInfo();
+    },
+
+    onDestroy() {
+      if (this.timer) {
+        clearInterval(this.timer);
+      }
+    },
+    
+    loadBuildInfo() {
+      file.readText({
+        uri: '/META-INF/build.txt',
+        success: (data) => {
+          const info = {};
+          data.text.trim().split('\n').forEach(line => {
+            const parts = line.split('=');
+            if (parts.length === 2) {
+              info[parts[0].trim()] = parts[1].trim();
+            }
+          });
+          
+          this.infoItems = [
+            { label: '构建工具版本', value: info.toolkit || '未知' },
+            { label: '编译时间', value: this.formatBuildTime(info.timeStamp) },
+            { label: 'Node.js 版本', value: info.node || '未知' },
+            { label: '编译平台', value: info.platform || '未知' },
+            { label: '系统架构', value: info.arch || '未知' }
+          ];
+        },
+        fail: (data, code) => {
+          console.log(`读取文件失败, code = ${code}, message = ${data}`);
+          this.infoItems = this.infoItems.map(item => ({ ...item, value: '读取失败' }));
+        }
+      });
+    },
+
+    formatBuildTime(isoString) {
+      if (!isoString) return "未知";
+      try {
+        const date = new Date(isoString);
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, "0");
+        const day = date.getDate().toString().padStart(2, "0");
+        const hours = date.getHours().toString().padStart(2, "0");
+        const minutes = date.getMinutes().toString().padStart(2, "0");
+        const seconds = date.getSeconds().toString().padStart(2, "0");
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      } catch (e) {
+        return "格式错误";
+      }
+    },
+
+    updateTime() {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      this.currentTime = `${hours}:${minutes}`;
+    },
+
+    goBack() {
+      router.back();
+    }
+  };
+</script>

@@ -1,199 +1,170 @@
 <template>
-  <scroll class="menu-container" scroll-y="true" bounces="true">
-      <!-- 1. 顶部时间和标题，保持一致 -->
-        <div class="header" onclick="goBack">
-      <text class="time-display">{{ currentTime }}</text>
-      <text class="title">‹关于软件</text>
-        </div>
-
-      <!-- 2. 软件信息块 (胶囊型) -->
-      <div class="info-capsule">
-          <image class="app-icon" src="/common/icon.png"></image>
-          <div class="app-details">
+    <div class="container">
+      <!-- 1. 固定的顶部栏 -->
+      <div class="header" onclick="goBack">
+        <text class="time-display">{{ currentTime }}</text>
+        <text class="title">‹关于软件</text>
+      </div>
+  
+      <!-- 2. 独立滚动的内容列表 -->
+      <list class="content-list" bounces="true">
+        <!-- 软件信息块 -->
+        <list-item type="infoCapsule" class="info-capsule-item">
+          <div class="info-capsule">
+            <image class="app-icon" src="/common/icon.png"></image>
+            <div class="app-details">
               <text class="app-name">OMusic</text>
-              <text class="app-version">v1.1</text>
+              <text class="app-version">v1.2</text>
+            </div>
           </div>
-      </div>
-
-      <!-- 3. 内容列表 -->
-      <div class="content-list">
-          <!-- 开发人员信息 -->
-          <div class="content-item">
-            <text class="item-label">参与开发</text>
-            <text class="item-value">OrPudding</text>
-          </div>
-          <!-- 协助开发 -->
-          <div class="content-item">
-            <text class="item-label">协助开发</text>
-            <text class="item-value">Manus AI</text>
-          </div>
-          
-          <div class="content-item">
-            <text class="item-label">协助测试</text>
-            <text class="item-value">xinghengCN</text>
-          </div>
-          <!-- 开源许可，可点击 -->
-          <div class="content-item" onclick="goToLicense">
-              <text class="item-label">开放源代码许可</text>
-              <text class="item-arrow">›</text>
-          </div>
-      </div>
-  </scroll>
-</template>
-<style>
-    /* --- 复用 menu.ux 的基础样式 --- */
-    .menu-container {
-        width: 100%;
-        height: 100%;
-        flex-direction: column;
-        align-items: center;
-        background-color: black;
+        </list-item>
+  
+        <!-- 列表项 -->
+        <list-item for="{{ listItems }}" type="contentItem" class="content-item" onclick="handleItemClick($item)">
+          <text class="item-label">{{ $item.label }}</text>
+          <text class="item-value" if="{{ $item.value }}">{{ $item.value }}</text>
+          <text class="item-arrow" else>›</text>
+        </list-item>
+      </list>
+    </div>
+  </template>
+  
+  <style>
+    /* 最终规范样式 */
+    .container {
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+      align-items: center;
+      background-color: black;
     }
-
+  
     .header {
-        width: 100%;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+      width: 100%;
+      height: 90px;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
     }
-
+    .time-display {
+      font-size: 28px;
+      font-weight: bold;
+      color: #ffffff;
+      padding-top: 5px;
+      text-align: center;
+    }
     .title {
-        font-size: 32px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        color: #fff;
+      font-size: 32px;
+      padding: 5px;
+      text-align: center;
+      font-weight: bold;
+      color: #fff;
     }
-
-    .time-display {
-        font-size: 28px;
-        font-weight: bold;
-        color: #ffffff;
-        padding-top: 5px;
-        text-align: center;
-    }
-
-    /* --- 软件信息胶囊样式 --- */
-    .info-capsule {
-        width: 360px;
-        padding: 20px 40px;
-        margin-top: 10px;
-        margin-bottom: 5px;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 45px; /* 更圆润的胶囊感 */
-        align-items: center;
-    }
-
-    .app-icon {
-        width: 64px;
-        height: 64px;
-    }
-
-    .app-details {
-        flex-grow: 1;
-        flex-direction: column;
-        justify-content: center;
-        margin-left: 40px;
-    }
-
-    .app-name {
-        font-size: 36px;
-        font-weight: bold;
-        color: #ffffff;
-    }
-
-    .app-version {
-        font-size: 24px;
-        color: rgba(255, 255, 255, 0.6);
-        font-weight: bold;
-        margin-top: 5px;
-    }
-
-    /* --- 内容列表样式 --- */
+  
+    /* --- list 样式 (遵循 <list> 组件法则) --- */
     .content-list {
-        width: 360px;
-        flex-direction: column;
-        align-items: center;
-padding-bottom: 80px;
+      flex-grow: 1;
+      width: 360px;
+      /* FIX: 移除多余的 margin-top */
+      padding-bottom: 80px; 
     }
-
-    .content-item {
-        width: 100%;
-        height: 80px;
-        background-color: rgba(255, 255, 255, 0.06);
-        margin: 5px 0;
-        border-radius: 36px;
-        align-items: center;
-        padding: 0 30px;
-        justify-content: space-between; /* 两端对齐 */
-        flex-wrap: wrap;
-    }
-
-    .item-label {
-        font-size: 28px;
-        font-weight: bold;
-        color: #ffffff;
-    }
-
-    .item-value {
-        font-size: 28px;
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.7);
-    }
-    
-    .item-arrow {
-      margin-bottom: 8px;
-        font-size: 36px;
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.5);
-    }
-
+  
+    /* --- 列表项样式 (保持不变) --- */
+    .info-capsule-item { width: 100%; height: 130px; margin: 5px 0; background-color: transparent; }
+    .info-capsule { width: 100%; height: 100%; padding: 0 40px; background-color: rgba(255, 255, 255, 0.06); border-radius: 45px; align-items: center; }
+    .app-icon { width: 64px; height: 64px; }
+    .app-details { flex-grow: 1; flex-direction: column; justify-content: center; margin-left: 40px; }
+    .app-name { font-size: 36px; font-weight: bold; color: #ffffff; }
+    .app-version { font-size: 24px; color: rgba(255, 255, 255, 0.6); font-weight: bold; margin-top: 5px; }
+    .content-item { width: 100%; height: 80px; background-color: rgba(255, 255, 255, 0.06); margin: 5px 0; border-radius: 36px; align-items: center; padding: 0 30px; justify-content: space-between; }
+    .item-label { font-size: 28px; font-weight: bold; color: #ffffff; }
+    .item-value { font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.7); }
+    .item-arrow { font-size: 36px; font-weight: bold; color: rgba(255, 255, 255, 0.5); margin-bottom: 8px; }
+  
+    /* 媒体查询 (应用最终确定的规范) */
     @media screen and (shape: rect) {
-    .header {
+      .header {
         padding-top: 10px;
-      flex-direction: row-reverse;
-      justify-content:space-around
-    }
-    .time-display {
+        height: 65px;
+        flex-direction: row-reverse;
+        justify-content: space-around;
+      }
+      .time-display {
         font-size: 32px;
+        padding-top: 0px;
+      }
+      .content-list {
+        /* FIX: 应用最终规范的 padding-bottom */
+        padding-bottom: 10px;
+      }
     }
-  }
-</style>
-<script>
-import router from '@system.router';
-
-export default {
-    private: {
+  </style>
+  
+  <script>
+    import router from '@system.router';
+  
+    export default {
+      private: {
         currentTime: '00:00',
-    },
-
-    onInit() {
+        timer: null,
+        listItems: [
+          { label: '参与开发', value: 'OrPudding' },
+          { label: '协助开发', value: 'Manus AI' },
+          { label: '协助测试', value: 'xinghengCN' },
+          // 将 handler 作为一个数据属性，而不是直接的函数名
+          { label: '编译信息', handler: 'goToCompileInfo' },
+          { label: '开放源代码许可', handler: 'goToLicense' }
+        ]
+      },
+  
+      onInit() {
         this.updateTime();
-        // 设置定时器每秒更新一次时间
-        setInterval(() => {
-            this.updateTime();
-        }, 1000);
-    },
-
-    updateTime() {
+        this.timer = setInterval(this.updateTime, 1000);
+      },
+  
+      onDestroy() {
+        if (this.timer) {
+          clearInterval(this.timer);
+        }
+      },
+  
+      /**
+       * 统一的列表项点击处理函数
+       * @param {object} item - 被点击的列表项的数据对象
+       */
+      handleItemClick(item) {
+        // 如果 item 没有 handler 属性，则不执行任何操作
+        if (!item.handler) {
+          return;
+        }
+  
+        // 根据 item.handler 的值来调用对应的函数
+        if (typeof this[item.handler] === 'function') {
+          this[item.handler]();
+        } else {
+          console.log(`未找到名为 ${item.handler} 的处理函数。`);
+        }
+      },
+  
+      updateTime() {
         const now = new Date();
         const hours = now.getHours().toString().padStart(2, '0');
         const minutes = now.getMinutes().toString().padStart(2, '0');
         this.currentTime = `${hours}:${minutes}`;
-    },
-
-    /**
-     * 跳转到开源许可页面 (预留)
-     */
-    goToLicense() {
+      },
+  
+      goToCompileInfo() {
+        router.push({ uri: '/pages/compileInfo' });
+      },
+  
+      goToLicense() {
         router.push({ uri: '/pages/license' });
-    },
-
-    /**
-     * 返回上一页
-     */
-    goBack() {
+      },
+  
+      goBack() {
         router.back();
-    }
-};
-</script>
+      }
+    };
+  </script>
+  

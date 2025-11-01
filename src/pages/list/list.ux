@@ -1,242 +1,241 @@
 <template>
-    <scroll id="songListScroll" class="list-container" scroll-y="true" bounces="true" 
-    onscrolltop="handleScrollTop" 
-    onscrollbottom="handleScrollBottom">
-        
-        <div class="header">
+    <div class="page-container">
+        <!-- 1. 固定的顶部栏 (保持不变) -->
+        <div class="header" onclick="goBack">
             <text class="time-display">{{currentTime}}</text>
-            <text class="title" onclick="goBack">‹{{ pageTitle }}</text>
+            <text class="title">‹{{ pageTitle }}</text>
         </div>
-                    <!-- "播放全部" 按钮 (已移除触摸事件) -->
-                    <div class="play-all-button" 
-                    if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" 
-                    onclick="playAll">
-                   <image class="play-all-icon" src="/common/icon/play.png"></image>
-                   <text class="play-all-text">{{ listType === 'personal_fm' ? '开启FM' : '播放全部' }}</text>
-               </div>
 
-               <!-- 核心修改：新增“添加到收藏”按钮 -->
-<div class="add-to-fav-button"
-if="{{ listType === 'songlist' && fullSongList.length > 0 }}"
-onclick="addAllToFavorites">
-<image class="add-to-fav-icon" src="/common/icon/liked.png"></image>
-<text class="add-to-fav-text">添加收藏</text>
-</div>
-   
-               <!-- "清空列表" 按钮 (已移除触摸事件) -->
-               <div class="clear-list-button"
-                    if="{{ listType === 'playlist' && fullSongList.length > 0 }}"
-                    onclick="clearPlaylist">
-                   <image class="clear-list-icon" src="/common/icon/delete.png"></image>
-                   <text class="clear-list-text">清空列表</text>
-               </div>
-        
-        <div class="list-content">
-            <!-- 列表项 (已移除触摸事件和动态class) -->
-            <div for="{{(index, item) in displaySongList}}" 
-            class="song-item"
-            onclick="play(item.id)">
-           
-           <text class="item-index">{{ item.displayIndex }}</text>
-           
-           <div class="song-info">
-               <text class="song-title">{{ item.name }}</text>
-               
-               <text class="song-artist">{{ item.artists }}</text>
-               <div class="song-meta" if="{{item.isDownloaded}}">
-                <text class="download-tag">已下载</text>
+        <!-- 2. 独立滚动的内容区 -->
+        <scroll id="songListScroll" class="scroll-wrapper" scroll-y="true" bounces="true" 
+                onscrolltop="handleScrollTop" 
+                onscrollbottom="handleScrollBottom">
+            
+            <!-- 按钮容器 -->
+            <div class="button-container">
+                <!-- "播放全部" 等现有按钮 (在多选模式下隐藏) -->
+                <div if="{{ !isMultiSelectMode }}">
+                    <div class="action-button play-all" if="{{ (listType === 'downloadlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" onclick="playAll">
+                        <image class="button-icon" src="/common/icon/play.png"></image>
+                        <text class="button-text">{{ listType === 'personal_fm' ? '开启FM' : '播放全部' }}</text>
+                    </div>
+                    <div class="button-group" if="{{ listType === 'songlist' && fullSongList.length > 0 }}">
+                        <div class="group-button play" onclick="playAll"><image class="button-icon" src="/common/icon/play.png"></image><text class="button-text dark">播放全部</text></div>
+                        <div class="group-button favorite" onclick="addAllToFavorites"><image class="button-icon" src="/common/icon/liked.png"></image><text class="button-text dark">添加收藏</text></div>
+                    </div>
+                    <div class="action-button clear-list" if="{{ listType === 'playlist' && fullSongList.length > 0 }}" onclick="clearPlaylist">
+                        <image class="button-icon" src="/common/icon/delete.png"></image><text class="button-text">清空列表</text>
+                    </div>
+                </div>
+
+                <!-- 
+                  【核心修改】
+                  - "多选"按钮现在是内容的一部分，位于滚动区顶部。
+                  - 只在特定列表类型且列表不为空时显示。
+                -->
+                <div class="header-action-btn-wrapper select-mode-btn" 
+                     if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'favorites') && fullSongList.length > 0 && !isMultiSelectMode }}" 
+                     onclick="toggleMultiSelectMode">
+                    <text class="header-action-btn-text">批量管理</text>
+                </div>
             </div>
-               
-           </div>
-   
-           <!-- 删除按钮 -->
-           <div class="delete-btn-wrapper" onclick="deleteSong(item)" show="{{ listType === 'downloadlist'||listType === 'favorites'}}">
-               <image class="delete-btn" src="{{listType !== 'downloadlist' ? '/common/icon/cancel.png' : '/common/icon/delete.png'}}"></image>
-           </div>
-       </div>
+            
+            <!-- 列表内容 -->
+            <div class="list-content">
+                <div for="{{(index, item) in displaySongList}}" 
+                     class="song-item"
+                     onclick="handleItemClick(item)">
+                    
+                    <div class="item-prefix">
+                        <text class="item-index">{{ item.displayIndex }}</text>
+
+                    </div>
+
+                    <div class="song-info">
+                        <text class="song-title">{{ item.name }}</text>
+                        <text class="song-artist">{{ item.artists }}</text>
+                        <div class="song-meta" if="{{item.isDownloaded}}">
+                            <text class="download-tag">已下载</text>
+                        </div>
+                    </div>
+
+                    <div class="delete-btn-wrapper" 
+                         onclick="deleteSong(item)" 
+                          if="{{ !isMultiSelectMode }}"
+                         show="{{ (listType === 'downloadlist' || listType === 'favorites') && !isMultiSelectMode }}">
+                        <image class="delete-btn" src="{{listType !== 'downloadlist' ? '/common/icon/cancel.png' : '/common/icon/delete.png'}}"></image>
+                    </div>
+                    <input type="checkbox" 
+                    class="song-checkbox" 
+                    if="{{ isMultiSelectMode }}"
+                    checked="{{ selectedSongIdsMap[item.id] }}"
+                    onchange="(e) => handleCheckboxChange(e, item.id)" />
+                </div>
+            </div>
+
+            <!-- 加载提示 -->
+            <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
+            <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">列表为空</text>
+            <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
+        </scroll>
+
+        <!-- 【核心修改】底部操作栏现在是绝对定位 -->
+        <div class="multi-select-footer" if="{{ isMultiSelectMode }}">
+            <text class="footer-text-button download" onclick="downloadSelectedSongs">下载</text>
+            <text class="footer-text-button delete" onclick="deleteSelectedSongs">删除</text>
+            <text class="footer-text-button cancel" onclick="toggleMultiSelectMode">取消</text>
+        </div>
     </div>
-
-        <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
-        <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">列表为空</text>
-        <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
-
-    </scroll>
 </template>
-
 <style>
-    .list-container {
+    /* --- 页面整体布局 --- */
+    .page-container {
         width: 100%;
         height: 100%;
+        background-color: black;
+        position: relative;
+    }
+
+    /* --- 顶栏样式 (保持不变) --- */
+    .header {
+        width: 100%;
+        height: 90px;
         flex-direction: column;
+        justify-content: center;
         align-items: center;
         background-color: black;
+        z-index: 10;
     }
-    .header {
+    .time-display { font-size: 28px; font-weight: bold; color: #ffffff; padding-top: 5px; text-align: center; }
+    .title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
+
+    /* --- 滚动区域 --- */
+    .scroll-wrapper {
+        position: absolute;
+        top: 90px;
+        bottom: 0;
+        left: 0;
+        right: 0;
         width: 100%;
         flex-direction: column;
-        justify-content: center;
         align-items: center;
-    }
-    .time-display {
-        font-size: 28px;
-        font-weight: bold;
-        color: #ffffff;
-        padding-top: 5px;
-        text-align: center;
-    }
-    .title {
-        font-size: 32px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        color: #fff;
+        transition: bottom 0.2s ease-in-out;
     }
 
-    /* --- 按钮通用样式 --- */
-    .play-all-button, .clear-list-button {
-        margin-top: 20px;
-        margin-bottom: 10px;
-        width: 280px;
-        height: 70px;
-        border-radius: 35px;
-        justify-content: center;
-        align-items: center;
-    }
-    .play-all-button {
-        background-color: #3ae1ff;
-    }
-    .play-all-icon {
-        width: 40px;
-        height: 40px;
-        margin-right: 10px;
-    }
-    .play-all-text {
-        font-size: 28px;
-        color: #000000;
-        font-weight: bold;
-    }
-
-    .add-to-fav-button {
-    margin-bottom: 20px;
-    width: 280px;
-    height: 70px;
-    border-radius: 35px;
-    justify-content: center;
-    align-items: center;
-    background-color: #3ae1ff; /* 使用一个醒目的颜色，例如橙色 */
-}
-.add-to-fav-icon {
-    width: 40px;
-    height: 40px;
-    margin-right: 10px;
-}
-.add-to-fav-text {
-    font-size: 28px;
-    color: #000000;
-    font-weight: bold;
-}
-
-    /* --- 清空列表按钮样式 --- */
-    .clear-list-button {
-        background-color: rgb(255, 58, 48);
-    }
-    .clear-list-icon {
-        width: 40px;
-        height: 40px;
-        margin-right: 10px;
-    }
-    .clear-list-text {
-        font-size: 28px;
-        color: #fff;
-        font-weight: bold;
-    }
-
-    .list-content {
-        flex-direction: column;
-        padding-bottom: 60px;
-    }
-    .song-item {
-        padding: 0 25px;
+    /* --- 按钮区域 --- */
+    .button-container {
         width: 360px;
-        height: 120px; 
-        margin: 5px;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 36px;
-        justify-content: space-between;
+        margin: 10px 0;
+        flex-direction: column;
         align-items: center;
     }
-    .item-index {
-        text-align: center;
-        font-size: 28px;
-        color: rgba(255, 255, 255, 0.6);
-        width: 50px;
-    }
-    .song-info {
-        width: 200px;
-        flex-direction: column;
-        /* 新增：让内容垂直居中，当只有一行标题时更好看 */
-        justify-content: center; 
-    }
-    .song-title {
-        font-size: 26px;
-        color: #fff;
-        lines: 1;
-        text-overflow: ellipsis;
-    }
-    .song-artist {
-        font-size: 22px;
-        color: #888;
-        lines: 1;
-        text-overflow: ellipsis;
-    }
+    .action-button { width: 160px; height: 100px; border-radius: 24px; justify-content: center; align-items: center; flex-direction: column; }
+    .action-button.play-all { background-color: #3ae1ff; }
+    .action-button.clear-list { background-color: rgb(255, 58, 48); }
+    .button-group { width: 100%; flex-direction: row; justify-content: space-around; margin: 10px 0; }
+    .group-button { width: 160px; height: 100px; border-radius: 24px; justify-content: center; align-items: center; flex-direction: column; }
+    .group-button.play { background-color: #3ae1ff; }
+    .group-button.favorite { background-color: #ff9a3c; }
+    .button-icon { width: 36px; height: 36px; }
+    .button-text { font-size: 26px; color: #fff; font-weight: bold; margin-top: 4px; }
+    .button-text.dark { color: #000000; }
 
-    /* --- 新增样式 --- */
-    .song-meta {
+    /* 
+      【核心修改】参考“存储管理”页面的按钮样式 
+    */
+    .header-action-btn-wrapper {
+        margin-top: 15px;
+        display: flex;
         flex-direction: row;
         align-items: center;
-        margin-top: 4px;
+        padding: 10px 20px;
+        border-radius: 25px;
+        align-self: flex-start; /* 按钮靠左对齐 */
     }
-    .download-tag {
-        background-color: rgba(58, 225, 255, 0.2);
-        color: #3ae1ff;
-        font-size: 18px;
-        padding: 2px 8px;
-        border-radius: 6px;
-        margin-right: 10px;
+    .header-action-btn-wrapper.select-mode-btn {
+        background-color: rgba(58, 225, 255, 0.2); /* 使用主题色 */
     }
-    .song-size {
-        font-size: 20px;
-        color: #888;
+    .header-action-btn-icon {
+        width: 32px;
+        height: 32px;
+        margin-right: 8px;
     }
-    .delete-btn-wrapper {
-        width: 80px;
-        height: 120px;
-        justify-content: center;
-        align-items: center;
-    }
-    .delete-btn {
-        width: 64px;
-        height: 64px;
-    }
-    .loading-tip {
-        width: 100%;
-        text-align: center;
-        color: #888;
+    .header-action-btn-text {
+        color: #3ae1ff; /* 使用主题色 */
         font-size: 24px;
-        padding: 30px;
+        font-weight: bold;
     }
+
+    /* --- 列表样式修改 --- */
+    .list-content { flex-direction: column; padding-bottom: 60px; width: 100%; align-items: center; }
+    .song-item { padding: 0 10px 0 0; width: 360px; height: 120px; margin: 5px; background-color: rgba(255, 255, 255, 0.06); border-radius: 36px; justify-content: flex-start; align-items: center; }
+    .item-prefix { width: 80px; height: 100%; justify-content: center; align-items: center; flex-shrink: 0; }
+    .item-index { text-align: center; font-size: 28px; color: rgba(255, 255, 255, 0.6); }
+    .song-checkbox { width: 40px; height: 40px; }
+    .song-info { flex-grow: 1; width: 0; flex-direction: column; justify-content: center; }
+    .song-title { font-size: 26px; color: #fff; lines: 1; text-overflow: ellipsis; }
+    .song-artist { font-size: 22px; color: #888; lines: 1; text-overflow: ellipsis; }
+    .song-meta { flex-direction: row; align-items: center; margin-top: 4px; }
+    .download-tag { background-color: rgba(58, 225, 255, 0.2); color: #3ae1ff; font-size: 18px; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
+    .delete-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
+    .delete-btn { width: 64px; height: 64px; }
+    .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px; }
+
+    /* 
+      【核心修改】
+      - 多选操作栏使用 absolute 定位悬浮。
+      - 内部按钮是纯文本样式。
+    */
+    .multi-select-footer {
+        position: absolute; /* 改为 absolute 定位 */
+        bottom: 30px; /* 距离页面底部 30px */
+        left: 36%;
+        width: 360px; /* 固定宽度 */
+        height: 80px;
+        background-color: rgba(28, 28, 30, 0.85); /* 半透明深色背景，增加毛玻璃效果感 */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 40px; /* 完全圆角 */
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 20; /* 确保在滚动内容之上 */
+    }
+    .footer-text-button {
+        font-size: 28px;
+        font-weight: bold;
+        padding: 10px 20px; /* 增加点击区域 */
+    }
+    .footer-text-button.download {
+        color: #3ae1ff; /* 下载 - 主题色 */
+    }
+    .footer-text-button.delete {
+        color: #ff453a; /* 删除 - 红色警告 */
+    }
+    .footer-text-button.cancel {
+        color: #ffffff; /* 取消 - 白色 */
+    }
+    /* --- 媒体查询 --- */
     @media screen and (shape: rect) {
-    .header {
-        flex-direction: row-reverse;
-        padding-top: 10px;
-      justify-content:space-around
+        .header {
+            height: 65px; /* 顶栏高度变化 */
+            flex-direction: row-reverse;
+            padding-top: 10px;
+            justify-content: space-around;
+        }
+        /* 关键: 滚动区域的起始位置也要相应调整 */
+        .scroll-wrapper {
+            top: 65px; /* 与变化后的顶栏高度保持一致 */
+        }
+        .time-display {
+            font-size: 32px;
+        }
+        .multi-select-toggle { flex-shrink: 0; }
     }
-    .time-display {
-        font-size: 32px;
-    }
-  }
 </style>
+
 <script>
+import downloadService from "../../services/download.js";
+
 import router from "@system.router";
 import file from "@system.file";
 import prompt from "@system.prompt";
@@ -315,6 +314,14 @@ export default {
         listFileUri: 'internal://files/play_list.json',
         downloadedFileUri: 'internal://files/downloaded_songs.json',
         favoritesFileUri: 'internal://files/favorites.json',
+        isMultiSelectMode: false,
+    // 【核心修改】用一个普通对象来模拟 Set
+    selectedSongIdsMap: {}, 
+
+    // 【新增】下载队列相关状态
+    downloadQueue: [],
+    activeDownloads: 0,
+    MAX_CONCURRENT_DOWNLOADS: 3,
     },
 
     async onInit() {
@@ -865,6 +872,157 @@ export default {
                 prompt.showToast({ message: '操作已取消' });
             }
         });
+    },
+
+    /**
+     * 【核心修改】统一的列表项点击事件处理函数
+     */
+     handleItemClick(item) {
+        if (this.isMultiSelectMode) {
+            this.toggleSongSelection(item.id);
+        } else {
+            this.play(item.id);
+        }
+    },
+
+    toggleMultiSelectMode() {
+        this.isMultiSelectMode = !this.isMultiSelectMode;
+        // 【核心修改】清空对象
+        this.selectedSongIdsMap = {}; 
+    },
+
+    /**
+     * 【核心修改】使用对象来操作
+     */
+    toggleSongSelection(songId) {
+        if (this.selectedSongIdsMap[songId]) {
+            delete this.selectedSongIdsMap[songId];
+        } else {
+            this.selectedSongIdsMap[songId] = true;
+        }
+        // 【核心修改】为了触发UI更新，我们创建一个新对象
+        this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
+    },
+
+    /**
+     * 【核心修改】使用对象来操作
+     */
+    handleCheckboxChange(event, songId) {
+        if (event.checked) {
+            this.selectedSongIdsMap[songId] = true;
+        } else {
+            delete this.selectedSongIdsMap[songId];
+        }
+        this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
+    },
+
+    /**
+     * 【核心修改】使用 Object.keys().length 来获取大小
+     */
+    deleteSelectedSongs() {
+        const selectedCount = Object.keys(this.selectedSongIdsMap).length;
+        if (selectedCount === 0) {
+            prompt.showToast({ message: '请先选择歌曲' });
+            return;
+        }
+        prompt.showDialog({
+            title: '删除歌曲',
+            message: `确定要删除选中的 ${selectedCount} 首歌曲吗？`,
+            buttons: [{ text: '取消' }, { text: '确定', color: '#ff3b30' }],
+            success: async () => {
+                // 【核心修改】从 Map 的键创建数组
+                const idsToDelete = Object.keys(this.selectedSongIdsMap);
+                
+                this.fullSongList = this.fullSongList.filter(song => !idsToDelete.includes(String(song.id)));
+                this.updateDisplayList(this.displayStartIndex);
+
+                try {
+                    for (const songId of idsToDelete) {
+                        await this.persistDeletion({ id: songId });
+                    }
+                    prompt.showToast({ message: '删除成功' });
+                } catch (error) {
+                    prompt.showToast({ message: '部分删除失败，请刷新' });
+                }
+
+                this.toggleMultiSelectMode();
+            }
+        });
+    },
+
+    /**
+     * 【核心修改】使用 Object.keys().length 来获取大小
+     */
+    downloadSelectedSongs() {
+        const selectedCount = Object.keys(this.selectedSongIdsMap).length;
+        if (selectedCount === 0) {
+            prompt.showToast({ message: '请先选择歌曲' });
+            return;
+        }
+        
+        const songsToDownload = this.fullSongList.filter(song => 
+            this.selectedSongIdsMap[song.id] && !song.isDownloaded
+        );
+
+        if (songsToDownload.length === 0) {
+            prompt.showToast({ message: '所选歌曲均已下载' });
+            this.toggleMultiSelectMode();
+            return;
+        }
+        
+        this.downloadQueue.push(...songsToDownload);
+        prompt.showToast({ message: `${songsToDownload.length} 首歌曲已加入下载队列` });
+
+        this.toggleMultiSelectMode();
+        this.processDownloadQueue();
+    },
+
+
+    // 4. 新增下载队列处理逻辑
+    processDownloadQueue() {
+        // 如果队列为空，或者正在下载的任务已达上限，则暂停
+        if (this.downloadQueue.length === 0 || this.activeDownloads >= this.MAX_CONCURRENT_DOWNLOADS) {
+            return;
+        }
+
+        // 从队列中取出一个任务
+        const songToDownload = this.downloadQueue.shift();
+        this.activeDownloads++;
+
+        if (!downloadService) {
+            console.error("Download service is not available.");
+            this.activeDownloads--;
+            return;
+        }
+
+        downloadService.start(
+            songToDownload,
+            { cookie: this.cookie, downloadBitrate: this.settings.audioQuality.download }, // 假设这些依赖存在
+            {
+                onStart: () => console.log(`开始下载: ${songToDownload.name}`),
+                onSuccess: async (downloadedInfo) => {
+                    console.log(`${songToDownload.name} 下载成功`);
+                    const downloaded = await fileService.readJson(this.downloadedFileUri, {});
+                    downloaded[downloadedInfo.id] = downloadedInfo;
+                    await fileService.writeJson(this.downloadedFileUri, downloaded);
+                    
+                    const songInList = this.fullSongList.find(s => s.id === downloadedInfo.id);
+                    if (songInList) songInList.isDownloaded = true;
+                    this.updateDisplayList(this.displayStartIndex);
+                },
+                onError: (errorMessage) => {
+                    console.error(`${songToDownload.name} 下载失败: ${errorMessage}`);
+                    prompt.showToast({ message: `${songToDownload.name.slice(0, 10)}... 下载失败` });
+                },
+                onFinish: () => {
+                    this.activeDownloads--;
+                    this.processDownloadQueue(); // 处理下一个
+                }
+            }
+        );
+
+        // 立即尝试启动下一个并行任务
+        this.processDownloadQueue();
     },
 };
 </script>

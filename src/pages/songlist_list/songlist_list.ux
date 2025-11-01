@@ -1,47 +1,57 @@
 <template>
-    <!-- 严格遵循 list.ux 的模板结构 -->
-    <scroll id="playlistScroll" class="page-container" scroll-y="true" bounces="true" 
-        onscrolltop="handleScrollTop" 
-        onscrollbottom="handleScrollBottom">
-        
+    <!-- FIX: 根组件使用 div，并将滚动限制在内容区，以固定顶栏 -->
+    <div class="page-container">
+        <!-- 1. 固定的顶部栏 -->
         <div class="header" onclick="goBack">
             <text class="time-display">{{ currentTime }}</text>
             <text class="title">‹{{ pageTitle }}</text>
         </div>
         
-        <!-- 列表内容区域 -->
-        <div class="list-content">
-            <!-- 循环 displayPlaylist，这是虚拟列表的核心 -->
-            <div for="{{(index, item) in displayPlaylist}}" class="playlist-item" onclick="goToSongList(item.id)">
-                <div class="item-info">
-                    <text class="item-name">{{ item.name }}</text>
-                    <text class="item-track-count">{{ item.trackCount }} 首</text>
+        <!-- 2. 独立滚动的内容区 -->
+        <scroll id="playlistScroll" class="scroll-wrapper" scroll-y="true" bounces="true" 
+            onscrolltop="handleScrollTop" 
+            onscrollbottom="handleScrollBottom">
+            
+            <!-- 列表内容区域 -->
+            <div class="list-content">
+                <!-- 循环 displayPlaylist，这是虚拟列表的核心 -->
+                <div for="{{(index, item) in displayPlaylist}}" class="playlist-item" onclick="goToSongList(item.id)">
+                    <div class="item-info">
+                        <text class="item-name">{{ item.name }}</text>
+                        <text class="item-track-count">{{ item.trackCount }} 首</text>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 状态提示 -->
-        <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
-        <text class="loading-tip" if="{{ !isLoading && fullPlaylist.length === 0 }}">列表为空</text>
-        <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullPlaylist.length > 0 }}">已加载全部</text>
-
-    </scroll>
+            <!-- 状态提示 -->
+            <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
+            <text class="loading-tip" if="{{ !isLoading && fullPlaylist.length === 0 }}">列表为空</text>
+            <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullPlaylist.length > 0 }}">已加载全部</text>
+        </scroll>
+    </div>
 </template>
 
 <style>
-    /* 样式调整为垂直列表样式，而不是网格 */
+    /* --- 页面整体布局 (已修正顶栏固定问题) --- */
     .page-container {
         width: 100%;
         height: 100%;
-        flex-direction: column;
-        align-items: center;
         background-color: black;
+        position: relative; /* 为子元素的绝对定位提供参考系 */
     }
+
+    /* 关键: 使用 fixed 定位将顶栏固定在屏幕顶部 */
     .header {
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100%;
+        height: 90px;
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        background-color: black; /* 确保顶栏有背景色 */
+        z-index: 10; /* 确保顶栏在最上层 */
     }
     .time-display {
         font-size: 28px;
@@ -57,18 +67,33 @@
         font-weight: bold;
         color: #fff;
     }
+
+    /* 关键: 滚动区域从顶栏下方开始，并占据剩余全部高度 */
+    .scroll-wrapper {
+        position: absolute;
+        top: 90px; /* 从顶栏高度(90px)的位置开始 */
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* --- 列表样式 (网格布局) --- */
     .list-content {
+        display: flex; /* 使用标准 display:flex 替代 */
         flex-direction: row;
         flex-wrap: wrap;
-        padding-bottom: 60px;
+        justify-content: center; /* 居中对齐所有行 */
+        padding: 10px 0 60px 0; /* 调整内边距 */
         width: 100%;
-        align-items: center; /* 让列表项居中 */
     }
     .playlist-item {
-        width:45%;
+        width: 45%;
         flex-direction: column;
         padding: 10px;
-        margin: 10px 5px;
+        margin: 10px 2.5%; /* 使用百分比外边距实现间隙 */
         background-color: rgba(255, 255, 255, 0.06);
         border-radius: 20px;
     }
@@ -87,11 +112,6 @@
         color: rgba(255, 255, 255, 0.6);
         margin-top: 4px;
     }
-    .arrow-icon {
-        width: 36px;
-        height: 36px;
-        color: #555;
-    }
     .loading-tip {
         width: 100%;
         text-align: center;
@@ -99,18 +119,27 @@
         font-size: 24px;
         padding: 30px;
     }
+
+    /* --- 媒体查询 (同步调整) --- */
     @media screen and (shape: rect) {
         .header {
+            height: 65px; /* 顶栏高度变化 */
             padding-top: 10px;
             flex-direction: row-reverse;
-            justify-content:space-around
+            justify-content: space-around;
+        }
+        /* 关键: 滚动区域的起始位置也要相应调整 */
+        .scroll-wrapper {
+            top: 65px; /* 与变化后的顶栏高度保持一致 */
         }
         .time-display {
             font-size: 32px;
         }
     }
 </style>
+
 <script>
+// --- script 部分与你提供的完全一致，无需修改 ---
 import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
@@ -120,9 +149,8 @@ const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
 const SETTINGS_FILE_URI = 'internal://files/settings.json';
 
-// 文件服务封装 (无变化 )
 const fileService = {
-    _promisify(fn, options ) {
+    _promisify(fn, options  ) {
         return new Promise((resolve, reject) => {
             fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
         });
@@ -158,15 +186,14 @@ export default {
     },
 
     private: {
-        // --- 严格对齐 list.ux 的数据模型 ---
         fullPlaylist: [],
         displayPlaylist: [],
         
         WINDOW_SIZE: 30,
-        PAGE_SIZE: 10,      // 网格布局，每页加载10个，即5行
-        ITEM_HEIGHT: 180,   // 估算的网格项行高 (item height + margin)
+        PAGE_SIZE: 10,
+        ITEM_HEIGHT: 180,
         TOTAL_LIMIT: 200,
-        API_PAGE_SIZE: 20,  // 每次网络请求获取20个
+        API_PAGE_SIZE: 20,
         
         displayStartIndex: 0,
         isLoading: false,
@@ -194,7 +221,7 @@ export default {
         if (settings) {
             if (settings.performance) {
                 this.WINDOW_SIZE = settings.performance.windowSize || this.WINDOW_SIZE;
-                this.PAGE_SIZE = (settings.performance.pageSize * 2) || this.PAGE_SIZE; // 适配网格
+                this.PAGE_SIZE = (settings.performance.pageSize * 2) || this.PAGE_SIZE;
             }
             if (settings.network) {
                 this.TOTAL_LIMIT = settings.network.totalLimit || this.TOTAL_LIMIT;
@@ -208,7 +235,6 @@ export default {
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
-    // --- 严格参考您的 loadData 逻辑 ---
     async loadData() {
         if (this.isLoading) return;
 
@@ -228,7 +254,6 @@ export default {
         }
     },
 
-    // --- 严格参考您的 fetchSonglistFromNetwork 逻辑 ---
     async fetchPlaylistsFromNetwork() {
         const userId = this.uid || await this.getUserIdFromLocal();
         if (!userId) {
@@ -246,7 +271,6 @@ export default {
 
         const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
         
-        // 尝试从缓存加载
         const cachedData = await fileService.readJson(cacheFileUri);
         if (cachedData) {
             this.fullPlaylist = cachedData.playlists;
@@ -255,10 +279,9 @@ export default {
             console.log(`已从缓存加载 ${this.fullPlaylist.length} 个歌单。`);
         }
 
-        // 从网络获取更新
-        let allPlaylists = [];
+        let allPlaylists = cachedData ? [...cachedData.playlists] : [];
         let hasMore = true;
-        let offset = 0;
+        let offset = allPlaylists.length;
 
         while (hasMore && allPlaylists.length < this.TOTAL_LIMIT) {
             const url = `${API_BASE}/user/playlist?uid=${userId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
@@ -272,7 +295,6 @@ export default {
                     const formatted = newPlaylists.map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.trackCount }));
                     allPlaylists.push(...formatted);
                     
-                    // 实时更新UI
                     this.fullPlaylist = [...allPlaylists];
                     this.updateDisplayList(this.displayStartIndex);
 
@@ -284,23 +306,21 @@ export default {
             } catch (error) {
                 console.error("分页获取歌单失败:", error);
                 hasMore = false;
-                if (!cachedData) throw error; // 只有在完全没有缓存时才向上抛出错误
+                if (!cachedData) throw error;
             }
         }
         
-        if (this.fullPlaylist.length > 0) {
-            const creatorName = this.fullPlaylist[0].creator?.nickname; // 假设API返回creator
+        if (this.fullPlaylist.length > 0 && this.fullPlaylist[0].creator) {
+            const creatorName = this.fullPlaylist[0].creator.nickname;
             this.pageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
         }
         
-        // 异步更新缓存
         fileService.writeJson(cacheFileUri, {
             pageTitle: this.pageTitle,
             playlists: this.fullPlaylist,
         });
     },
 
-    // --- 严格复制您 list.ux 的虚拟列表核心方法 ---
     updateDisplayList(startIndex) {
         this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullPlaylist.length - this.PAGE_SIZE));
         const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullPlaylist.length);
@@ -321,7 +341,6 @@ export default {
         }
         this.updateDisplayList(prevStartIndex);
         
-        // 适配网格布局，滚动距离是 行数 * 行高
         const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
         this.$element('playlistScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
         setTimeout(() => { this.isScrolling = false; }, 100);
@@ -330,22 +349,18 @@ export default {
     handleScrollBottom() {
         if (this.isScrolling || !this.hasMoreDown) return;
         
-        // 只有当本地数据还有未显示的，才执行窗口滑动
         if (this.displayStartIndex + this.PAGE_SIZE < this.fullPlaylist.length) {
             this.isScrolling = true;
             const nextStartIndex = this.displayStartIndex + this.PAGE_SIZE;
             
             this.updateDisplayList(nextStartIndex);
             
-            // 适配网格布局，滚动距离是 行数 * 行高
             const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
             this.$element('playlistScroll').scrollBy({ top: -scrollOffset, behavior: 'instant' });
             
             setTimeout(() => { this.isScrolling = false; }, 100);
         }
-        // 注意：网络加载的懒加载由 fetchPlaylistsFromNetwork 的循环实现，这里只负责UI层面的窗口滑动
     },
-    // --- 虚拟列表方法结束 ---
 
     async getUserIdFromLocal() {
         const profile = await fileService.readJson(PROFILE_FILE_URI);

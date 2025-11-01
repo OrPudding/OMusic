@@ -1,8 +1,8 @@
 {
   "package": "moe.orpu.omusic",
   "name": "OMusic",
-  "versionName": "1.1",
-  "versionCode": 2,
+  "versionName": "1.2",
+  "versionCode": 3,
   "minPlatformVersion": 1000,
   "icon": "/common/icon.png",
   "deviceTypeList": [
@@ -98,6 +98,9 @@
       },
       "pages/license": {
         "component": "license"
+      },
+      "pages/compileInfo": {
+        "component": "compileInfo"
       },
       "pages/songlist_list": {
         "component": "songlist_list"
