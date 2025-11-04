@@ -10,7 +10,8 @@
         <!-- 2. 独立滚动的内容区 -->
         <scroll id="playlistScroll" class="scroll-wrapper" scroll-y="true" bounces="true" 
             onscrolltop="handleScrollTop" 
-            onscrollbottom="handleScrollBottom">
+            onscrollbottom="handleScrollBottom"
+            onscroll="handleScroll">
             
             <!-- 列表内容区域 -->
             <div class="list-content">
@@ -198,6 +199,8 @@ export default {
         displayStartIndex: 0,
         isLoading: false,
         isScrolling: false,
+        isRefreshing: false, // 标记是否正在网络刷新
+        justReachedTop: false, // 【【【新增】】】标记用户是否刚滚动到顶部
         hasMoreUp: false,
         hasMoreDown: true,
 
@@ -236,6 +239,7 @@ export default {
     },
 
     async loadData() {
+        // 【【【核心修改】】】此方法现在只负责初始加载，优先从缓存加载
         if (this.isLoading) return;
 
         this.isLoading = true;
@@ -244,7 +248,8 @@ export default {
         this.hasMoreDown = true;
 
         try {
-            await this.fetchPlaylistsFromNetwork();
+            // 对于歌单列表，调用一个不会强制刷新的 fetch 方法
+            await this.fetchPlaylistsFromNetwork(false); // forceAll = false
         } catch (error) {
             console.error("加载歌单数据源失败:", error);
             prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
@@ -254,38 +259,45 @@ export default {
         }
     },
 
-    async fetchPlaylistsFromNetwork() {
+
+    async fetchPlaylistsFromNetwork(forceAll = false) {
         const userId = this.uid || await this.getUserIdFromLocal();
-        if (!userId) {
-            this.isLoading = false;
-            this.hasMoreDown = false;
-            throw new Error("未提供用户ID");
-        }
+        if (!userId) throw new Error("未提供用户ID");
 
         const request = this.$app.$def.requestService;
-        if (!request) {
-            this.isLoading = false;
-            this.hasMoreDown = false;
-            throw new Error("内部服务错误: requestService 未找到");
-        }
+        if (!request) throw new Error("内部服务错误: requestService 未找到");
 
         const cacheFileUri = `${USER_PLAYLISTS_DIR}${userId}.json`;
-        
-        const cachedData = await fileService.readJson(cacheFileUri);
-        if (cachedData) {
-            this.fullPlaylist = cachedData.playlists;
-            this.pageTitle = cachedData.pageTitle;
-            this.updateDisplayList(0);
-            console.log(`已从缓存加载 ${this.fullPlaylist.length} 个歌单。`);
+
+        // 【【【核心修改】】】
+        // 如果是强制刷新，则清空列表准备从网络加载
+        if (forceAll) {
+            this.fullPlaylist = [];
+            this.displayPlaylist = [];
+            this.displayStartIndex = 0;
+        } 
+        // 如果不是强制刷新，则优先从缓存加载
+        else if (this.fullPlaylist.length === 0) {
+            const cachedData = await fileService.readJson(cacheFileUri);
+            if (cachedData && cachedData.playlists) {
+                console.log("从缓存加载歌单列表...");
+                this.fullPlaylist = cachedData.playlists;
+                this.pageTitle = cachedData.pageTitle;
+                this.updateDisplayList(0);
+                // 加载完缓存后，不再继续执行网络请求，直接返回
+                return; 
+            }
         }
 
-        let allPlaylists = cachedData ? [...cachedData.playlists] : [];
+        // --- 只有在强制刷新或缓存为空时，才会执行以下网络请求逻辑 ---
+        console.log(forceAll ? "强制刷新，从网络加载..." : "缓存为空，从网络加载...");
+        
+        let offset = 0;
         let hasMore = true;
-        let offset = allPlaylists.length;
+        let networkPlaylists = [];
 
-        while (hasMore && allPlaylists.length < this.TOTAL_LIMIT) {
+        while (hasMore && networkPlaylists.length < this.TOTAL_LIMIT) {
             const url = `${API_BASE}/user/playlist?uid=${userId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
-            
             try {
                 const response = await request.fetch({ url });
                 if (response.status !== 'success') throw new Error(response.message);
@@ -293,11 +305,7 @@ export default {
                 const newPlaylists = response.data?.playlist;
                 if (newPlaylists && newPlaylists.length > 0) {
                     const formatted = newPlaylists.map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.trackCount }));
-                    allPlaylists.push(...formatted);
-                    
-                    this.fullPlaylist = [...allPlaylists];
-                    this.updateDisplayList(this.displayStartIndex);
-
+                    networkPlaylists.push(...formatted);
                     offset += newPlaylists.length;
                     if (newPlaylists.length < this.API_PAGE_SIZE) hasMore = false;
                 } else {
@@ -306,20 +314,27 @@ export default {
             } catch (error) {
                 console.error("分页获取歌单失败:", error);
                 hasMore = false;
-                if (!cachedData) throw error;
+                if (networkPlaylists.length === 0) throw error; // 如果一次都没成功，则抛出错误
             }
         }
-        
+
+        // 使用最新的网络数据更新UI和缓存
+        this.fullPlaylist = networkPlaylists;
         if (this.fullPlaylist.length > 0 && this.fullPlaylist[0].creator) {
             const creatorName = this.fullPlaylist[0].creator.nickname;
             this.pageTitle = creatorName ? `${creatorName}的歌单` : '用户歌单';
         }
-        
-        fileService.writeJson(cacheFileUri, {
+        this.updateDisplayList(0);
+        this.hasMoreDown = hasMore;
+
+        await fileService.writeJson(cacheFileUri, {
             pageTitle: this.pageTitle,
-            playlists: this.fullPlaylist,
+            playlists: networkPlaylists,
         });
     },
+
+
+
 
     updateDisplayList(startIndex) {
         this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullPlaylist.length - this.PAGE_SIZE));
@@ -331,20 +346,74 @@ export default {
         this.hasMoreDown = endIndex < this.fullPlaylist.length;
     },
 
-    handleScrollTop() {
-        if (this.isScrolling || !this.hasMoreUp) return;
-        this.isScrolling = true;
-        const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
-        if (prevStartIndex < 0) {
-            this.isScrolling = false;
-            return;
+        // 【【【新增】】】
+        handleScroll(e) {
+        // 当用户向下滑动，离开顶部区域后，重置“刚刚触顶”的状态
+        // 5px 的阈值是为了防止微小抖动造成的误判
+        if (e.scrollY > 5 && this.justReachedTop) {
+            this.justReachedTop = false;
         }
-        this.updateDisplayList(prevStartIndex);
-        
-        const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
-        this.$element('playlistScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
-        setTimeout(() => { this.isScrolling = false; }, 100);
     },
+
+
+    // 【【【完整替换】】】
+    handleScrollTop() {
+        // 1. 如果正在加载或刷新或滚动，则直接返回
+        if (this.isLoading || this.isRefreshing || this.isScrolling) return;
+
+        // 2. 判断是“向上加载更多”还是“顶部操作”
+        //    如果 hasMoreUp 为 true，说明上方还有数据，执行“向上加载更多”
+        if (this.hasMoreUp) {
+            console.log("触发向上加载更多...");
+            this.isScrolling = true;
+            const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
+            
+            if (prevStartIndex < 0) {
+                this.isScrolling = false;
+                return;
+            }
+
+            this.updateDisplayList(prevStartIndex);
+            
+            const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
+            this.$element('playlistScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
+            
+            setTimeout(() => { this.isScrolling = false; }, 100);
+        }
+        // 否则，说明列表已经滚动到最顶部，执行“顶部操作”逻辑
+        else {
+            // 3. 【【【核心逻辑】】】判断是“首次触顶”还是“再次下拉”
+            //    如果 justReachedTop 为 true，说明用户在顶部再次下拉，执行刷新
+            if (this.justReachedTop) {
+                console.log("在顶部再次下拉，触发刷新...");
+                this.isRefreshing = true;
+                prompt.showToast({ message: '正在尝试刷新...' });
+
+                this.fetchPlaylistsFromNetwork(true) // forceAll = true
+                    .then(() => {
+                        prompt.showToast({ message: '刷新成功' });
+                    })
+                    .catch(error => {
+                        console.error("下拉刷新失败:", error);
+                        prompt.showToast({ message: `刷新失败: ${error.message}` });
+                    })
+                    .finally(() => {
+                        this.isRefreshing = false;
+                        // 刷新完成后，重置状态，下一次触顶依然是“首次”
+                        this.justReachedTop = false; 
+                    });
+            } 
+            // 否则，说明是第一次滚动到顶部
+            else {
+                console.log("首次滚动到顶部...");
+                prompt.showToast({ message: '已到顶部，再次下拉可刷新' });
+                // 标记为“刚刚已触顶”
+                this.justReachedTop = true;
+            }
+        }
+    },
+
+
 
     handleScrollBottom() {
         if (this.isScrolling || !this.hasMoreDown) return;

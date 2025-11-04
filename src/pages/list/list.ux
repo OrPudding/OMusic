@@ -7,13 +7,14 @@
         </div>
 
         <!-- 2. 独立滚动的内容区 -->
-        <scroll id="songListScroll" class="scroll-wrapper" scroll-y="true" bounces="true" 
+        <scroll id="songListScroll" class="scroll-wrapper {{ isMultiSelectMode ? 'footer-padding' : '' }}" scroll-y="true" bounces="true" 
                 onscrolltop="handleScrollTop" 
-                onscrollbottom="handleScrollBottom">
-            
-            <!-- 按钮容器 -->
+                onscrollbottom="handleScrollBottom"
+                onscroll="handleScroll">
+        
+            <!-- 按钮容器 (保持原有结构) -->
             <div class="button-container">
-                <!-- "播放全部" 等现有按钮 (在多选模式下隐藏) -->
+                <!-- 普通模式下的按钮 -->
                 <div if="{{ !isMultiSelectMode }}">
                     <div class="action-button play-all" if="{{ (listType === 'downloadlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" onclick="playAll">
                         <image class="button-icon" src="/common/icon/play.png"></image>
@@ -28,29 +29,31 @@
                     </div>
                 </div>
 
-                <!-- 
-                  【核心修改】
-                  - "多选"按钮现在是内容的一部分，位于滚动区顶部。
-                  - 只在特定列表类型且列表不为空时显示。
-                -->
-                  <!--
+                <!-- 【【【修复】】】: "批量管理"按钮被放出，并有了更清晰的样式 
                 <div class="header-action-btn-wrapper select-mode-btn" 
                      if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'favorites') && fullSongList.length > 0 && !isMultiSelectMode }}" 
                      onclick="toggleMultiSelectMode">
                     <text class="header-action-btn-text">批量管理</text>
+                </div>-->
+
+                <!-- 【【【新增】】】: 多选模式下的“全选”和信息栏 -->
+                <div class="multi-select-header" if="{{ isMultiSelectMode }}">
+                    <div class="select-all-container" onclick="toggleSelectAll">
+                        <input type="checkbox" class="select-all-checkbox" checked="{{ isAllSelected }}"></input>
+                        <text class="select-all-text">全选</text>
+                    </div>
+                    <text class="selection-count-text">已选{{ selectedCount }}首</text>
                 </div>
-            -->
             </div>
             
-            <!-- 列表内容 -->
+            <!-- 列表内容 (保持原有结构，仅增加class绑定) -->
             <div class="list-content">
                 <div for="{{(index, item) in displaySongList}}" 
-                     class="song-item"
+                     class="song-item {{ selectedSongIdsMap[item.id] ? 'selected' : '' }}"
                      onclick="handleItemClick(item)">
                     
                     <div class="item-prefix">
                         <text class="item-index">{{ item.displayIndex }}</text>
-
                     </div>
 
                     <div class="song-info">
@@ -61,35 +64,38 @@
                         </div>
                     </div>
 
+                    <!-- 单项删除按钮 (保持原有逻辑) -->
                     <div class="delete-btn-wrapper" 
                          onclick="deleteSong(item)" 
-                          if="{{ !isMultiSelectMode }}"
+                         if="{{ !isMultiSelectMode }}"
                          show="{{ (listType === 'downloadlist' || listType === 'favorites') && !isMultiSelectMode }}">
                         <image class="delete-btn" src="{{listType !== 'downloadlist' ? '/common/icon/cancel.png' : '/common/icon/delete.png'}}"></image>
                     </div>
+                    
+                    <!-- 复选框 (保持原有逻辑) -->
                     <input type="checkbox" 
-                    class="song-checkbox" 
-                    if="{{ isMultiSelectMode }}"
-                    checked="{{ selectedSongIdsMap[item.id] }}"
-                    onchange="(e) => handleCheckboxChange(e, item.id)" />
+                           class="song-checkbox" 
+                           if="{{ isMultiSelectMode }}"
+                           checked="{{ selectedSongIdsMap[item.id] }}"
+                           onchange="(e) => handleCheckboxChange(e, item.id)" />
                 </div>
             </div>
-
             <!-- 加载提示 -->
             <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
             <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">列表为空</text>
             <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
         </scroll>
 
-        <!-- 【核心修改】底部操作栏现在是绝对定位
-        <div class="multi-select-footer" if="{{ isMultiSelectMode }}">
+        <!-- 【【【修复】】】: 底部操作栏被放出，并优化了样式和动效 -->
+        <div class="multi-select-footer {{ isMultiSelectMode ? 'visible' : '' }}" if="{{ isMultiSelectMode }}">
             <text class="footer-text-button download" onclick="downloadSelectedSongs">下载</text>
             <text class="footer-text-button delete" onclick="deleteSelectedSongs">删除</text>
             <text class="footer-text-button cancel" onclick="toggleMultiSelectMode">取消</text>
         </div>
-         -->
     </div>
 </template>
+
+
 <style>
     /* --- 页面整体布局 --- */
     .page-container {
@@ -184,6 +190,39 @@
     .delete-btn { width: 64px; height: 64px; }
     .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px; }
 
+    /* --- 【新增】多选模式头部样式 --- */
+.multi-select-header {
+    width: 100%; /* 宽度与父容器 .button-container 一致 */
+    height: 60px; /* 高度与原有的 .action-button 保持一致 */
+    flex-direction: row;
+    justify-content: space-between; /* “全选”居左，“计数”居右 */
+    align-items: center;
+    padding: 0 10px; /* 左右留出一些边距 */
+}
+
+.select-all-container {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px; /* 增大点击区域 */
+}
+
+.select-all-checkbox {
+    width: 40px;
+    height: 40px;
+    margin-right: 15px;
+}
+
+.select-all-text {
+    font-size: 26px; /* 与 .button-text 字体大小保持一致 */
+    color: #fff; /* 与 .button-text 颜色保持一致 */
+    font-weight: bold;
+}
+
+.selection-count-text {
+    font-size: 24px;
+    color: #888; /* 使用次要文字颜色 */
+}
+
     /* 
       【核心修改】
       - 多选操作栏使用 absolute 定位悬浮。
@@ -235,6 +274,7 @@
         .multi-select-toggle { flex-shrink: 0; }
     }
 </style>
+
 
 <script>
 import downloadService from "../../services/download.js";
@@ -309,6 +349,9 @@ export default {
         hasMoreUp: false,
         hasMoreDown: true,
 
+        isRefreshing: false,     // 【【【新增】】】标记是否正在网络刷新
+        justReachedTop: false,   // 【【【新增】】】标记用户是否刚滚动到顶部
+
         downloadedSongsMap: null,
 
         pageTitle: "播放列表",
@@ -325,6 +368,22 @@ export default {
     downloadQueue: [],
     activeDownloads: 0,
     MAX_CONCURRENT_DOWNLOADS: 3,
+    },
+
+        // 【【【新增：Computed 计算属性】】】
+        computed: {
+        // 计算已选中的歌曲数量
+        selectedCount() {
+            return Object.keys(this.selectedSongIdsMap).length;
+        },
+        // 判断是否已全选
+        isAllSelected() {
+            const selectableCount = this.fullSongList.length;
+            if (selectableCount === 0) {
+                return false;
+            }
+            return this.selectedCount === selectableCount;
+        }
     },
 
     async onInit() {
@@ -375,27 +434,36 @@ export default {
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
-    async loadData() {
-        if (this.isLoading) return;
+// 在 list.ux 的 <script> 中
+async loadData() {
+    if (this.isLoading) return;
 
-        this.isLoading = true;
-        this.fullSongList = [];
-        this.displaySongList = [];
-        this.hasMoreDown = true;
+    this.isLoading = true;
+    // 重置核心状态
+    this.fullSongList = [];
+    this.displaySongList = [];
+    this.hasMoreDown = true;
+    this.justReachedTop = false;
 
-        try {
-            const downloadedMeta = await fileService.readJson(this.downloadedFileUri, {});
-            const downloadedIds = new Set(Object.keys(downloadedMeta));
+    try {
+        const downloadedMeta = await fileService.readJson(this.downloadedFileUri, {});
+        const downloadedIds = new Set(Object.keys(downloadedMeta));
 
+        // 对于 songlist，调用一个不会强制刷新的 fetch 方法
+        if (this.listType === 'songlist') {
+            // 【修复】await 确保 fetch 执行完毕后，才进入 finally
+            await this.fetchSonglistFromNetwork(downloadedIds, false); // forceAll = false
+        }
+        // --- 处理其他本地数据源的逻辑 (保持不变) ---
+        else {
             let sourceData = [];
             switch (this.listType) {
-                case 'daily_recommend': // 新增日推逻辑
+                case 'daily_recommend':
                     await this.fetchDailyRecommendSongs(downloadedIds);
-                    return; // 方法内部会处理所有逻辑
-                
-                case 'personal_fm': // 新增FM逻辑
+                    break; // fetch 方法内部会处理 isLoading
+                case 'personal_fm':
                     await this.fetchPersonalFmSongs(downloadedIds);
-                    return; // 方法内部会处理所有逻辑
+                    break; // fetch 方法内部会处理 isLoading
                 case 'downloadlist':
                     sourceData = Object.values(downloadedMeta);
                     break;
@@ -405,28 +473,27 @@ export default {
                 case 'playlist':
                     sourceData = await fileService.readJson(this.listFileUri, []);
                     break;
-                case 'songlist':
-                    await this.fetchSonglistFromNetwork(downloadedIds);
-                    return; // fetchSonglistFromNetwork 会自己处理后续逻辑
             }
-
-            this.fullSongList = sourceData.map((song, index) => ({
-                ...song,
-                originalIndex: index + 1,
-                isDownloaded: downloadedIds.has(String(song.id))
-            }));
-
-            this.updateDisplayList(0);
-            this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
-
-        } catch (error) {
-            console.error("加载数据源失败:", error);
-            prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
-            this.hasMoreDown = false;
-        } finally {
-            this.isLoading = false;
+            if (sourceData.length > 0) {
+                this.fullSongList = sourceData.map((song, index) => ({
+                    ...song,
+                    originalIndex: index + 1,
+                    isDownloaded: downloadedIds.has(String(song.id))
+                }));
+                this.updateDisplayList(0);
+                this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
+            }
         }
-    },
+    } catch (error) {
+        console.error("加载数据源失败:", error);
+        prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
+        this.hasMoreDown = false;
+    } finally {
+        // 【修复】统一在 finally 中设置 isLoading，确保状态正确
+        this.isLoading = false;
+    }
+},
+
 
 
     // --- 3. 新增获取日推歌曲的方法 ---
@@ -492,7 +559,8 @@ export default {
         }
     },
 
-    // --- 核心修改：fetchSonglistFromNetwork 增加 forceAll 参数 ---
+// 在 list.ux 的 <script> 中
+    // 【【【最终完整版】】】
     async fetchSonglistFromNetwork(downloadedIds, forceAll = false) {
         if (!this.songlistId) {
             this.isLoading = false;
@@ -500,43 +568,52 @@ export default {
             throw new Error("未提供歌单ID");
         }
 
-        if (!(downloadedIds instanceof Set)) downloadedIds = new Set();
+        if (!(downloadedIds instanceof Set)) {
+            downloadedIds = new Set();
+        }
 
         const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
         const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误: requestService 未找到");
-
-        // 如果不是强制加载全部，且已有数据，则直接返回
-        if (!forceAll && this.fullSongList.length > 0 && !this.hasMoreDown) {
-            this.isLoading = false;
-            return;
+        if (!request) {
+            throw new Error("内部服务错误: requestService 未找到");
         }
 
-        // 尝试从缓存加载
-        if (this.fullSongList.length === 0) {
+        // 1. 【【【核心修正】】】如果不是强制刷新，并且当前列表为空，则优先尝试加载缓存
+        if (!forceAll && this.fullSongList.length === 0) {
             const cachedList = await fileService.readJson(cacheFileUri, null);
-            if (cachedList) {
+            if (cachedList && cachedList.length > 0) {
+                console.log(`已从缓存加载 ${cachedList.length} 首歌曲。`);
                 this.fullSongList = cachedList.map(song => ({
                     ...song,
                     isDownloaded: downloadedIds.has(String(song.id))
                 }));
                 this.updateDisplayList(0);
+                // 标记仍有可能需要网络加载更多（如果缓存不完整）
+                this.hasMoreDown = true; 
+                // 即使加载了缓存，也让加载状态结束，UI可以交互
+                this.isLoading = false; 
+                return; // 【【【关键】】】加载缓存成功后，直接返回，不再执行网络请求
             }
         }
 
-        const BASE_URL = 'https://163api.qijieya.cn/playlist/track/all';
-        let offset = forceAll ? 0 : this.fullSongList.length;
-        if (forceAll ) this.fullSongList = []; // 强制加载时清空列表
-
-        let hasMore = true;
+        // 2. 执行网络请求逻辑（仅在强制刷新或无缓存时）
+        console.log(forceAll ? "强制刷新：开始从网络获取全新数据..." : "无缓存或需要加载更多，开始网络请求...");
         
-        // 循环获取
-        while (hasMore && (forceAll || this.fullSongList.length < this.TOTAL_LIMIT)) {
-            const url = `${BASE_URL}?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
+        // 如果是强制刷新，清空列表
+        if (forceAll) {
+            this.fullSongList = [];
+        }
+        
+        let offset = forceAll ? 0 : this.fullSongList.length;
+        let hasMore = true;
+        let networkSongs = forceAll ? [] : [...this.fullSongList]; // 从现有列表开始或从空列表开始
+
+        while (hasMore && networkSongs.length < this.TOTAL_LIMIT) {
+            const url = `https://163api.qijieya.cn/playlist/track/all?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
             
             try {
-                const response = await request.fetch({ url });
-                if (response.status !== 'success') throw new Error(response.message);
+                const response = await request.fetch({ url } );
+                if (response.status !== 'success') throw new Error(response.message || '网络响应状态异常');
 
                 const songs = response.data?.songs;
                 if (songs && songs.length > 0) {
@@ -547,28 +624,42 @@ export default {
                         isDownloaded: downloadedIds.has(String(s.id))
                     }));
 
-                    this.fullSongList.push(...newSongs);
-                    this.updateDisplayList(this.displayStartIndex);
-                    
+                    // 使用一个临时变量来合并，避免频繁操作 this.fullSongList
+                    networkSongs.push(...newSongs);
                     offset += songs.length;
-                    this.hasMoreDown = songs.length === this.API_PAGE_SIZE;
-                    if (!this.hasMoreDown) hasMore = false;
 
+                    if (songs.length < this.API_PAGE_SIZE) {
+                        hasMore = false;
+                    }
                 } else {
                     hasMore = false;
-                    this.hasMoreDown = false;
                 }
             } catch (error) {
                 console.error("分页获取歌单失败:", error);
-                prompt.showToast({ message: '网络请求失败' });
-                hasMore = false;
-                this.hasMoreDown = false;
+                hasMore = false; // 发生错误时，停止继续请求
+                // 只有在列表完全为空（首次加载就失败）时才抛出错误或提示
+                if (networkSongs.length === 0) {
+                    prompt.showToast({ message: '网络请求失败' });
+                }
             }
         }
         
-        // 异步更新缓存
-        fileService.writeJson(cacheFileUri, this.fullSongList.map(({...rest }) => rest));
+        // 3. 所有网络请求结束后，用最终的完整数据更新UI
+        this.fullSongList = networkSongs;
+        this.updateDisplayList(this.displayStartIndex);
+        this.hasMoreDown = hasMore;
+
+        // 4. 【【【核心修正】】】用最新的、最完整的网络数据覆盖旧缓存
+        if (this.fullSongList.length > 0) {
+            // 创建不含 isDownloaded 字段的纯净数据用于缓存
+            const songsToCache = this.fullSongList.map(({ id, name, artists }) => ({ id, name, artists }));
+            await fileService.writeJson(cacheFileUri, songsToCache);
+            console.log(`缓存已更新，共 ${songsToCache.length} 首歌曲。`);
+        }
     },
+
+
+
 
     // --- 新增：添加到收藏的方法 ---
     async addAllToFavorites() {
@@ -641,20 +732,88 @@ export default {
         this.hasMoreDown = endIndex < this.fullSongList.length;
     },
 
-    handleScrollTop() {
-        if (this.isScrolling || !this.hasMoreUp) return;
-        this.isScrolling = true;
-        const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
-        if (prevStartIndex < 0) {
-            this.isScrolling = false;
-            return;
+        // 【【【新增】】】
+        handleScroll(e) {
+        // 当用户向下滑动，离开顶部区域后，重置“刚刚触顶”的状态
+        // 5px 的阈值是为了防止微小抖动造成的误判
+        if (e.scrollY > 5 && this.justReachedTop) {
+            this.justReachedTop = false;
         }
-        this.updateDisplayList(prevStartIndex);
-        prompt.showToast({ message: `加载上页，避免操作` });
-        const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
-        this.$element('songListScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
-        setTimeout(() => { this.isScrolling = false; }, 100);
     },
+
+
+    // 【【【完整替换】】】
+    handleScrollTop() {
+        // 1. 如果正在加载或刷新或滚动，则直接返回
+        if (this.isLoading || this.isRefreshing || this.isScrolling) return;
+
+        // 2. 判断是“向上加载更多”还是“顶部操作”
+        //    如果 hasMoreUp 为 true，说明上方还有数据，执行“向上加载更多”
+        if (this.hasMoreUp) {
+            console.log("触发向上加载更多...");
+            this.isScrolling = true;
+            const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
+            
+            if (prevStartIndex < 0) {
+                this.isScrolling = false;
+                return;
+            }
+
+            this.updateDisplayList(prevStartIndex);
+            
+            const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
+            this.$element('songListScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
+            
+            setTimeout(() => { this.isScrolling = false; }, 100);
+        }
+        // 否则，说明列表已经滚动到最顶部，执行“顶部操作”逻辑
+        else {
+            // 【【【核心逻辑】】】
+            // 只有在线歌单、日推、FM 这几种网络列表才支持下拉刷新
+            if (this.listType !== 'songlist' && this.listType !== 'daily_recommend' && this.listType !== 'personal_fm') {
+                // 对于本地列表，只提示已到顶部
+                prompt.showToast({ message: '已到顶部' });
+                return;
+            }
+
+            // 判断是“首次触顶”还是“再次下拉”
+            if (this.justReachedTop) {
+                console.log("在顶部再次下拉，触发刷新...");
+                this.isRefreshing = true;
+                prompt.showToast({ message: '正在尝试刷新...' });
+
+                // 根据不同列表类型，调用对应的刷新方法
+                let refreshPromise;
+                if (this.listType === 'songlist') {
+                    refreshPromise = this.fetchSonglistFromNetwork(new Set(), true);
+                } else if (this.listType === 'daily_recommend') {
+                    refreshPromise = this.fetchDailyRecommendSongs(new Set());
+                } else if (this.listType === 'personal_fm') {
+                    refreshPromise = this.fetchPersonalFmSongs(new Set());
+                }
+
+                refreshPromise
+                    .then(() => {
+                        prompt.showToast({ message: '刷新成功' });
+                    })
+                    .catch(error => {
+                        console.error("下拉刷新失败:", error);
+                        prompt.showToast({ message: `刷新失败: ${error.message}` });
+                    })
+                    .finally(() => {
+                        this.isRefreshing = false;
+                        this.justReachedTop = false; 
+                    });
+            } 
+            // 否则，说明是第一次滚动到顶部
+            else {
+                console.log("首次滚动到顶部...");
+                prompt.showToast({ message: '已到顶部，再次下拉可刷新' });
+                this.justReachedTop = true;
+            }
+        }
+    },
+
 
     handleScrollBottom() {
         if (this.isScrolling) return;
@@ -877,10 +1036,8 @@ export default {
         });
     },
 
-    /**
-     * 【核心修改】统一的列表项点击事件处理函数
-     */
-     handleItemClick(item) {
+    // --- 交互方法 (部分新增和修改) ---
+    handleItemClick(item) {
         if (this.isMultiSelectMode) {
             this.toggleSongSelection(item.id);
         } else {
@@ -890,26 +1047,20 @@ export default {
 
     toggleMultiSelectMode() {
         this.isMultiSelectMode = !this.isMultiSelectMode;
-        // 【核心修改】清空对象
-        this.selectedSongIdsMap = {}; 
+        if (!this.isMultiSelectMode) {
+            this.selectedSongIdsMap = {}; // 退出时清空选择
+        }
     },
 
-    /**
-     * 【核心修改】使用对象来操作
-     */
     toggleSongSelection(songId) {
         if (this.selectedSongIdsMap[songId]) {
             delete this.selectedSongIdsMap[songId];
         } else {
             this.selectedSongIdsMap[songId] = true;
         }
-        // 【核心修改】为了触发UI更新，我们创建一个新对象
         this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
     },
 
-    /**
-     * 【核心修改】使用对象来操作
-     */
     handleCheckboxChange(event, songId) {
         if (event.checked) {
             this.selectedSongIdsMap[songId] = true;
@@ -919,26 +1070,35 @@ export default {
         this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
     },
 
-    /**
-     * 【核心修改】使用 Object.keys().length 来获取大小
-     */
+    // 【【【新增：全选/取消全选逻辑】】】
+    toggleSelectAll() {
+        // 如果当前已全选，则取消全选 (清空)
+        if (this.isAllSelected) {
+            this.selectedSongIdsMap = {};
+        } 
+        // 否则，全选所有歌曲
+        else {
+            const newSelectedMap = {};
+            this.fullSongList.forEach(song => {
+                newSelectedMap[song.id] = true;
+            });
+            this.selectedSongIdsMap = newSelectedMap;
+        }
+    },
+
     deleteSelectedSongs() {
-        const selectedCount = Object.keys(this.selectedSongIdsMap).length;
-        if (selectedCount === 0) {
+        if (this.selectedCount === 0) {
             prompt.showToast({ message: '请先选择歌曲' });
             return;
         }
         prompt.showDialog({
             title: '删除歌曲',
-            message: `确定要删除选中的 ${selectedCount} 首歌曲吗？`,
+            message: `确定要删除选中的 ${this.selectedCount} 首歌曲吗？`,
             buttons: [{ text: '取消' }, { text: '确定', color: '#ff3b30' }],
             success: async () => {
-                // 【核心修改】从 Map 的键创建数组
                 const idsToDelete = Object.keys(this.selectedSongIdsMap);
-                
                 this.fullSongList = this.fullSongList.filter(song => !idsToDelete.includes(String(song.id)));
                 this.updateDisplayList(this.displayStartIndex);
-
                 try {
                     for (const songId of idsToDelete) {
                         await this.persistDeletion({ id: songId });
@@ -947,36 +1107,26 @@ export default {
                 } catch (error) {
                     prompt.showToast({ message: '部分删除失败，请刷新' });
                 }
-
-                this.toggleMultiSelectMode();
+                this.toggleMultiSelectMode(); // 操作完成后退出多选模式
             }
         });
     },
 
-    /**
-     * 【核心修改】使用 Object.keys().length 来获取大小
-     */
     downloadSelectedSongs() {
-        const selectedCount = Object.keys(this.selectedSongIdsMap).length;
-        if (selectedCount === 0) {
+        if (this.selectedCount === 0) {
             prompt.showToast({ message: '请先选择歌曲' });
             return;
         }
-        
         const songsToDownload = this.fullSongList.filter(song => 
             this.selectedSongIdsMap[song.id] && !song.isDownloaded
         );
-
         if (songsToDownload.length === 0) {
             prompt.showToast({ message: '所选歌曲均已下载' });
-            this.toggleMultiSelectMode();
             return;
         }
-        
         this.downloadQueue.push(...songsToDownload);
         prompt.showToast({ message: `${songsToDownload.length} 首歌曲已加入下载队列` });
-
-        this.toggleMultiSelectMode();
+        this.toggleMultiSelectMode(); // 操作完成后退出多选模式
         this.processDownloadQueue();
     },
 

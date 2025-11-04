@@ -229,5 +229,65 @@ export default {
             prompt.showToast({ message: error.message || "验证失败，请检查网络" });
         }
     },
+    async processAndSaveProfile(profile) {
+        if (!profile || !profile.userId) {
+            throw new Error("无效的用户信息");
+        }
+
+        const finalProfile = {
+            status: 'verified',
+            nickname: profile.nickname,
+            userId: profile.userId,
+            avatarUrl: profile.avatarUrl,
+            backgroundUrl: profile.backgroundUrl,
+            signature: profile.signature,
+        };
+
+        try {
+            // 尝试下载并缓存头像
+            const localAvatarUri = await this.downloadAndCacheAvatar(profile.avatarUrl, profile.userId);
+            finalProfile.localAvatarUri = localAvatarUri;
+        } catch (downloadError) {
+            console.error("下载头像失败:", downloadError);
+            // 下载失败不应阻塞主流程，使用在线URL作为后备
+        }
+
+        // 将最终处理好的用户信息写入文件
+        await this.saveProfileToFile(finalProfile);
+    },
+
+    downloadAndCacheAvatar(avatarUrl, userId) {
+        return new Promise((resolve, reject) => {
+            const fileExtension = avatarUrl.split('.').pop().split('?')[0] || 'jpg';
+            const localUri = `${AVATAR_CACHE_DIR}${userId}.${fileExtension}`;
+
+            // 使用 request.download 来下载文件
+            const request = this.$app.$def.request; // 假设全局有 request 模块
+            if (!request) {
+                return reject(new Error("内部服务错误: request 未找到"));
+            }
+
+            request.download({
+                url: avatarUrl,
+                // filename 是可选的，下载完成后会返回临时路径
+                success: (task) => {
+                    request.onDownloadComplete({
+                        token: task.token,
+                        success: (data) => {
+                            // 下载成功后，将临时文件移动到我们的缓存目录
+                            file.move({
+                                srcUri: data.uri,
+                                dstUri: localUri,
+                                success: () => resolve(localUri),
+                                fail: (err, code) => reject(new Error(`移动头像文件失败: ${code}`)),
+                            });
+                        },
+                        fail: (err, code) => reject(new Error(`下载任务失败: ${code}`)),
+                    });
+                },
+                fail: (err, code) => reject(new Error(`启动下载失败: ${code}`)),
+            });
+        });
+    },
 };
 </script>

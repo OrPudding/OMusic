@@ -1,581 +1,680 @@
+<!-- settings.ux -->
 <template>
-    <!-- FIX: 根组件使用 div，并将滚动限制在内容区，以固定顶栏 -->
-    <div class="page-container">
-        <!-- 1. 固定的顶部栏 -->
-        <div class="header" onclick="goBack">
-            <text class="time-display">{{ currentTime }}</text>
-            <text class="title">‹设置</text>
-        </div>
+	<div class="page-container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header" onclick="goBack">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">{{ titleText }}</text>
+		</div>
 
-        <!-- 2. 独立滚动的内容区 -->
-        <scroll class="scroll-wrapper" scroll-y="true" bounces="true">
-            <div class="settings-list">
-                <!-- 歌词显示 -->
-                <text class="category-title">歌词显示</text>
-                <div class="setting-item">
-                    <text class="item-label">日语歌词</text>
-                    <text class="item-value-btn" onclick="toggleJapaneseLyricMode">{{ japaneseLyricModeText }}</text>
-                </div>
-                <text class="item-desc">适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。</text>
+		<!-- 2. 唯一的、可独立滚动的内容区 -->
+		<scroll
+			id="settings-scroller"
+			class="scroll-wrapper"
+			scroll-y="true"
+			bounces="true"
+		>
+			<!-- ==================== 主菜单 (根页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'main' }}">
+				<div class="setting-group-item" onclick="navigateTo('lyrics')">
+					<text class="item-label">歌词显示</text>
+					<text class="item-arrow">›</text>
+				</div>
+				<div class="setting-group-item" onclick="navigateTo('audioQuality')">
+					<text class="item-label">音质设置</text>
+					<text class="item-arrow">›</text>
+				</div>
+				<div class="setting-group-item" onclick="navigateTo('performance')">
+					<text class="item-label">列表性能</text>
+					<text class="item-arrow">›</text>
+				</div>
+				<div class="setting-group-item" onclick="navigateTo('network')">
+					<text class="item-label">网络与加载</text>
+					<text class="item-arrow">›</text>
+				</div>
+				<div class="setting-group-item" onclick="navigateTo('search')">
+					<text class="item-label">搜索设置</text>
+					<text class="item-arrow">›</text>
+				</div>
+				<div class="setting-group-item" onclick="navigateTo('data')">
+					<text class="item-label">应用数据</text>
+					<text class="item-arrow">›</text>
+				</div>
+			</div>
 
-                <div class="setting-item">
-                    <text class="item-label">粤语歌词</text>
-                    <text class="item-value-btn" onclick="toggleCantoneseLyricMode">{{ cantoneseLyricModeText }}</text>
-                </div>
-                <text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
-                
-                <div class="setting-item">
-                    <text class="item-label">英文歌词</text>
-                    <text class="item-value-btn" onclick="toggleEnglishLyricMode">{{ englishLyricModeText }}</text>
-                </div>
-                <text class="item-desc">适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。</text>
+			<!-- ==================== 歌词显示 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'lyrics' }}">
+				<!-- 【【【新增设置项】】】 -->
+				<div id="lyrics-item-3" class="setting-item">
+					<text class="item-label">歌词提前</text>
+					<text class="item-value-btn" onclick="toggleLyricAdvanceTime">
+						{{ settings.lyricAdvanceTime }}s
+					</text>
+				</div>
+				<text id="lyrics-desc-3" class="item-desc">
+					适当调高可改善歌词滚动延迟，但过高可能导致歌词与歌曲不同步。
+				</text>
 
-                <!-- 音质设置 -->
-                <text class="category-title">音质设置</text>
-                <div class="setting-item">
-                    <text class="item-label">在线播放音质</text>
-                    <text class="item-value-btn" onclick="toggleOnlineQuality">{{ settings.audioQuality.online }}kbps</text>
-                </div>
-                <text class="item-desc">在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。</text>
-        
-                <div class="setting-item">
-                    <text class="item-label">下载音质</text>
-                    <text class="item-value-btn" onclick="toggleDownloadQuality">{{ settings.audioQuality.download }}kbps</text>
-                </div>
-                <text class="item-desc">下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。</text>
-      
-                <!-- 列表性能 -->
-                <text class="category-title">列表性能</text>
-                <div class="setting-item">
-                    <text class="item-label">列表渲染数量</text>
-                    <text class="item-value-btn" onclick="toggleWindowSize">{{ settings.performance.windowSize }}</text>
-                </div>
-                <text class="item-desc">影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。</text>
-                
-                <div class="setting-item">
-                    <text class="item-label">列表加载步长</text>
-                    <text class="item-value-btn" onclick="togglePageSize">{{ settings.performance.pageSize }}</text>
-                </div>
-                <text class="item-desc">每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。</text>
-                
-                <!-- 网络与加载 -->
-                <text class="category-title">网络与加载</text>
-                <div class="setting-item">
-                    <text class="item-label">歌单加载总数</text>
-                    <text class="item-value-btn" onclick="toggleTotalLimit">{{ settings.network.totalLimit }}</text>
-                </div>
-                <text class="item-desc">在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。</text>
-                
-                <div class="setting-item">
-                    <text class="item-label">网络请求分页</text>
-                    <text class="item-value-btn" onclick="toggleApiPageSize">{{ settings.network.apiPageSize }}</text>
-                </div>
-                <text class="item-desc">每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。</text>
-      
-                <!-- 搜索设置 -->
-                <text class="category-title">搜索设置</text>
-                <div class="setting-item">
-                    <text class="item-label">最大搜索结果</text>
-                    <text class="item-value-btn" onclick="toggleSearchTotalLimit">{{ settings.search.totalLimit }}</text>
-                </div>
-                <text class="item-desc">单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。</text>
-                
-                <div class="setting-item">
-                    <text class="item-label">搜索请求分页</text>
-                    <text class="item-value-btn" onclick="toggleSearchApiPageSize">{{ settings.search.apiPageSize }}</text>
-                </div>
-                <text class="item-desc">每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。</text>
+				<div class="setting-item">
+					<text class="item-label">日语歌词</text>
+					<text class="item-value-btn" onclick="toggleJapaneseLyricMode">
+						{{ japaneseLyricModeText }}
+					</text>
+				</div>
+				<text class="item-desc">
+					适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">粤语歌词</text>
+					<text class="item-value-btn" onclick="toggleCantoneseLyricMode">
+						{{ cantoneseLyricModeText }}
+					</text>
+				</div>
+				<text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
+				<div class="setting-item">
+					<text class="item-label">英文歌词</text>
+					<text class="item-value-btn" onclick="toggleEnglishLyricMode">
+						{{ englishLyricModeText }}
+					</text>
+				</div>
+				<text class="item-desc">
+					适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。
+				</text>
+			</div>
 
-                <!-- 应用数据 -->
-                <text class="category-title">应用数据</text>
-                <div class="setting-item">
-                    <text class="item-label">清空缓存数据</text>
-                    <text class="action-btn cache-color" onclick="handleClearCache">清空缓存</text>
-                </div>
-                <text class="item-desc">清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。</text>
+			<!-- ==================== 音质设置 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'audioQuality' }}">
+				<div class="setting-item">
+					<text class="item-label">在线播放音质</text>
+					<text class="item-value-btn" onclick="toggleOnlineQuality">
+						{{ settings.audioQuality.online }}kbps
+					</text>
+				</div>
+				<text class="item-desc">
+					在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">下载音质</text>
+					<text class="item-value-btn" onclick="toggleDownloadQuality">
+						{{ settings.audioQuality.download }}kbps
+					</text>
+				</div>
+				<text class="item-desc">
+					下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。
+				</text>
+			</div>
 
-                <div class="setting-item">
-                    <text class="item-label">退出当前登录</text>
-                    <text class="action-btn logout-color" onclick="handleLogout">退出登录</text>
-                </div>
-                <text class="item-desc">仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。</text>
+			<!-- ==================== 列表性能 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'performance' }}">
+				<div class="setting-item">
+					<text class="item-label">列表渲染数量</text>
+					<text class="item-value-btn" onclick="toggleWindowSize">
+						{{ settings.performance.windowSize }}
+					</text>
+				</div>
+				<text class="item-desc">
+					影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">列表加载步长</text>
+					<text class="item-value-btn" onclick="togglePageSize">
+						{{ settings.performance.pageSize }}
+					</text>
+				</div>
+				<text class="item-desc">
+					每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。
+				</text>
+			</div>
 
-                <div class="setting-item">
-                    <text class="item-label">清除设备授权</text>
-                    <text class="action-btn deauth-color" onclick="handleClearActivation">清除授权</text>
-                </div>
-                <text class="item-desc">清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。</text>
+			<!-- ==================== 网络与加载 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'network' }}">
+				<div class="setting-item">
+					<text class="item-label">歌单加载总数</text>
+					<text class="item-value-btn" onclick="toggleTotalLimit">
+						{{ settings.network.totalLimit }}
+					</text>
+				</div>
+				<text class="item-desc">
+					在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">网络请求分页</text>
+					<text class="item-value-btn" onclick="toggleApiPageSize">
+						{{ settings.network.apiPageSize }}
+					</text>
+				</div>
+				<text class="item-desc">
+					每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。
+				</text>
+			</div>
 
-                <div class="setting-item">
-                    <text class="item-label">清空全部数据</text>
-                    <text class="action-btn reset-color" onclick="handleClearAllData">彻底重置</text>
-                </div>
-                <text class="item-desc">将应用恢复到初始安装状态，清除所有本地数据。</text>
-            </div>
-        </scroll>
-    </div>
+			<!-- ==================== 搜索设置 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'search' }}">
+				<div class="setting-item">
+					<text class="item-label">最大搜索结果</text>
+					<text class="item-value-btn" onclick="toggleSearchTotalLimit">
+						{{ settings.search.totalLimit }}
+					</text>
+				</div>
+				<text class="item-desc">
+					单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">搜索请求分页</text>
+					<text class="item-value-btn" onclick="toggleSearchApiPageSize">
+						{{ settings.search.apiPageSize }}
+					</text>
+				</div>
+				<text class="item-desc">
+					每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。
+				</text>
+			</div>
+
+			<!-- ==================== 应用数据 (子页面) ==================== -->
+			<div class="settings-list" if="{{ currentView === 'data' }}">
+				<div class="setting-item">
+					<text class="item-label">清空缓存数据</text>
+					<text class="action-btn cache-color" onclick="handleClearCache">
+						清空缓存
+					</text>
+				</div>
+				<text class="item-desc">
+					清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">退出当前登录</text>
+					<text class="action-btn logout-color" onclick="handleLogout">
+						退出登录
+					</text>
+				</div>
+				<text class="item-desc">
+					仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">清除设备授权</text>
+					<text class="action-btn deauth-color" onclick="handleClearActivation">
+						清除授权
+					</text>
+				</div>
+				<text class="item-desc">
+					清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。
+				</text>
+				<div class="setting-item">
+					<text class="item-label">清空全部数据</text>
+					<text class="action-btn reset-color" onclick="handleClearAllData">
+						彻底重置
+					</text>
+				</div>
+				<text class="item-desc">
+					将应用恢复到初始安装状态，清除所有本地数据。
+				</text>
+			</div>
+		</scroll>
+	</div>
 </template>
+
 <style>
-    /* --- 页面整体布局 (最终修正版) --- */
-    .page-container {
-        width: 100%;
-        height: 100%;
-        background-color: black;
-        /* 关键：为子元素的绝对定位提供参考系 */
-        position: relative; 
-    }
+.page-container {
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	position: relative;
+}
+.header {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background-color: black;
+	z-index: 10;
+}
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
+.title {
+	font-size: 32px;
+	padding: 5px;
+	text-align: center;
+	font-weight: bold;
+	color: #fff;
+}
+.scroll-wrapper {
+	position: absolute;
+	top: 90px;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+}
 
-    /* 关键：使用 fixed 定位将顶栏固定在屏幕顶部 */
-    .header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 90px;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background-color: black; /* 确保顶栏有背景色，不会被下方内容透出 */
-        z-index: 10; /* 确保顶栏在最上层 */
-    }
-    .time-display {
-        font-size: 28px;
-        font-weight: bold;
-        color: #ffffff;
-        padding-top: 5px;
-        text-align: center;
-    }
-    .title {
-        font-size: 32px;
-        padding: 5px;
-        text-align: center;
-        font-weight: bold;
-        color: #fff;
-    }
+/* --- 列表样式 --- */
+.settings-list {
+	width: 360px;
+	flex-direction: column;
+	align-items: center;
+	padding-top: 10px;
+	/* 【关键适配】默认给圆形屏幕设置 80px 的底部内边距 */
+	padding-bottom: 80px;
+}
 
-    /* 关键：滚动区域从顶栏下方开始，并占据剩余全部高度 */
-    .scroll-wrapper {
-        position: absolute;
-        top: 90px; /* 从顶栏高度(90px)的位置开始 */
-        bottom: 0; /* 一直延伸到底部 */
-        left: 0;
-        right: 0;
-        width: 100%;
-        flex-direction: column;
-        align-items: center;
-    }
+.setting-group-item {
+	width: 100%;
+	height: 80px;
+	padding: 0 30px;
+	margin: 5px 0;
+	background-color: rgba(255, 255, 255, 0.06);
+	border-radius: 40px;
+	justify-content: space-between;
+	align-items: center;
+}
+.item-arrow {
+	font-size: 36px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.5);
+	margin-bottom: 8px;
+}
+.setting-item {
+	width: 100%;
+	height: 80px;
+	padding: 0 20px;
+	margin: 5px 0;
+	background-color: rgba(255, 255, 255, 0.06);
+	border-radius: 40px;
+	justify-content: space-between;
+	align-items: center;
+}
+.item-label {
+	font-weight: bold;
+	font-size: 26px;
+	color: #fff;
+}
+.item-value-btn {
+	min-width: 100px;
+	height: 50px;
+	padding: 0 20px;
+	background-color: rgba(58, 225, 255, 0.2);
+	border-radius: 25px;
+	color: #3ae1ff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+.item-desc {
+	width: 85%;
+	font-size: 20px;
+	color: #666;
+	margin-top: 5px;
+	margin-bottom: 15px;
+}
+.action-btn {
+	min-width: 120px;
+	height: 50px;
+	padding: 0 20px;
+	border-radius: 25px;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+.cache-color {
+	background-color: rgba(255, 204, 0, 0.2);
+	color: #ffcc00;
+}
+.logout-color {
+	background-color: rgba(255, 59, 48, 0.2);
+	color: #ff453a;
+}
+.deauth-color {
+	background-color: rgba(255, 149, 0, 0.2);
+	color: #ff9500;
+}
+.reset-color {
+	background-color: rgba(199, 0, 57, 0.2);
+	color: #c70039;
+}
 
-    /* --- 设置列表样式 (保持不变) --- */
-    .settings-list {
-        width: 360px;
-        flex-direction: column;
-        align-items: center;
-        padding: 10px 0 40px 0;
-    }
-    .category-title {
-        width: 96%;
-        font-size: 26px;
-        font-weight: bold;
-        color: #888;
-        padding: 20px 0 5px 15px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-    }
-    .setting-item {
-        width: 100%;
-        height: 80px;
-        padding: 0 20px;
-        margin: 5px 0;
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 40px;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .item-label {
-        font-weight: bold;
-        font-size: 26px;
-        color: #fff;
-    }
-    .item-value-btn {
-        min-width: 100px;
-        height: 50px;
-        padding: 0 20px;
-        background-color: rgba(58, 225, 255, 0.2);
-        border-radius: 25px;
-        color: #3ae1ff;
-        font-size: 24px;
-        font-weight: bold;
-        text-align: center;
-    }
-    .item-desc {
-        width: 85%;
-        font-size: 20px;
-        color: #666;
-        margin-top: 5px;
-        margin-bottom: 15px;
-    }
-
-    /* --- 危险操作按钮样式 (保持不变) --- */
-    .action-btn { min-width: 120px; height: 50px; padding: 0 20px; border-radius: 25px; font-size: 24px; font-weight: bold; text-align: center; }
-    .cache-color { background-color: rgba(255, 204, 0, 0.2); color: #FFCC00; }
-    .logout-color { background-color: rgba(255, 59, 48, 0.2); color: #FF453A; }
-    .deauth-color { background-color: rgba(255, 149, 0, 0.2); color: #FF9500; }
-    .reset-color { background-color: rgba(199, 0, 57, 0.2); color: #c70039; }
-
-    /* --- 媒体查询 (需要同步调整) --- */
-    @media screen and (shape: rect) {
-        .header {
-            height: 65px; /* 顶栏高度变化 */
-            padding-top: 10px;
-            flex-direction: row-reverse;
-            justify-content: space-around;
-        }
-        /* 关键：滚动区域的起始位置也要相应调整 */
-        .scroll-wrapper {
-            top: 65px; /* 与变化后的顶栏高度保持一致 */
-        }
-        .time-display {
-            font-size: 32px;
-            padding-top: 0px;
-        }
-    }
+/* 【关键适配】媒体查询，完全参考您提供的规范 */
+@media screen and (shape: rect) {
+	/* 1. 适配方形屏幕的顶栏 */
+	.header {
+		height: 65px;
+		padding-top: 10px;
+		flex-direction: row-reverse;
+		justify-content: space-around;
+	}
+	.time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
+	/* 2. 适配滚动区的起始位置 */
+	.scroll-wrapper {
+		top: 65px;
+	}
+	/* 3. 适配方形屏幕的列表底部内边距 */
+	.settings-list {
+		padding-bottom: 10px;
+	}
+}
 </style>
 <script>
-import router from '@system.router';
-import file from '@system.file';
-import prompt from '@system.prompt';
+    import router from '@system.router';
+    import file from '@system.file';
+    import prompt from '@system.prompt';
 
-// --- 文件路径常量 ---
-const LICENSE_FILE_URI = 'internal://files/license.json';
-const SETTINGS_FILE_URI = 'internal://files/settings.json';
-const PROFILE_FILE_URI = 'internal://files/user_profile.json';
-const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
-const COOKIE_FILE_URI = 'internal://files/cookie.txt';
-const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
-const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
+    const LICENSE_FILE_URI = 'internal://files/license.json';
+    const SETTINGS_FILE_URI = 'internal://files/settings.json';
+    const PROFILE_FILE_URI = 'internal://files/user_profile.json';
+    const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
+    const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+    const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
+    const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
+    const PRESETS = {
+        lyrics: { japaneseMode: ['translation', 'romaji', 'original'], cantoneseMode: ['romaji', 'original'], englishMode: ['translation', 'original'], },
+        lyricAdvanceTime: [0, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2], // 单位：秒
+        audioQuality: { online: [64, 128, 192, 320, 990], download: [64, 128, 192, 320] },
+        performance: { windowSize: [20, 30, 40], pageSize: [10, 15, 20], },
+        network: { totalLimit: [50, 200, 500], apiPageSize: [20, 50, 100], },
+        search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25], }
+    };
 
-// ... (PRESETS, private, computed, onInit, updateTime, load/save settings, toggle methods - 保持不变)
-const PRESETS = {
-    lyrics: {
-        japaneseMode: ['translation', 'romaji', 'original'],
-        cantoneseMode: ['romaji', 'original'], 
-        englishMode: ['translation', 'original'],
-    },
-    audioQuality: {
-        online: [64, 128, 192, 320, 990],
-        download: [64, 128, 192, 320]
-    },
-    performance: {
-        windowSize: [20, 30, 40],
-        pageSize: [10, 15, 20],
-    },
-    network: {
-        totalLimit: [50, 200, 500],
-        apiPageSize: [20, 50, 100],
-    },
-    search: {
-        totalLimit: [10, 25, 50],
-        apiPageSize: [5, 10, 25],
-    }
-};
-
-export default {
-    private: {
-        currentTime: '00:00',
-        settings: {
-            lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
-            audioQuality: { online: 64, download: 128 },
-            performance: { windowSize: 30, pageSize: 15 },
-            network: { totalLimit: 200, apiPageSize: 50 },
-            search: { totalLimit: 25, apiPageSize: 10 }
+    export default {
+        private: {
+            currentTime: '00:00',
+            currentView: 'main',
+            viewTitles: {
+                main: '‹设置',
+                lyrics: '‹歌词显示',
+                audioQuality: '‹音质设置',
+                performance: '‹列表性能',
+                network: '‹网络与加载',
+                search: '‹搜索设置',
+                data: '‹应用数据'
+            },
+            settings: {
+                lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
+                lyricAdvanceTime: 1.8,
+                audioQuality: { online: 64, download: 128 },
+                performance: { windowSize: 30, pageSize: 15 },
+                network: { totalLimit: 200, apiPageSize: 50 },
+                search: { totalLimit: 25, apiPageSize: 10 }
+            },
         },
-    },
 
-    computed: {
-        japaneseLyricModeText() {
-            const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' };
-            return map[this.settings.lyrics.japaneseMode] || '未知';
+        computed: {
+            titleText() { return this.viewTitles[this.currentView] || '‹设置'; },
+            japaneseLyricModeText() { const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' }; return map[this.settings.lyrics.japaneseMode] || '未知'; },
+            cantoneseLyricModeText() { const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' }; return map[this.settings.lyrics.cantoneseMode] || '未知'; },
+            englishLyricModeText() { const map = { 'translation': '显示翻译', 'original': '仅显示原文' }; return map[this.settings.lyrics.englishMode] || '未知'; }
         },
-        cantoneseLyricModeText() {
-            const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' };
-            return map[this.settings.lyrics.cantoneseMode] || '未知';
+
+        onInit() {
+            this.updateTime();
+            setInterval(() => this.updateTime(), 1000);
+            this.loadSettings();
         },
-        englishLyricModeText() {
-            const map = { 'translation': '显示翻译', 'original': '仅显示原文' };
-            return map[this.settings.lyrics.englishMode] || '未知';
-        }
-    },
 
-    onInit() {
-        this.updateTime();
-        setInterval(() => this.updateTime(), 1000);
-        this.loadSettings();
-    },
-
-    updateTime() {
-        const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        this.currentTime = `${hours}:${minutes}`;
-    },
-
-    loadSettings() {
-        file.readText({
-            uri: SETTINGS_FILE_URI,
-            success: (data) => {
-                try {
-                    const loadedSettings = JSON.parse(data.text);
-                    this.settings = {
-                        ...this.settings,
-                        ...loadedSettings,
-                        lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
-                        audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) },
-                        performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
-                        network: { ...this.settings.network, ...(loadedSettings.network || {}) },
-                        search: { ...this.settings.search, ...(loadedSettings.search || {}) },
-                    };
-                } catch (e) {
-                    console.error("解析设置文件失败，将保存默认设置。", e);
-                    this.saveSettings();
-                }
-            },
-            fail: () => {
-                console.log("设置文件不存在，将创建并保存默认设置。");
-                this.saveSettings();
-            }
-        });
-    },
-
-    saveSettings() {
-        file.writeText({
-            uri: SETTINGS_FILE_URI,
-            text: JSON.stringify(this.settings, null, 2),
-            success: () => console.log('设置已保存。'),
-            fail: (data, code) => console.error(`保存设置失败, code=${code}`)
-        });
-    },
-
-    _toggleSetting(category, key, presets) {
-        const currentValue = this.settings[category][key];
-        const currentIndex = presets.indexOf(currentValue);
-        const nextIndex = (currentIndex + 1) % presets.length;
-        this.settings[category][key] = presets[nextIndex];
-        this.saveSettings();
-    },
-
-    toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
-    toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
-    toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
-    toggleOnlineQuality() { this._toggleSetting('audioQuality', 'online', PRESETS.audioQuality.online); },
-    toggleDownloadQuality() { this._toggleSetting('audioQuality', 'download', PRESETS.audioQuality.download); },
-    toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
-    togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
-    toggleTotalLimit() { this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit); },
-    toggleApiPageSize() { this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize); },
-    toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
-    toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
-
-    // --- 新增方法 ---
-    handleClearCache() {
-        prompt.showDialog({
-            title: '清除缓存',
-            message: '您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像。',
-            buttons: [{ text: '取消' }, { text: '确定', color: '#007AFF' }], // 使用蓝色作为非危险操作的确认色
-            success: () => {
-                prompt.showToast({ message: '正在清除缓存...' });
-
-                const itemsToClear = [
-                    { uri: AVATAR_CACHE_URI, type: 'file' },
-                    { uri: PLAYLIST_CACHE_DIR, type: 'dir' },
-                    { uri: USER_PLAYLISTS_DIR, type: 'dir' }
-                ];
-                let itemsCount = itemsToClear.length;
-                let hasFailed = false;
-
-                const onComplete = () => {
-                    itemsCount--;
-                    if (itemsCount === 0) {
-                        if (!hasFailed) {
-                            prompt.showToast({ message: '缓存已清除' });
-                        } else {
-                            prompt.showToast({ message: '部分缓存清除失败，可能缓存不存在，这是正常的' });
-                        }
-                    }
-                };
-
-                const onFail = (uri, code) => {
-                    hasFailed = true;
-                    console.error(`清除 ${uri} 失败, code=${code}`);
-                };
-
-                itemsToClear.forEach(item => {
-                    if (item.type === 'file') {
-                        file.delete({
-                            uri: item.uri,
-                            complete: onComplete,
-                            fail: (data, code) => onFail(item.uri, code)
-                        });
-                    } else if (item.type === 'dir') {
-                        file.rmdir({
-                            uri: item.uri,
-                            recursive: true,
-                            complete: onComplete,
-                            fail: (data, code) => onFail(item.uri, code)
-                        });
-                    }
-                });
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
-
-    handleClearActivation() {
-        prompt.showDialog({
-            title: '清除授权',
-            message: '您确定要清除本地授权信息吗？清除后需要重新联网激活应用。',
-            buttons: [{ text: '取消' }, { text: '确定', color: '#FF9500' }],
-            success: () => {
-                prompt.showToast({ message: '正在清除授权...' });
-                file.delete({
-                    uri: LICENSE_FILE_URI,
-                    complete: () => {
-                        if (this.$app.$def) {
-                            this.$app.$def.isActivated = false;
-                        }
-                        prompt.showToast({ message: '授权已清除，请重新启动应用' });
-                        router.replace({ uri: '/pages/splash' });
-                    }
-                });
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
-
-// settings.ux <script>
-handleLogout() {
-    prompt.showDialog({
-        title: '退出登录',
-        message: '您确定要退出登录吗？这将清除您的本地用户数据。',
-        buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-        success: () => {
-            prompt.showToast({ message: '正在退出...' });
-            
-            // 【这样就足够了】: 只需删除文件，requestService 会在下次 fetch 时自动发现
-            const filesToDelete = [PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI];
-            let deleteCount = filesToDelete.length;
-            
-            const onComplete = () => {
-                deleteCount--;
-                if (deleteCount === 0) {
-                    prompt.showToast({ message: '已退出登录' });
-                    router.replace({ uri: '/pages/user' }); 
-                }
-            };
-
-            filesToDelete.forEach(uri => {
-                file.delete({ uri: uri, complete: onComplete });
-            });
+        navigateTo(viewName) {
+            this.currentView = viewName;
+            this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
         },
-        cancel: () => {
-            prompt.showToast({ message: '操作已取消' });
-        }
-    });
-},
 
-
-    handleClearAllData() {
-        prompt.showDialog({
-            title: '清空所有数据',
-            message: '【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？',
-            buttons: [{ text: '取消' }, { text: '确定清空', color: '#FF453A' }],
-            success: () => {
-                prompt.showToast({ message: '正在清空所有数据...' });
-                this.ClearAllData({
-                    success: () => {
-                        if (this.$app.$def) {
-                            this.$app.$def.isActivated = false;
-                            if (this.$app.$def.cookieService) {
-                                this.$app.$def.cookieService.cookie = null;
-                            }
-                        }
-                        prompt.showToast({ message: '所有数据已清空，请重启应用' });
-                        router.replace({ uri: '/pages/splash' });
-                    },
-                    fail: (data, code) => {
-                        prompt.showToast({ message: `清空数据失败，错误码: ${code}` });
-                    }
-                });
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
+        goBack() {
+            if (this.currentView !== 'main') {
+                this.currentView = 'main';
+                this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
+            } else {
+                router.back();
             }
-        });
-    },
+        },
 
-    ClearAllData({ success, fail, complete }) {
-        const baseUri = 'internal://files/';
-        console.log('开始清除所有数据...');
+        updateTime() { const now = new Date(); this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`; },
+        loadSettings() { file.readText({ uri: SETTINGS_FILE_URI, success: (data) => { try { const loadedSettings = JSON.parse(data.text); this.settings = { ...this.settings, ...loadedSettings, lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) }, audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) }, performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) }, network: { ...this.settings.network, ...(loadedSettings.network || {}) }, search: { ...this.settings.search, ...(loadedSettings.search || {}) }, }; } catch (e) { this.saveSettings(); } }, fail: () => { this.saveSettings(); } }); },
+        saveSettings() { file.writeText({ uri: SETTINGS_FILE_URI, text: JSON.stringify(this.settings, null, 2) }); },
 
-        file.list({
-            uri: baseUri,
-            success: (data) => {
-                const fileList = data.fileList;
-                if (fileList.length === 0) {
-                    if (success) success();
-                    if (complete) complete();
-                    return;
-                }
+        // 【【【最终的、唯一的、正确的修正】】】
+        _toggleSetting(category, key, presets) {
+            let targetObject;
+            let currentValue;
 
-                let itemsToDelete = fileList.length;
-                let hasFailed = false;
-
-                const checkCompletion = () => {
-                    itemsToDelete--;
-                    if (itemsToDelete === 0 && !hasFailed) {
-                        if (success) success();
-                        if (complete) complete();
-                    }
-                };
-
-                const failOnce = (errData, errCode, itemUri) => {
-                    if (!hasFailed) {
-                        hasFailed = true;
-                        console.error(`删除 ${itemUri} 失败, code=${errCode}。`);
-                        if (fail) fail(errData, errCode);
-                        if (complete) complete();
-                    }
-                };
-
-                fileList.forEach(item => {
-                    if (hasFailed) return;
-                    if (item.uri.endsWith('/')) {
-                        file.rmdir({
-                            uri: item.uri, recursive: true,
-                            success: () => { checkCompletion(); },
-                            fail: (d, c) => failOnce(d, c, item.uri)
-                        });
-                    } else {
-                        file.delete({
-                            uri: item.uri,
-                            success: () => { checkCompletion(); },
-                            fail: (d, c) => failOnce(d, c, item.uri)
-                        });
-                    }
-                });
-            },
-            fail: (data, code) => {
-                if (fail) fail(data, code);
-                if (complete) complete();
+            // 智能判断目标对象
+            if (key === null) {
+                // 处理顶层设置项，如 lyricAdvanceTime
+                targetObject = this.settings;
+                currentValue = targetObject[category];
+            } else {
+                // 处理嵌套设置项，如 lyrics.japaneseMode
+                targetObject = this.settings[category];
+                currentValue = targetObject[key];
             }
-        });
-    },
 
-    goBack() {
-        router.back();
-    }
+            const currentIndex = presets.indexOf(currentValue);
+            const nextIndex = (currentIndex + 1) % presets.length;
+            const nextValue = presets[nextIndex];
+
+            // 智能更新
+            if (key === null) {
+                targetObject[category] = nextValue;
+            } else {
+                targetObject[key] = nextValue;
+            }
+
+            this.saveSettings();
+        },
+
+        // 【【【调用方式修正】】】
+        toggleLyricAdvanceTime() {
+            // 对于顶层设置项，第二个参数传 null
+            this._toggleSetting('lyricAdvanceTime', null, PRESETS.lyricAdvanceTime);
+        },
+        
+        // 其他调用方式保持不变
+        toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
+        toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
+        toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
+        toggleOnlineQuality() { this._toggleSetting('audioQuality', 'online', PRESETS.audioQuality.online); },
+        toggleDownloadQuality() { this._toggleSetting('audioQuality', 'download', PRESETS.audioQuality.download); },
+        toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
+        togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
+        toggleTotalLimit() { this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit); },
+        toggleApiPageSize() { this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize); },
+        toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
+        toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
+	handleClearCache() {
+		prompt.showDialog({
+			title: "清除缓存",
+			message:
+				"您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像。",
+			buttons: [{ text: "取消" }, { text: "确定", color: "#007AFF" }],
+			success: () => {
+				prompt.showToast({ message: "正在清除缓存..." });
+				const itemsToClear = [
+					{ uri: AVATAR_CACHE_URI, type: "file" },
+					{ uri: PLAYLIST_CACHE_DIR, type: "dir" },
+					{ uri: USER_PLAYLISTS_DIR, type: "dir" },
+				];
+				let itemsCount = itemsToClear.length;
+				let hasFailed = false;
+				const onComplete = () => {
+					itemsCount--;
+					if (itemsCount === 0) {
+						prompt.showToast({
+							message: hasFailed
+								? "部分缓存清除失败，可能缓存不存在，这是正常的"
+								: "缓存已清除",
+						});
+					}
+				};
+				const onFail = (uri, code) => {
+					hasFailed = true;
+					console.error(`清除 ${uri} 失败, code=${code}`);
+				};
+				itemsToClear.forEach((item) => {
+					if (item.type === "file") {
+						file.delete({
+							uri: item.uri,
+							complete: onComplete,
+							fail: (data, code) => onFail(item.uri, code),
+						});
+					} else if (item.type === "dir") {
+						file.rmdir({
+							uri: item.uri,
+							recursive: true,
+							complete: onComplete,
+							fail: (data, code) => onFail(item.uri, code),
+						});
+					}
+				});
+			},
+			cancel: () => {
+				prompt.showToast({ message: "操作已取消" });
+			},
+		});
+	},
+	handleLogout() {
+		prompt.showDialog({
+			title: "退出登录",
+			message: "您确定要退出登录吗？这将清除您的本地用户数据。",
+			buttons: [{ text: "取消" }, { text: "确定", color: "#FF453A" }],
+			success: () => {
+				prompt.showToast({ message: "正在退出..." });
+				const filesToDelete = [
+					PROFILE_FILE_URI,
+					AVATAR_CACHE_URI,
+					COOKIE_FILE_URI,
+				];
+				let deleteCount = filesToDelete.length;
+				const onComplete = () => {
+					deleteCount--;
+					if (deleteCount === 0) {
+						prompt.showToast({ message: "已退出登录" });
+						router.replace({ uri: "/pages/user" });
+					}
+				};
+				filesToDelete.forEach((uri) => {
+					file.delete({ uri: uri, complete: onComplete });
+				});
+			},
+			cancel: () => {
+				prompt.showToast({ message: "操作已取消" });
+			},
+		});
+	},
+	handleClearActivation() {
+		prompt.showDialog({
+			title: "清除授权",
+			message: "您确定要清除本地授权信息吗？清除后需要重新联网激活应用。",
+			buttons: [{ text: "取消" }, { text: "确定", color: "#FF9500" }],
+			success: () => {
+				prompt.showToast({ message: "正在清除授权..." });
+				file.delete({
+					uri: LICENSE_FILE_URI,
+					complete: () => {
+						if (this.$app.$def) {
+							this.$app.$def.isActivated = false;
+						}
+						prompt.showToast({ message: "授权已清除，请重新启动应用" });
+						router.replace({ uri: "/pages/splash" });
+					},
+				});
+			},
+			cancel: () => {
+				prompt.showToast({ message: "操作已取消" });
+			},
+		});
+	},
+	handleClearAllData() {
+		prompt.showDialog({
+			title: "清空所有数据",
+			message:
+				"【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？",
+			buttons: [{ text: "取消" }, { text: "确定清空", color: "#FF453A" }],
+			success: () => {
+				prompt.showToast({ message: "正在清空所有数据..." });
+				this.ClearAllData({
+					success: () => {
+						if (this.$app.$def) {
+							this.$app.$def.isActivated = false;
+							if (this.$app.$def.cookieService) {
+								this.$app.$def.cookieService.cookie = null;
+							}
+						}
+						prompt.showToast({ message: "所有数据已清空，请重启应用" });
+						router.replace({ uri: "/pages/splash" });
+					},
+					fail: (data, code) => {
+						prompt.showToast({ message: `清空数据失败，错误码: ${code}` });
+					},
+				});
+			},
+			cancel: () => {
+				prompt.showToast({ message: "操作已取消" });
+			},
+		});
+	},
+	ClearAllData({ success, fail, complete }) {
+		const baseUri = "internal://files/";
+		file.list({
+			uri: baseUri,
+			success: (data) => {
+				const fileList = data.fileList;
+				if (fileList.length === 0) {
+					if (success) success();
+					if (complete) complete();
+					return;
+				}
+				let itemsToDelete = fileList.length;
+				let hasFailed = false;
+				const checkCompletion = () => {
+					itemsToDelete--;
+					if (itemsToDelete === 0 && !hasFailed) {
+						if (success) success();
+						if (complete) complete();
+					}
+				};
+				const failOnce = (errData, errCode, itemUri) => {
+					if (!hasFailed) {
+						hasFailed = true;
+						console.error(`删除 ${itemUri} 失败, code=${errCode}。`);
+						if (fail) fail(errData, errCode);
+						if (complete) complete();
+					}
+				};
+				fileList.forEach((item) => {
+					if (hasFailed) return;
+					if (item.uri.endsWith("/")) {
+						file.rmdir({
+							uri: item.uri,
+							recursive: true,
+							success: () => {
+								checkCompletion();
+							},
+							fail: (d, c) => failOnce(d, c, item.uri),
+						});
+					} else {
+						file.delete({
+							uri: item.uri,
+							success: () => {
+								checkCompletion();
+							},
+							fail: (d, c) => failOnce(d, c, item.uri),
+						});
+					}
+				});
+			},
+			fail: (data, code) => {
+				if (fail) fail(data, code);
+				if (complete) complete();
+			},
+		});
+	},
 };
 </script>

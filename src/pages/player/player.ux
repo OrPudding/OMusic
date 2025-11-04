@@ -43,23 +43,22 @@
             </div>
 
 <!-- 视图 1: 歌词 -->
+<!-- 视图 1: 歌词 -->
 <div class="swiper-item">
     <scroll id="lyricsScrollView" class="lyrics-scroll-view" scroll-y="true">
         <div class="lyrics-list-padding-top"></div>
         
-        <!-- 【【【性能优化点】】】 -->
-        <!-- 1. 添加 tid 属性，值为一个在数组中唯一的标识符 -->
-        <!-- 2. 我们将在 computed.fullVisibleLyrics 中为每一行歌词生成一个唯一的 line.id -->
+        <!-- 保持此结构以支持未来的歌词特性 -->
         <div
             for="{{(index, line) in fullVisibleLyrics}}"
             tid="line.id" 
             id="lyric-line-{{ index }}"
             class="lyric-line-wrapper {{ line.isCurrent ? 'is-current-wrapper' : '' }}"
         >
-            <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}" style="{{ line.dynamicStyle }}">
+            <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}">
                 {{ line.original }}
             </text>
-            <text if="{{ line.isCurrent && line.extra }}" class="lyric-line extra-lyric" style="{{ line.dynamicStyle }}">
+            <text if="{{ line.isCurrent && line.extra }}" class="lyric-line extra-lyric">
                 {{ line.extra }}
             </text>
         </div>
@@ -69,11 +68,12 @@
 </div>
 
 
-            <!-- 视图 2: 评论 -->
+
+            <!-- 视图 2: 评论 
             <div class="swiper-item comments-view">
                 <image class="placeholder-icon" src="/common/icon/comment.png"></image>
                 <text class="placeholder-text">评论区即将上线</text>
-            </div>
+            </div>-->
         </swiper>
 	</div>
 </template>
@@ -108,7 +108,8 @@
 .singer-name { 
     width: 300px; 
     font-size: 24px; 
-    color: rgba(255, 255, 255, 0.8); 
+    /* 【修改】使用固定颜色代替透明度 */
+    color: #CCCCCC; 
     lines: 1; 
     text-overflow: ellipsis; 
     text-align: center; 
@@ -120,7 +121,8 @@
     /* 让 swiper 占据剩余的所有空间 */
     flex-grow: 1; 
     indicator-size: 10px;
-    indicator-color: rgba(255, 255, 255, 0.2);
+    /* 【修改】使用固定颜色代替透明度 */
+    indicator-color: #555555;
     indicator-selected-color: #3ae1ff;
     indicator-bottom: 10px; /* 指示器位置微调 */
 }
@@ -187,10 +189,11 @@
     height: 64px; 
 }
 
-/* --- 歌词视图样式 (已优化 - 无动画版) --- */
+/* --- 歌词视图样式 (已优化 - 无透明度版) --- */
 .lyrics-scroll-view {
     width: 100%;
     height: 100%;
+    padding:0 10px;
     flex-direction: column;
     align-items: center;
 }
@@ -203,28 +206,25 @@
     align-items: center;
     justify-content: center;
     padding: 3px 0;
-    /* 【移除】移除了 background-color 的 transition */
 }
 .is-current-wrapper {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 24px;
+    /* 【修改】使用固定颜色代替透明度 */
+    background-color: #1A1A1A; 
+    border-radius: 50%;
 }
 .lyric-line {
     width: 90%;
     text-align: center;
     lines: -1;
-    /* 【移除】移除了所有 transition 属性 */
     
-    /* 【修改】默认状态：非当前行 */
-    opacity: 0.6; /* 相比动画版，可以稍微调高非当前行的透明度，使其更清晰 */
-    color: #FFFFFF;
+    /* 【核心修改】默认状态：非当前行，使用灰色代替白色+透明度 */
+    color: #999999; 
     font-size: 24px;
 }
 
-/* 【修改】当前行的激活状态 */
+/* 【核心修改】当前行的激活状态 */
 .current-lyric {
-    opacity: 1;
-    /* transform: scale(1); */ /* 默认就是1，无需重复定义 */
+    /* 【移除】opacity: 1; (已是默认) */
     color: #3ae1ff;
     font-weight: bold;
     font-size: 26px;
@@ -233,21 +233,23 @@
 
 .extra-lyric {
     font-size: 20px;
-    color: #FFFFFF;
+    /* 【修改】使用固定颜色代替白色+透明度 */
+    color: #BBBBBB;
     padding-bottom: 6px;
-    /* 【移除】移除了淡入动画 */
 }
 
 
 /* --- 评论区占位符 --- */
 .comments-view {
     justify-content: center;
-    color: rgba(255, 255, 255, 0.4);
+    /* 【修改】使用固定颜色代替透明度 */
+    color: #666666;
 }
 .placeholder-icon {
     width: 60px;
     height: 60px;
-    color: rgba(255, 255, 255, 0.3);
+    /* 【修改】使用固定颜色代替透明度 */
+    color: #4D4D4D;
 }
 .placeholder-text {
     font-size: 24px;
@@ -262,6 +264,11 @@
     .progress {
         width: 400px;
     }
+    .is-current-wrapper {
+        /* 【修改】使用固定颜色代替透明度 */
+        background-color: #1A1A1A;
+        border-radius: 24px;
+    }
     .lyrics-list-padding-top, .lyrics-list-padding-bottom {
         height: 190px;
     }
@@ -271,6 +278,7 @@
     .extra-lyric { font-size: 19px; }
 }
 </style>
+
 
 <script>
 import router from "@system.router";
@@ -282,6 +290,7 @@ import app from "@system.app";
 
 // --- 1. 引入新的服务模块 ---
 import apiService from '../../services/api.js';
+import throttle from '../../utils/throttle.js';
 
 // --- 2. 常量和文件服务封装 (保持不变) ---
 const CONSTANTS = {
@@ -310,7 +319,7 @@ export default {
     // expend: false, // <--- 删除此行
     swiperCurrentIndex: 0, // <--- 添加此行
         downloadedSongs: {},
-        settings: { lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' }, audioQuality: { online: 64, download: 128 } },
+        settings: { lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },lyricAdvanceTime:1.8, audioQuality: { online: 64, download: 128 } },
         isPlaying: false,
         cookie: null,
         isDownloadingLocked: false,
@@ -327,6 +336,8 @@ export default {
         pendingSongId: null,
         playTimeoutId: null,
         needsRefresh: false,
+        // 【新增】缓存滚动容器元素，避免重复查询
+        _lyricsScrollView: null,
     },
 
     protected: {
@@ -387,8 +398,11 @@ export default {
 
     // --- 生命周期函数 (保持不变) ---
     async onInit() {
-        if (this.$app.$def.isActivated === false) { router.replace({ uri: '/pages/splash' }); return; }
+        if (this.$app.$def.isActivated !== true) { router.replace({ uri: '/pages/splash' }); return; }
         console.log("Player onInit: 准备基础环境。");
+        this.throttledSliderChange = throttle(this.applySliderChange, 200);
+        
+        // ... 您已有的 onInit 剩余代码 ...
         this.bindAudioEvents();
         await this.loadSettings();
         await this.loadCookie();
@@ -532,7 +546,7 @@ async onRefresh(query) {
         this.swiperCurrentIndex = e.index;
         
         // 当用户滑动到歌词页时，主动触发一次滚动，确保位置正确
-        if (this.swiperCurrentIndex === 1.5) {
+        if (this.swiperCurrentIndex === 1) {
             this.scrollToCurrentLyric(); 
         }
     },
@@ -547,7 +561,21 @@ async onRefresh(query) {
         if (!audio.src) { this.startLogic(); return; }
         if (!this.isChangingSong) this.playerState.isPlaying ? audio.pause() : audio.play();
     },
-    onSliderChange(e) { if (this.playerState.isPlaying || audio.duration > 0) { audio.currentTime = e.progress; this.updateLyric(); } },
+        // 真正执行 seek 的方法
+        applySliderChange(progress) {
+        console.log(`[Throttled] Applying seek to: ${progress}`);
+        if (this.playerState.isPlaying || audio.duration > 0) {
+            audio.currentTime = progress;
+            this.updateLyric(); // 手动更新歌词以保证UI响应
+        }
+    },
+
+    // 进度条的 onchange 事件处理函数
+    onSliderChange(e) {
+        // 3. 调用节流后的函数，而不是直接操作 audio
+        //    注意：这里需要通过 this 来调用
+        this.throttledSliderChange(e.progress);
+    },
     goToSongActions() {
         if (!this.currSong) { prompt.showToast({ message: '当前无播放歌曲' }); return; }
         router.push({ uri: "/pages/volume", params: { currentSong: JSON.stringify(this.currSong), screenShape: this.screenShape, playMode: this.playMode, isFmMode: this.isFmMode } });
@@ -576,23 +604,25 @@ async onRefresh(query) {
         router.push({ uri: "/pages/menu" });
     },
     exit() { app.terminate(); },
-
-    // --- 下载逻辑 (已重构) ---
+    // --- 下载逻辑 (已重构并使用闭包管理周期性提示) ---
     initiateDownload() {
-        // 【关键】由于 onInit 中的 await，这里的 this.downloadedSongs 保证是一个对象
+        // 1. 前置检查 (保持不变)
         if (typeof this.downloadedSongs !== 'object' || this.downloadedSongs === null) {
             prompt.showToast({ message: '下载列表未准备好，请稍后重试' });
-            // 可以在这里增加一个重试逻辑
             this.loadDownloadedSongs();
             return;
         }
-
         if (!this.currSong) { prompt.showToast({ message: '歌曲信息无效，无法下载' }); return; }
         if (this.downloadedSongs[this.currSong.id]) { prompt.showToast({ message: '歌曲已下载' }); return; }
         if (this.isDownloadingLocked) { prompt.showToast({ message: '已有任务在下载中' }); return; }
 
+        // 2. 【【【核心】】】在方法作用域顶部声明一个变量，用于存储定时器ID
+        let downloadToastTimer = null;
+
+        // 3. 初始提示
         prompt.showToast({ message: `开始准备下载: ${this.currSong.name}` });
 
+        // 4. 调用下载服务
         this.$app.$def.downloadService.start(
             this.currSong,
             { cookie: this.cookie, downloadBitrate: this.settings.audioQuality.download },
@@ -600,23 +630,22 @@ async onRefresh(query) {
                 onStart: (song) => {
                     this.isDownloadingLocked = true;
                     this.songBeingDownloaded = { ...song };
+
+                    // 【【【核心】】】创建定时器，并将其ID赋值给外部作用域的变量
+                    downloadToastTimer = setInterval(() => {
+                        if (this.songBeingDownloaded) {
+                            prompt.showToast({ message: `下载中` ,duration: 500});
+                        }
+                    }, 3000);
                 },
                 
                 onSuccess: async (downloadedInfo) => {
+                    // ... (成功逻辑保持不变)
                     try {
-                        // 【正确操作】此时 this.downloadedSongs 是一个真正的对象
-                        const updatedSongs = {
-                            ...this.downloadedSongs,
-                            [downloadedInfo.id]: downloadedInfo
-                        };
-                        
-                        // 调用写入服务
+                        const updatedSongs = { ...this.downloadedSongs, [downloadedInfo.id]: downloadedInfo };
                         await fileService.writeJson(CONSTANTS.FILE_DOWNLOADED_SONGS, updatedSongs);
-
-                        // 只有在文件确认写入成功后，才更新内存状态并提示用户
                         this.downloadedSongs = updatedSongs;
                         prompt.showToast({ message: `${downloadedInfo.name} 下载并记录成功`, duration: 5000 });
-
                     } catch (error) {
                         console.error("写入下载记录失败:", error);
                         prompt.showToast({ message: `歌曲已下载，但保存记录失败: ${error.message}` });
@@ -624,16 +653,25 @@ async onRefresh(query) {
                 },
                 
                 onError: (errorMessage) => {
+                    // ... (失败逻辑保持不变)
                     prompt.showToast({ message: `下载失败: ${errorMessage}` });
                 },
                 
                 onFinish: () => {
+                    // 【【【核心】】】
+                    // onFinish 回调作为闭包，可以访问并清除在外部作用域中声明的 downloadToastTimer
+                    if (downloadToastTimer) {
+                        clearInterval(downloadToastTimer);
+                        console.log("下载提示定时器已清除。");
+                    }
+
                     this.isDownloadingLocked = false;
                     this.songBeingDownloaded = null;
                 }
             }
         );
     },
+
 
     /**
      * 【核心修正】: startLogic 不再处理恢复逻辑，职责更单一
@@ -902,77 +940,102 @@ async onRefresh(query) {
             index: 1
         });
     },
-/**
- * 【【【最终优化版 + 提前切换】】】
- * updateLyric 逻辑，增加了时间范围检查，并实现了提前切换歌词以优化体验。
- */
- updateLyric() {
-    // 1. 早期退出：如果歌词数据还没准备好，直接返回，避免无效计算。
-    if (!this.lyrics || this.lyrics.length === 0) {
-        return;
-    }
+    /**
+     * 【【【核心优化函数】】】
+     * 歌词更新逻辑
+     * 此函数由 audio.ontimeupdate 触发
+     */
+     updateLyric() {
+        // 1. 早期退出：如果歌词数据还没准备好，或当前不在歌词页，直接返回。
+        if (!this.lyrics || this.lyrics.length === 0 || this.swiperCurrentIndex !== 1) {
+            return;
+        }
 
-    // --- 核心修改点：使用“幽灵时间”进行计算 ---
-    const PRE_SWITCH_OFFSET = 1.5; // 定义一个常量，方便调整提前的秒数（例如提前0.5秒高亮）
-    const currentTime = this.playerState.playDuration;
-    const lookaheadTime = currentTime + PRE_SWITCH_OFFSET; // 我们用这个“幽灵时间”来判断该高亮哪一行
+        // 2. 引入“幽灵时间”进行计算，以实现歌词提前高亮。
+        const preSwitchOffset = this.settings.lyricAdvanceTime || 1.8;
+        const lookaheadTime = this.playerState.playDuration + preSwitchOffset;
 
-    const currentIndex = this.playerState.currentLyricIndex;
-    const currentLine = this.lyrics[currentIndex];
+        // 3. 时间范围快速检查 (高性能路径)，避免在歌词行未变化时进行不必要的计算。
+        const currentIndex = this.playerState.currentLyricIndex;
+        const currentLine = this.lyrics[currentIndex];
+        const nextLine = this.lyrics[currentIndex + 1];
+        if (nextLine && lookaheadTime >= currentLine.time && lookaheadTime < nextLine.time) {
+            return; // 当前行无需变化，直接返回
+        }
 
-    // 2. 时间范围快速检查 (性能优化的关键)
-    //    我们假设下一行歌词存在，并检查“幽灵时间”是否还在当前行的时间范围内。
-    const nextLine = this.lyrics[currentIndex + 1];
-    
-    // 如果下一行存在，并且“幽灵时间”处于 [当前行开始时间, 下一行开始时间) 这个区间内...
-    if (nextLine && lookaheadTime >= currentLine.time && lookaheadTime < nextLine.time) {
-        // ...说明歌词行不需要改变，直接退出。这是最高频的路径，几乎零计算量。
-        return; 
-    }
-
-    // 3. 执行完整的查找逻辑 (低频路径)
-    //    只有在“幽灵时间”超出了上述范围，或者已经是最后一行时，才需要重新遍历数组来查找。
-    //    我们查找第一个时间点大于“幽灵时间”的行。
-    let newIndex = this.lyrics.findIndex(line => line.time > lookaheadTime);
-    
-    // 如果没找到（意味着是最后一行），则 newIndex 为 -1。
-    if (newIndex === -1) {
-        // 将索引设置为最后一行。
-        newIndex = this.lyrics.length > 0 ? this.lyrics.length - 1 : 0;
-    } else {
-        // 如果找到了，我们需要的是它前一行（也就是当前应该高亮的行）。
-        newIndex = Math.max(0, newIndex - 1);
-    }
-    
-    // 4. 最终检查与更新UI
-    //    只有在计算出的新索引与当前索引不同时，才更新状态并滚动视图。
-    if (newIndex !== currentIndex) {
-        this.playerState.currentLyricIndex = newIndex;
-        this.scrollToCurrentLyric(); // 触发滚动到高亮行
-    }
-},
-
-
-        // scrollToCurrentLyric 方法保持不变
-        scrollToCurrentLyric() {
-            const scrollElement = this.$element('lyricsScrollView');
-            if (!scrollElement) return;
-            const lineElement = this.$element(`lyric-line-${this.playerState.currentLyricIndex}`);
-            if (!lineElement) return;
-
-            scrollElement.getBoundingClientRect({
-                success: (scrollRect) => {
-                    lineElement.getBoundingClientRect({
-                        success: (lineRect) => {
-                            const targetTopInContainer = scrollRect.height * 0.4;
-                            const lineTopInContainer = lineRect.top - scrollRect.top;
-                            const scrollOffset = lineTopInContainer - targetTopInContainer;
-                            scrollElement.scrollBy({ top: scrollOffset, behavior: 'instant' });
-                        }
-                    });
-                }
+        // 4. 执行完整的查找逻辑 (低频路径)，找到当前应该高亮的新索引。
+        let newIndex = this.lyrics.findIndex(line => line.time > lookaheadTime);
+        if (newIndex === -1) {
+            newIndex = this.lyrics.length > 0 ? this.lyrics.length - 1 : 0;
+        } else {
+            newIndex = Math.max(0, newIndex - 1);
+        }
+        
+        // 5. 【关键】只有在计算出的新索引与当前索引不同时，才执行更新和滚动。
+        if (newIndex !== currentIndex) {
+            // a. 立即更新数据状态。
+            //    这会触发框架在下一个渲染周期中去更新DOM（即改变高亮行的class）。
+            this.playerState.currentLyricIndex = newIndex;
+            
+            // b. 【关键】使用 $nextTick，确保在DOM更新完成后再执行滚动。
+            this.$nextTick(() => {
+                this.scrollToCurrentLyric();
             });
-        },
+        }
+    },
+
+    /**
+     * 【【【核心优化函数 - 已修复居中偏移问题】】】
+     * 滚动到当前高亮歌词
+     */
+     scrollToCurrentLyric() {
+        // 1. 检查页面是否在歌词页
+        if (this.swiperCurrentIndex !== 1) {
+            return;
+        }
+
+        // 2. 检查滚动容器是否已缓存
+        if (!this._lyricsScrollView) {
+            this._lyricsScrollView = this.$element('lyricsScrollView');
+            if (!this._lyricsScrollView) return; // 如果获取失败则退出
+        }
+
+        // 3. 获取当前高亮行元素 (这是包含主歌词和附加歌词的整个wrapper div)
+        const lineElement = this.$element(`lyric-line-${this.playerState.currentLyricIndex}`);
+        if (!lineElement) return;
+
+        // 4. 将两次 getBoundingClientRect 合并到一个回调链中
+        this._lyricsScrollView.getBoundingClientRect({
+            success: (scrollRect) => {
+                lineElement.getBoundingClientRect({
+                    success: (lineRect) => {
+                        // 【【【核心修复】】】
+                        // 这里的 lineRect.height 是当前高亮区块的【实际渲染高度】。
+                        // 当显示附加歌词时，这个值会自然变大。
+                        
+                        // 1. 计算滚动容器的目标中线位置 (例如，容器高度的40%处)
+                        const targetCenterY = scrollRect.height * 0.4;
+                        
+                        // 2. 计算当前高亮区块的顶部边缘，在其父容器(滚动区域)中的相对位置
+                        const lineTopInContainer = lineRect.top - scrollRect.top;
+                        
+                        // 3. 计算为了让【高亮区块的中心】对齐到【目标中线】所需的滚动量
+                        //    公式解读:
+                        //    a. (lineTopInContainer + lineRect.height / 2) 是高亮区块的中心线位置
+                        //    b. 减去 targetCenterY，就是中心线之间的距离，即需要滚动的偏移量
+                        const scrollOffset = (lineTopInContainer + lineRect.height / 2) - targetCenterY;
+                        
+                        // 4. 执行滚动
+                        this._lyricsScrollView.scrollBy({ 
+                            top: scrollOffset, 
+                            behavior: 'smooth' 
+                        });
+                    }
+                });
+            }
+        });
+    },
+
     // --- 播放器事件绑定 (已补全系统全局控制事件) ---
     bindAudioEvents() {
         // 同步播放/暂停状态
@@ -1096,8 +1159,14 @@ async onRefresh(query) {
         try {
             const data = await fileService.readJson(CONSTANTS.SETTINGS_FILE_URI);
             if (data) {
-                this.settings = { ...this.settings, ...data, lyrics: { ...this.settings.lyrics, ...(data.lyrics || {}) }, audioQuality: { ...this.settings.audioQuality, ...(data.audioQuality || {}) } };
-                console.log("播放器设置加载成功，在线音质:", this.settings.audioQuality.online);
+                // 【【【修改】】】确保 lyricAdvanceTime 能被正确合并
+                this.settings = { 
+                    ...this.settings, 
+                    ...data, 
+                    lyrics: { ...this.settings.lyrics, ...(data.lyrics || {}) }, 
+                    audioQuality: { ...this.settings.audioQuality, ...(data.audioQuality || {}) } 
+                };
+                console.log("播放器设置加载成功，歌词提前量:", this.settings.lyricAdvanceTime);
             }
         } catch (e) { console.log("无法加载播放器设置，使用默认值。"); }
     },

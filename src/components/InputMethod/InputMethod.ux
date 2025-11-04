@@ -572,10 +572,10 @@ export default {
     this.clearWaiting();
     this.resetReslutList();
   },
-  watchHidePropsChange(newV, oldV) {
+  watchHidePropsChange(newV) {
     this.$emit("visibilityChange", { visible: newV });
   },
-  watchMaxLengthPropsChange(newV, oldV) {
+  watchMaxLengthPropsChange(newV) {
     if (newV) {
       const tempCvalList = [];
       for (let i = 0; i < newV; i++) {
