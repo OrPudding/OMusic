@@ -446,7 +446,7 @@
 	// 在 PRESETS 同级位置定义手势常量
 	const GESTURE_ACTIONS = ['none', 'lyrics', 'playlist', 'search', 'user', 'settings', 'prev', 'next'];
 const GESTURE_ACTION_TEXTS = {
-    none: '无',
+    none: '无操作',
     lyrics: '切换歌词页', // 新增
     playlist: '播放列表',
     search: '搜索',
