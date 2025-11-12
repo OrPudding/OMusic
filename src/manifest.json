@@ -1,8 +1,8 @@
 {
   "package": "moe.orpu.omusic",
   "name": "OMusic",
-  "versionName": "1.2",
-  "versionCode": 3,
+  "versionName": "1.3",
+  "versionCode": 130,
   "minPlatformVersion": 1000,
   "icon": "/common/icon.png",
   "deviceTypeList": [
@@ -47,6 +47,9 @@
     },
     {
       "name": "system.crypto"
+    },
+    {
+      "name": "system.brightness"
     }
   ],
   "config": {

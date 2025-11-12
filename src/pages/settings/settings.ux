@@ -14,37 +14,40 @@
 			scroll-y="true"
 			bounces="true"
 		>
-			<!-- ==================== 主菜单 (根页面) ==================== -->
-			<div class="settings-list" if="{{ currentView === 'main' }}">
-				<div class="setting-group-item" onclick="navigateTo('lyrics')">
-					<text class="item-label">歌词显示</text>
+			<!-- ==================== 主菜单 (根页面)，已替换为用户页的 item 样式 ==================== -->
+			<div class="menu-list" if="{{ currentView === 'main' }}">
+				<div class="menu-item" onclick="navigateTo('lyrics')">
+					<text class="item-text">歌词显示</text>
 					<text class="item-arrow">›</text>
 				</div>
-				<div class="setting-group-item" onclick="navigateTo('audioQuality')">
-					<text class="item-label">音质设置</text>
+				<div class="menu-item" onclick="navigateTo('gestures')">
+                    <text class="item-text">快捷手势</text>
+                    <text class="item-arrow">›</text>
+                </div>
+				<div class="menu-item" onclick="navigateTo('audioQuality')">
+					<text class="item-text">音质设置</text>
 					<text class="item-arrow">›</text>
 				</div>
-				<div class="setting-group-item" onclick="navigateTo('performance')">
-					<text class="item-label">列表性能</text>
+				<div class="menu-item" onclick="navigateTo('performance')">
+					<text class="item-text">列表性能</text>
 					<text class="item-arrow">›</text>
 				</div>
-				<div class="setting-group-item" onclick="navigateTo('network')">
-					<text class="item-label">网络与加载</text>
+				<div class="menu-item" onclick="navigateTo('network')">
+					<text class="item-text">网络与加载</text>
 					<text class="item-arrow">›</text>
 				</div>
-				<div class="setting-group-item" onclick="navigateTo('search')">
-					<text class="item-label">搜索设置</text>
+				<div class="menu-item" onclick="navigateTo('search')">
+					<text class="item-text">搜索设置</text>
 					<text class="item-arrow">›</text>
 				</div>
-				<div class="setting-group-item" onclick="navigateTo('data')">
-					<text class="item-label">应用数据</text>
+				<div class="menu-item" onclick="navigateTo('data')">
+					<text class="item-text">应用数据</text>
 					<text class="item-arrow">›</text>
 				</div>
 			</div>
 
 			<!-- ==================== 歌词显示 (子页面) ==================== -->
 			<div class="settings-list" if="{{ currentView === 'lyrics' }}">
-				<!-- 【【【新增设置项】】】 -->
 				<div id="lyrics-item-3" class="setting-item">
 					<text class="item-label">歌词提前</text>
 					<text class="item-value-btn" onclick="toggleLyricAdvanceTime">
@@ -81,6 +84,48 @@
 					适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。
 				</text>
 			</div>
+
+			            <!-- ==================== 快捷手势 (新增子页面) ==================== -->
+						<div class="settings-list" if="{{ currentView === 'gestures' }}">
+							<div class="setting-item">
+								<text class="item-label">播放页左滑</text>
+								<text class="item-value-btn" onclick="toggleGesture('left')">
+									{{ gestureLeftText }}
+								</text>
+							</div>
+							<text class="item-desc">
+								在播放器控制页，从屏幕中间向左滑动时触发的操作。
+							</text>
+							<div class="setting-item">
+								<text class="item-label">播放页右滑</text>
+								<text class="item-value-btn" onclick="toggleGesture('right')">
+									{{ gestureRightText }}
+								</text>
+							</div>
+							<text class="item-desc">
+								在播放器控制页，从屏幕中间向右滑动时触发的操作。
+							</text>
+			
+							<div class="setting-item">
+								<text class="item-label">播放页上滑</text>
+								<text class="item-value-btn" onclick="toggleGesture('up')">
+									{{ gestureUpText }}
+								</text>
+							</div>
+							<text class="item-desc">
+								在播放器控制页，从屏幕中间向上滑动时触发的操作。
+							</text>
+			
+							<div class="setting-item">
+								<text class="item-label">播放页下滑</text>
+								<text class="item-value-btn" onclick="toggleGesture('down')">
+									{{ gestureDownText }}
+								</text>
+							</div>
+							<text class="item-desc">
+								在播放器控制页，从屏幕中间向下滑动时触发的操作。
+							</text>
+						</div>
 
 			<!-- ==================== 音质设置 (子页面) ==================== -->
 			<div class="settings-list" if="{{ currentView === 'audioQuality' }}">
@@ -255,34 +300,46 @@
 	width: 100%;
 	flex-direction: column;
 	align-items: center;
+    padding-top: 10px; /* 为列表顶部增加一点间距 */
 }
 
-/* --- 列表样式 --- */
+/* --- 根菜单样式 (复刻自 user.ux) --- */
+.menu-list {
+    width: 360px;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 80px; /* 适配圆形屏幕底部 */
+}
+.menu-item {
+    width: 100%;
+    height: 80px;
+    background-color: rgba(255, 255, 255, 0.06);
+    margin: 5px 0;
+    border-radius: 36px;
+    align-items: center;
+    padding: 0 30px;
+    justify-content: space-between;
+}
+.item-text {
+    font-size: 30px;
+    font-weight: bold;
+    color: #fff;
+}
+.item-arrow {
+    font-size: 36px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- 子页面列表样式 (原 settings.ux 样式) --- */
+/* --- 子页面列表样式 (原 settings.ux 样式) --- */
 .settings-list {
 	width: 360px;
 	flex-direction: column;
 	align-items: center;
-	padding-top: 10px;
-	/* 【关键适配】默认给圆形屏幕设置 80px 的底部内边距 */
 	padding-bottom: 80px;
 }
-
-.setting-group-item {
-	width: 100%;
-	height: 80px;
-	padding: 0 30px;
-	margin: 5px 0;
-	background-color: rgba(255, 255, 255, 0.06);
-	border-radius: 40px;
-	justify-content: space-between;
-	align-items: center;
-}
-.item-arrow {
-	font-size: 36px;
-	font-weight: bold;
-	color: rgba(255, 255, 255, 0.5);
-	margin-bottom: 8px;
-}
+/* .setting-group-item 样式已被 .menu-item 替代，故移除 */
 .setting-item {
 	width: 100%;
 	height: 80px;
@@ -295,7 +352,7 @@
 }
 .item-label {
 	font-weight: bold;
-	font-size: 26px;
+	font-size: 28px;  /* <-- 从 26px 增大到 28px */
 	color: #fff;
 }
 .item-value-btn {
@@ -305,14 +362,14 @@
 	background-color: rgba(58, 225, 255, 0.2);
 	border-radius: 25px;
 	color: #3ae1ff;
-	font-size: 24px;
+	font-size: 26px;  /* <-- 从 24px 增大到 26px */
 	font-weight: bold;
 	text-align: center;
 }
 .item-desc {
 	width: 85%;
-	font-size: 20px;
-	color: #666;
+	font-size: 22px;  /* <-- 从 20px 增大到 22px */
+	color: #888;     /* <-- 颜色从 #666 调整为 #888，更柔和 */
 	margin-top: 5px;
 	margin-bottom: 15px;
 }
@@ -321,10 +378,11 @@
 	height: 50px;
 	padding: 0 20px;
 	border-radius: 25px;
-	font-size: 24px;
+	font-size: 26px;  /* <-- 从 24px 增大到 26px */
 	font-weight: bold;
 	text-align: center;
 }
+
 .cache-color {
 	background-color: rgba(255, 204, 0, 0.2);
 	color: #ffcc00;
@@ -342,9 +400,8 @@
 	color: #c70039;
 }
 
-/* 【关键适配】媒体查询，完全参考您提供的规范 */
+/* --- 媒体查询，适配方形屏幕 --- */
 @media screen and (shape: rect) {
-	/* 1. 适配方形屏幕的顶栏 */
 	.header {
 		height: 65px;
 		padding-top: 10px;
@@ -355,16 +412,17 @@
 		font-size: 32px;
 		padding-top: 0px;
 	}
-	/* 2. 适配滚动区的起始位置 */
 	.scroll-wrapper {
 		top: 65px;
 	}
-	/* 3. 适配方形屏幕的列表底部内边距 */
-	.settings-list {
+	/* 为方形屏幕的列表底部设置较小的内边距 */
+	.menu-list, .settings-list {
 		padding-bottom: 10px;
 	}
 }
 </style>
+
+
 <script>
     import router from '@system.router';
     import file from '@system.file';
@@ -385,6 +443,18 @@
         network: { totalLimit: [50, 200, 500], apiPageSize: [20, 50, 100], },
         search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25], }
     };
+	// 在 PRESETS 同级位置定义手势常量
+	const GESTURE_ACTIONS = ['none', 'lyrics', 'playlist', 'search', 'user', 'settings', 'prev', 'next'];
+const GESTURE_ACTION_TEXTS = {
+    none: '无',
+    lyrics: '切换歌词页', // 新增
+    playlist: '播放列表',
+    search: '搜索',
+    user: '个人中心',
+    settings: '设置',
+    prev: '上一首',
+    next: '下一首'
+};
 
     export default {
         private: {
@@ -393,6 +463,7 @@
             viewTitles: {
                 main: '‹设置',
                 lyrics: '‹歌词显示',
+                gestures: '‹快捷手势',
                 audioQuality: '‹音质设置',
                 performance: '‹列表性能',
                 network: '‹网络与加载',
@@ -405,7 +476,13 @@
                 audioQuality: { online: 64, download: 128 },
                 performance: { windowSize: 30, pageSize: 15 },
                 network: { totalLimit: 200, apiPageSize: 50 },
-                search: { totalLimit: 25, apiPageSize: 10 }
+                search: { totalLimit: 25, apiPageSize: 10 },
+				gestures: {
+                left: 'lyrics',       // 左滑默认切换到歌词页
+                right: 'playlist',    // 右滑默认打开播放列表
+                up: 'search',       // 上滑默认打开搜索
+                down: 'none'    // 下滑默认打开个人中心
+            }
             },
         },
 
@@ -413,8 +490,13 @@
             titleText() { return this.viewTitles[this.currentView] || '‹设置'; },
             japaneseLyricModeText() { const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' }; return map[this.settings.lyrics.japaneseMode] || '未知'; },
             cantoneseLyricModeText() { const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' }; return map[this.settings.lyrics.cantoneseMode] || '未知'; },
-            englishLyricModeText() { const map = { 'translation': '显示翻译', 'original': '仅显示原文' }; return map[this.settings.lyrics.englishMode] || '未知'; }
-        },
+            englishLyricModeText() { const map = { 'translation': '显示翻译', 'original': '仅显示原文' }; return map[this.settings.lyrics.englishMode] || '未知'; },
+        // 新增计算属性，用于显示手势中文文本
+			gestureLeftText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.left] || '未知'; },
+        gestureRightText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.right] || '未知'; },
+        gestureUpText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.up] || '未知'; },
+        gestureDownText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.down] || '未知'; }
+    },
 
         onInit() {
             this.updateTime();
@@ -437,49 +519,96 @@
         },
 
         updateTime() { const now = new Date(); this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`; },
-        loadSettings() { file.readText({ uri: SETTINGS_FILE_URI, success: (data) => { try { const loadedSettings = JSON.parse(data.text); this.settings = { ...this.settings, ...loadedSettings, lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) }, audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) }, performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) }, network: { ...this.settings.network, ...(loadedSettings.network || {}) }, search: { ...this.settings.search, ...(loadedSettings.search || {}) }, }; } catch (e) { this.saveSettings(); } }, fail: () => { this.saveSettings(); } }); },
-        saveSettings() { file.writeText({ uri: SETTINGS_FILE_URI, text: JSON.stringify(this.settings, null, 2) }); },
-
-        // 【【【最终的、唯一的、正确的修正】】】
-        _toggleSetting(category, key, presets) {
-            let targetObject;
-            let currentValue;
-
-            // 智能判断目标对象
-            if (key === null) {
-                // 处理顶层设置项，如 lyricAdvanceTime
-                targetObject = this.settings;
-                currentValue = targetObject[category];
-            } else {
-                // 处理嵌套设置项，如 lyrics.japaneseMode
-                targetObject = this.settings[category];
-                currentValue = targetObject[key];
+    // 【修正】统一加载逻辑，与 player.js 保持一致
+    loadSettings() {
+        file.readText({
+            uri: SETTINGS_FILE_URI,
+            success: (data) => {
+                try {
+                    const loadedSettings = JSON.parse(data.text);
+                    // 使用与 player.js 相同的健壮合并逻辑
+                    this.settings = {
+                        ...this.settings,
+                        ...loadedSettings,
+                        lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
+						gestures: { ...this.settings.gestures, ...(loadedSettings.gestures || {}) }, // 合并 gestures
+                        audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) },
+                        performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
+                        network: { ...this.settings.network, ...(loadedSettings.network || {}) },
+                        search: { ...this.settings.search, ...(loadedSettings.search || {}) },
+                    };
+                } catch (e) {
+                    // 如果解析失败，用当前的默认设置保存一次，以修复文件
+                    this.saveSettings();
+                }
+            },
+            fail: () => {
+                // 如果文件不存在，用当前的默认设置创建它
+                this.saveSettings();
             }
+        });
+    },
 
-            const currentIndex = presets.indexOf(currentValue);
-            const nextIndex = (currentIndex + 1) % presets.length;
-            const nextValue = presets[nextIndex];
+    saveSettings() {
+        file.writeText({
+            uri: SETTINGS_FILE_URI,
+            text: JSON.stringify(this.settings, null, 2)
+        });
+    },
 
-            // 智能更新
-            if (key === null) {
-                targetObject[category] = nextValue;
-            } else {
-                targetObject[key] = nextValue;
-            }
+    // 【【【核心重构】】】
+    // 一个通用的设置切换函数
+    _toggleSetting(category, key, presets) {
+        let targetObject;
+        let currentValue;
 
-            this.saveSettings();
-        },
+        // 智能判断目标对象：
+        // 如果 key 为 null，说明是顶层属性 (如 lyricAdvanceTime)
+        // 否则是嵌套属性 (如 lyrics.japaneseMode)
+        if (key === null) {
+            targetObject = this.settings;
+            currentValue = targetObject[category];
+        } else {
+            targetObject = this.settings[category];
+            currentValue = targetObject[key];
+        }
 
-        // 【【【调用方式修正】】】
-        toggleLyricAdvanceTime() {
-            // 对于顶层设置项，第二个参数传 null
-            this._toggleSetting('lyricAdvanceTime', null, PRESETS.lyricAdvanceTime);
-        },
+        const currentIndex = presets.indexOf(currentValue);
+        const nextIndex = (currentIndex + 1) % presets.length;
+        const nextValue = presets[nextIndex];
+
+        // 智能更新值
+        if (key === null) {
+            targetObject[category] = nextValue;
+        } else {
+            targetObject[key] = nextValue;
+        }
+
+        // 保存所有更改
+        this.saveSettings();
+    },
+
+    // 【调用方式修正】
+    // 调用 _toggleSetting 时，顶层属性的 key 传入 null
+    toggleLyricAdvanceTime() {
+        this._toggleSetting('lyricAdvanceTime', null, PRESETS.lyricAdvanceTime);
+    },
         
         // 其他调用方式保持不变
         toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
         toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
         toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
+		    // 【【【新增方法】】】
+    // 切换手势设置
+    toggleGesture(direction) { // direction: 'left', 'up', 'down'
+        const currentAction = this.settings.gestures[direction];
+        const currentIndex = GESTURE_ACTIONS.indexOf(currentAction);
+        const nextIndex = (currentIndex + 1) % GESTURE_ACTIONS.length;
+        
+        this.settings.gestures[direction] = GESTURE_ACTIONS[nextIndex];
+        
+        this.saveSettings();
+    },
         toggleOnlineQuality() { this._toggleSetting('audioQuality', 'online', PRESETS.audioQuality.online); },
         toggleDownloadQuality() { this._toggleSetting('audioQuality', 'download', PRESETS.audioQuality.download); },
         toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },

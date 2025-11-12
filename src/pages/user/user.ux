@@ -59,7 +59,10 @@
     @media screen and (shape: rect) {
         .header { height: 65px; padding-top: 10px; flex-direction: row-reverse; justify-content: space-around; }
         .scroll-wrapper { top: 65px; padding-bottom: 10px;}
-        .time-display { font-size: 32px; }
+        .time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
     }
 </style>
 
@@ -79,7 +82,7 @@ export default {
     private: {
         nickname: '未登录',
         userId: '点击此处以登录',
-        avatarUrl: DEFAULT_AVATAR,
+        avatarUrl: LOCAL_AVATAR_URI,
         currentTime: "00:00",
         isUpdating: false,
         isPendingVerification: false,

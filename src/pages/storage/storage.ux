@@ -153,8 +153,9 @@
             top: 65px; /* 与变化后的顶栏高度保持一致 */
         }
         .time-display {
-            font-size: 32px;
-        }
+		font-size: 32px;
+		padding-top: 0px;
+	}
     }
 </style>
 

@@ -134,8 +134,9 @@
             top: 65px; /* 与变化后的顶栏高度保持一致 */
         }
         .time-display {
-            font-size: 32px;
-        }
+		font-size: 32px;
+		padding-top: 0px;
+	}
     }
 </style>
 
@@ -212,12 +213,10 @@ export default {
         await fileService.ensureDirExists(USER_PLAYLISTS_DIR);
         await this.applySettings();
         this.updateTime();
-        setInterval(() => this.updateTime(), 1000 * 60);
-    },
-
-    onShow() {
+        setInterval(() => this.updateTime(), 1000);
         this.loadData();
     },
+
 
     async applySettings() {
         const settings = await fileService.readJson(SETTINGS_FILE_URI);

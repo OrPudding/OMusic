@@ -7,11 +7,11 @@
         </div>
 
         <!-- 2. 独立滚动的内容区 -->
-        <scroll id="songListScroll" class="scroll-wrapper {{ isMultiSelectMode ? 'footer-padding' : '' }}" scroll-y="true" bounces="true" 
-                onscrolltop="handleScrollTop" 
+        <scroll id="songListScroll" class="scroll-wrapper {{ isMultiSelectMode ? 'footer-padding' : '' }}" scroll-y="true" bounces="true"
+                onscrolltop="handleScrollTop"
                 onscrollbottom="handleScrollBottom"
                 onscroll="handleScroll">
-        
+
             <!-- 按钮容器 (保持原有结构) -->
             <div class="button-container">
                 <!-- 普通模式下的按钮 -->
@@ -29,14 +29,7 @@
                     </div>
                 </div>
 
-                <!-- 【【【修复】】】: "批量管理"按钮被放出，并有了更清晰的样式 
-                <div class="header-action-btn-wrapper select-mode-btn" 
-                     if="{{ (listType === 'downloadlist' || listType === 'songlist' || listType === 'favorites') && fullSongList.length > 0 && !isMultiSelectMode }}" 
-                     onclick="toggleMultiSelectMode">
-                    <text class="header-action-btn-text">批量管理</text>
-                </div>-->
-
-                <!-- 【【【新增】】】: 多选模式下的“全选”和信息栏 -->
+                <!-- 多选模式下的“全选”和信息栏 -->
                 <div class="multi-select-header" if="{{ isMultiSelectMode }}">
                     <div class="select-all-container" onclick="toggleSelectAll">
                         <input type="checkbox" class="select-all-checkbox" checked="{{ isAllSelected }}"></input>
@@ -45,13 +38,13 @@
                     <text class="selection-count-text">已选{{ selectedCount }}首</text>
                 </div>
             </div>
-            
-            <!-- 列表内容 (保持原有结构，仅增加class绑定) -->
+
+            <!-- 列表内容 -->
             <div class="list-content">
-                <div for="{{(index, item) in displaySongList}}" 
+                <div for="{{(index, item) in displaySongList}}"
                      class="song-item {{ selectedSongIdsMap[item.id] ? 'selected' : '' }}"
                      onclick="handleItemClick(item)">
-                    
+
                     <div class="item-prefix">
                         <text class="item-index">{{ item.displayIndex }}</text>
                     </div>
@@ -64,17 +57,23 @@
                         </div>
                     </div>
 
-                    <!-- 单项删除按钮 (保持原有逻辑) -->
-                    <div class="delete-btn-wrapper" 
-                         onclick="deleteSong(item)" 
+                    <!-- 【【【修改】】】: 动态功能按钮 -->
+                    <div class="action-btn-wrapper"
                          if="{{ !isMultiSelectMode }}"
-                         show="{{ (listType === 'downloadlist' || listType === 'favorites') && !isMultiSelectMode }}">
-                        <image class="delete-btn" src="{{listType !== 'downloadlist' ? '/common/icon/cancel.png' : '/common/icon/delete.png'}}"></image>
+                         show="{{ listType === 'playlist' || listType === 'favorites' || listType === 'downloadlist' || listType === 'songlist' }}">
+                        <!-- 在播放列表或收藏页显示删除按钮 -->
+                        <div if="{{ listType === 'playlist' || listType === 'favorites' }}" onclick="deleteSong(item)">
+                            <image class="action-btn" src="/common/icon/cancel.png"></image>
+                        </div>
+                        <!-- 在下载页或歌单页显示添加到下一首按钮 -->
+                        <div if="{{ listType === 'downloadlist' || listType === 'songlist' }}" onclick="addSongToNext(item)">
+                            <image class="action-btn" src="/common/icon/plus.png"></image>
+                        </div>
                     </div>
-                    
+
                     <!-- 复选框 (保持原有逻辑) -->
-                    <input type="checkbox" 
-                           class="song-checkbox" 
+                    <input type="checkbox"
+                           class="song-checkbox"
                            if="{{ isMultiSelectMode }}"
                            checked="{{ selectedSongIdsMap[item.id] }}"
                            onchange="(e) => handleCheckboxChange(e, item.id)" />
@@ -86,7 +85,7 @@
             <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
         </scroll>
 
-        <!-- 【【【修复】】】: 底部操作栏被放出，并优化了样式和动效 -->
+        <!-- 底部操作栏 -->
         <div class="multi-select-footer {{ isMultiSelectMode ? 'visible' : '' }}" if="{{ isMultiSelectMode }}">
             <text class="footer-text-button download" onclick="downloadSelectedSongs">下载</text>
             <text class="footer-text-button delete" onclick="deleteSelectedSongs">删除</text>
@@ -149,9 +148,6 @@
     .button-text { font-size: 26px; color: #fff; font-weight: bold; margin-top: 4px; }
     .button-text.dark { color: #000000; }
 
-    /* 
-      【核心修改】参考“存储管理”页面的按钮样式 
-    */
     .header-action-btn-wrapper {
         margin-top: 15px;
         display: flex;
@@ -186,8 +182,9 @@
     .song-artist { font-size: 22px; color: #888; lines: 1; text-overflow: ellipsis; }
     .song-meta { flex-direction: row; align-items: center; margin-top: 4px; }
     .download-tag { background-color: rgba(58, 225, 255, 0.2); color: #3ae1ff; font-size: 18px; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
-    .delete-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
-    .delete-btn { width: 64px; height: 64px; }
+    /* 【【【修改】】】: 统一右侧按钮样式 */
+    .action-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
+    .action-btn { width: 64px; height: 64px; }
     .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px; }
 
     /* --- 【新增】多选模式头部样式 --- */
@@ -223,7 +220,7 @@
     color: #888; /* 使用次要文字颜色 */
 }
 
-    /* 
+    /*
       【核心修改】
       - 多选操作栏使用 absolute 定位悬浮。
       - 内部按钮是纯文本样式。
@@ -269,12 +266,12 @@
             top: 65px; /* 与变化后的顶栏高度保持一致 */
         }
         .time-display {
-            font-size: 32px;
-        }
+		font-size: 32px;
+		padding-top: 0px;
+	}
         .multi-select-toggle { flex-shrink: 0; }
     }
 </style>
-
 
 <script>
 import downloadService from "../../services/download.js";
@@ -388,13 +385,10 @@ export default {
 
     async onInit() {
         this.updateTime();
-        setInterval(() => this.updateTime(), 1000 * 60); // 减少更新频率
+        setInterval(() => this.updateTime(), 1000); // 减少更新频率
         this.updatePageTitle();
         await this.applySettings();
         await fileService.ensureDirExists(this.songlistsDir);
-    },
-
-    onShow() {
         this.loadData();
     },
 

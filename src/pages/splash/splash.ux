@@ -92,7 +92,10 @@
   
     @media screen and (shape: rect) {
         .header { padding-top: 10px; flex-direction: row-reverse; justify-content:space-around; }
-        .time-display { font-size: 32px; }
+        .time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
         .debug-button { margin-bottom: 20px; }
     }
     @media screen and (shape: circle) {
