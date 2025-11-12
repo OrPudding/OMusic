@@ -355,7 +355,7 @@ export default {
                     gestures: {
                         left: 'lyrics',
                 right: 'playlist',
-                up: 'search',
+                up: 'none',
                 down: 'none'
             },
                     audioQuality: { online: 64, download: 128 } },

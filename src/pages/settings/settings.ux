@@ -480,7 +480,7 @@ const GESTURE_ACTION_TEXTS = {
 				gestures: {
                 left: 'lyrics',       // 左滑默认切换到歌词页
                 right: 'playlist',    // 右滑默认打开播放列表
-                up: 'search',       // 上滑默认打开搜索
+                up: 'none',       // 上滑默认打开搜索
                 down: 'none'    // 下滑默认打开个人中心
             }
             },
