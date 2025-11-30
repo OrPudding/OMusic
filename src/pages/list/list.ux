@@ -3,7 +3,7 @@
         <!-- 1. 固定的顶部栏 -->
         <div class="header" onclick="goBack">
             <text class="time-display">{{currentTime}}</text>
-            <text class="title">‹ {{ pageTitle }}</text>
+            <text class="title">‹{{ pageTitle }}</text>
         </div>
 
         <!-- 2. 独立滚动的内容区 -->

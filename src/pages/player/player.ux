@@ -195,6 +195,7 @@
     padding: 20px 0;
 }
 .controls {
+    width: 92%;
 	justify-content: space-around; /* 按钮间距更均匀 */
 	align-items: center;
 }
@@ -922,7 +923,7 @@ refreshLyricGroup(lyricIndex) {
 
 
 /**
- * [最终修正] 重置选中状态 (例如在3秒超时后调用)
+ * [最终修正] 重置选中状态 (例如在2秒超时后调用)
  * - 这个函数现在只负责在需要明确取消选中框时，才触发UI刷新。
  */
 resetLyricSelection() {
@@ -982,7 +983,7 @@ updateLyricSelection(index, isSelected) {
 
     /**
      * 【【【逻辑修正】】】
-     * 启动3秒后自动取消选中的定时器
+     * 启动2秒后自动取消选中的定时器
      */
      startSelectionTimeout() {
         this.selectionTimeoutId = setTimeout(() => {
@@ -992,7 +993,7 @@ updateLyricSelection(index, isSelected) {
             audio.play();
             
             this.resetLyricSelection();
-        }, 3000);
+        }, 2000);
     },
 
     /**

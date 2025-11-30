@@ -56,7 +56,7 @@
     }
     .time-display {
         font-size: 28px;
-        color: #ffffff;
+        color: #fff;
         font-weight: bold;
         padding-top: 5px;
         text-align: center;
@@ -92,6 +92,7 @@
     }
     .playlist-item {
         width: 45%;
+        height: 180px;
         flex-direction: column;
         padding: 10px;
         margin: 10px 2.5%; /* 使用百分比外边距实现间隙 */
@@ -103,7 +104,7 @@
     }
     .item-name {
         font-size: 24px;
-        color: #ffffff;
+        color: #fff;
         lines: 2;
         text-overflow: ellipsis;
         margin-top: 8px;
