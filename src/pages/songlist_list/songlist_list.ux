@@ -95,7 +95,7 @@
         flex-direction: column;
         padding: 10px;
         margin: 10px 2.5%; /* 使用百分比外边距实现间隙 */
-        background-color: rgba(255, 255, 255, 0.06);
+        background-color: #191821;
         border-radius: 20px;
     }
     .item-info {

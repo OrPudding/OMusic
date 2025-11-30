@@ -22,14 +22,14 @@ export default {
     deviceId: null,    // 全局设备ID
 
         // 1. 全局 interconnect 实例 (保持不变)
-    connectInstance: interconnect.instance(),
+    //connectInstance: interconnect.instance(),
 
     downloadService: downloadService,
 
 
     // --- 服务器和密钥配置 ---
     // !! 替换为你的 服务器 URL
-    ACTIVATION_SERVER_URL: 'http://75.127.89.154:5000',
+    ACTIVATION_SERVER_URL: 'https://vela-verify.orpu.moe',
 
     
     // !! 替换为你的服务器公钥 (server_public.pem 的内容 )

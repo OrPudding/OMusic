@@ -5,7 +5,6 @@
 			<text class="time-display">{{ currentTime }}</text>
 			<text class="title">‹主菜单</text>
 		</div>
-
 		<!-- 2. 独立滚动的内容区域 -->
 		<scroll class="scroll-wrapper" scroll-y="true" bounces="true">
 			<div class="menu-columns-container">
@@ -58,21 +57,21 @@ export default {
 			clearInterval(this.timer);
 		}
 	},
-
+	
 	prepareMenuItems() {
 		const allItems = [
 			{ text: "搜索", handler: "goToSearch", icon: "/common/icon/search.png" },
 			{
 				text: "已下载",
 				handler: "goToDownloadList",
-				icon: "/common/icon/download.png",
+				icon: "/common/icon/downloaded.png",
 			},
 			{
 				text: "播放列表",
 				handler: "goToList",
 				icon: "/common/icon/playlist.png",
 			},
-			{ text: "我的收藏", handler: "goToLike", icon: "/common/icon/liked.png" },
+			{ text: "我的收藏", handler: "goToLike", icon: "/common/icon/star-filled.png" },
 			{
 				text: "私人FM",
 				handler: "goToPersonalFM",
@@ -81,7 +80,7 @@ export default {
 			{
 				text: "每日推荐",
 				handler: "goToDailyRecommend",
-				icon: "/common/icon/recommend.png",
+				icon: "/common/icon/calendar.png",
 			},
 			{
 				text: "我的歌单",
@@ -199,7 +198,7 @@ export default {
 .menu-item {
 	width: 180px;
 	height: 140px;
-	background-color: rgba(255, 255, 255, 0.06);
+	background-color: #191821;
 	margin: 5px 0;
 	border-radius: 36px;
 	flex-direction: column;

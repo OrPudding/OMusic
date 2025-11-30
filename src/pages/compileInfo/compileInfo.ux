@@ -63,7 +63,7 @@
   .info-item {
     width: 100%;
     height: 80px;
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: #191821;
     margin: 5px 0;
     border-radius: 36px;
     align-items: center;

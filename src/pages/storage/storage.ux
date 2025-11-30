@@ -68,7 +68,6 @@
         width: 100%;
         height: 100%;
         background-color: black;
-        position: relative; /* 为子元素的绝对定位提供参考系 */
     }
 
     /* 关键: 使用 fixed 定位将顶栏固定在屏幕顶部 */
@@ -112,29 +111,29 @@
     }
 
     /* --- 内容样式 (保持不变) --- */
-    .list-content { flex-direction: column; padding-bottom: 60px; }
-    .song-item { padding: 0 25px; width: 360px; height: 140px; margin: 5px; background-color: rgba(255, 255, 255, 0.06); border-radius: 36px; justify-content: space-between; align-items: center; }
-    .item-index { text-align: center; font-size: 28px; color: rgba(255, 255, 255, 0.6); width: 50px; }
+    .list-content { flex-direction: column; padding-bottom: 60px; width: 100%; align-items: center; }
+    .song-item { padding: 0 25px; width: 392px; height: 118px; margin: 5px; background-color: #191821; border-radius: 59px; justify-content: space-between; align-items: center; }
+    .item-index { text-align: center; font-size: 28px;font-weight: bold; color: rgba(255, 255, 255, 0.6); width: 50px; }
     .song-info { width: 200px; flex-direction: column; justify-content: center; }
-    .song-title { font-size: 26px; color: #fff; lines: 1; text-overflow: ellipsis; }
-    .song-artist { font-size: 22px; color: #888; lines: 1; text-overflow: ellipsis; margin-top: 2px; }
+    .song-title { font-size: 26px; color: #fff; font-weight: bold; lines: 1; text-overflow: ellipsis; }
+    .song-artist { font-size: 22px; color: #888; font-weight: bold; lines: 1; text-overflow: ellipsis; margin-top: 2px; }
     .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px; }
-    .storage-overview { display: flex; flex-direction: column; margin: 10px 0 20px 0; padding: 15px; background-color: #1c1c1e; border-radius: 20px; width: 360px; }
+    .storage-overview { display: flex; flex-direction: column; margin: 10px 0 20px 0; padding: 15px; background-color: #191821; border-radius: 20px; width: 360px; }
     .storage-text { font-size: 24px; color: #ffffff; font-weight: bold; margin-bottom: 10px; }
-    .storage-progress { width: 100%; height: 12px; stroke-width: 12px; color: #3ae1ff; background-color: #333; }
+    .storage-progress { width: 100%; height: 12px; stroke-width: 12px; color: #BAC3FF; background-color: #333; }
     .storage-details { flex-direction: column; display: flex; justify-content: space-around; width: 100%; margin-top: 15px; }
-    .detail-item { display: flex; align-items: center; font-size: 20px; color: #cccccc; }
-    .detail-text { font-size: 20px; color: #cccccc; }
+    .detail-item { display: flex; align-items: center; font-size: 20px; font-weight: bold; color: #cccccc; }
+    .detail-text { font-size: 20px; font-weight: bold; color: #cccccc; }
     .color-box { width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; }
-    .music-color { background-color: #3ae1ff; }
-    .lyrics-color { background-color: rgba(58, 225, 255, 0.5); }
+    .music-color { background-color: #BAC3FF; }
+    .lyrics-color { background-color: #697699; }
     .free-color { background-color: #555555; }
     .file-size-details { display: flex; flex-direction: row; margin-top: 6px; }
-    .size-tag { font-size: 18px; padding: 2px 6px; border-radius: 5px; margin-right: 8px; }
-    .size-tag.music { background-color: rgba(58, 225, 255, 0.2); color: #3ae1ff; }
+    .size-tag { font-size: 18px; font-weight: bold; padding: 2px 6px; border-radius: 5px; margin-right: 8px; }
+    .size-tag.music { background-color: #2E323C; color: #BAC3FF; }
     .size-tag.lyric { background-color: rgba(200, 200, 200, 0.2); color: #cccccc; }
-    .unknown-title { color: #FFCC00; font-style: italic; }
-    .action-btn-wrapper { width: 80px; height: 140px; justify-content: center; align-items: center; }
+    .unknown-title { color: #FFCC00; }
+    .action-btn-wrapper { width: 80px; height: 80px; justify-content: center; align-items: center; }
     .action-btn-icon { width: 64px; height: 64px; }
     .header-action-btn-wrapper { margin-top: 15px; display: flex; flex-direction: row; align-items: center; padding: 8px 15px; background-color: rgba(255, 204, 0, 0.2); border-radius: 20px; align-self: flex-start; }
     .header-action-btn-icon { width: 32px; height: 32px; margin-right: 8px; }
@@ -216,71 +215,97 @@ export default {
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
-    loadAndScanStorage() {
-        if (this.isLoading && this.fullSongList.length > 0) return;
-        this.isLoading = true;
-        this.fullSongList = [];
-        this.hasUnknownSongs = false;
+// 修正后的 loadAndScanStorage 函数
+loadAndScanStorage() {
+    if (this.isLoading && this.fullSongList.length > 0) return;
+    this.isLoading = true;
+    this.fullSongList = [];
+    this.hasUnknownSongs = false;
 
-        let asyncTasksCompleted = 0;
-        const totalAsyncTasks = 4;
+    let downloadedMeta = {};
+    let musicFiles = [];
+    let lyricFiles = [];
 
-        let downloadedMeta = {};
-        let musicFiles = [];
-        let lyricFiles = [];
+    // 最终数据处理函数
+    const processScannedData = () => {
+        console.log("所有异步文件操作完成，开始处理数据...");
+        try {
+            const musicFileMap = new Map(musicFiles.map(f => {
+                const songId = f.uri.split('/').pop().replace('.mp3', '');
+                return [songId, { uri: f.uri, size: f.length }];
+            }));
+            const lyricFileMap = new Map(lyricFiles.map(f => {
+                const songId = f.uri.split('/').pop().replace('.json', '');
+                return [songId, { uri: f.uri, size: f.length }];
+            }));
 
-        const onAllTasksDone = () => {
-            asyncTasksCompleted++;
-            if (asyncTasksCompleted < totalAsyncTasks) return;
+            let newFullSongList = [], updatedDownloadedMeta = {}, totalMusicSize = 0, totalLyricsSize = 0, hasDataChanged = false, unknownCount = 0;
 
-            console.log("所有异步文件操作完成，开始处理数据...");
-            try {
-                const musicFileMap = new Map(musicFiles.map(f => {
-                    const songId = f.uri.split('/').pop().replace('.mp3', '');
-                    return [songId, { uri: f.uri, size: f.length }];
-                }));
-                const lyricFileMap = new Map(lyricFiles.map(f => {
-                    const songId = f.uri.split('/').pop().replace('.json', '');
-                    return [songId, { uri: f.uri, size: f.length }];
-                }));
-
-                let newFullSongList = [], updatedDownloadedMeta = {}, totalMusicSize = 0, totalLyricsSize = 0, hasDataChanged = false, unknownCount = 0;
-
-                for (const [songId, musicFileInfo] of musicFileMap.entries()) {
-                    const meta = downloadedMeta[songId];
-                    const lyricFileInfo = lyricFileMap.get(songId);
-                    if (meta) {
-                        newFullSongList.push({ ...meta, isUnknown: false, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
-                        updatedDownloadedMeta[songId] = meta;
-                    } else {
-                        unknownCount++;
-                        newFullSongList.push({ id: songId, name: '未知歌曲', artists: `ID: ${songId}`, isUnknown: true, localUri: musicFileInfo.uri, localLyricUri: lyricFileInfo ? lyricFileInfo.uri : null, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
-                    }
-                    totalMusicSize += musicFileInfo.size;
-                    if (lyricFileInfo) totalLyricsSize += lyricFileInfo.size;
+            for (const [songId, musicFileInfo] of musicFileMap.entries()) {
+                const meta = downloadedMeta[songId];
+                const lyricFileInfo = lyricFileMap.get(songId);
+                if (meta) {
+                    newFullSongList.push({ ...meta, isUnknown: false, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
+                    updatedDownloadedMeta[songId] = meta;
+                } else {
+                    unknownCount++;
+                    newFullSongList.push({ id: songId, name: '未知歌曲', artists: `ID: ${songId}`, isUnknown: true, localUri: musicFileInfo.uri, localLyricUri: lyricFileInfo ? lyricFileInfo.uri : null, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
                 }
-
-                if (Object.keys(downloadedMeta).length !== Object.keys(updatedDownloadedMeta).length) hasDataChanged = true;
-                if (hasDataChanged) file.writeText({ uri: FILE_DOWNLOADED_SONGS, text: JSON.stringify(updatedDownloadedMeta, null, 2) });
-
-                this.fullSongList = newFullSongList;
-                this.musicSize = totalMusicSize;
-                this.lyricsSize = totalLyricsSize;
-                this.hasUnknownSongs = unknownCount > 0;
-                this.updateDisplayList(0);
-                this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
-            } catch (e) {
-                console.error("处理扫描数据时出错:", e);
-            } finally {
-                this.isLoading = false;
+                totalMusicSize += musicFileInfo.size;
+                if (lyricFileInfo) totalLyricsSize += lyricFileInfo.size;
             }
-        };
 
-        this.getDeviceStorage(onAllTasksDone);
-        file.readText({ uri: FILE_DOWNLOADED_SONGS, success: (data) => { try { downloadedMeta = JSON.parse(data.text) || {}; } catch (e) { downloadedMeta = {}; } }, fail: () => { downloadedMeta = {}; }, complete: onAllTasksDone });
-        file.list({ uri: DIR_MUSIC, success: (data) => { musicFiles = data.fileList || []; }, fail: () => { musicFiles = []; }, complete: onAllTasksDone });
-        file.list({ uri: DIR_LYRICS, success: (data) => { lyricFiles = data.fileList || []; }, fail: () => { lyricFiles = []; }, complete: onAllTasksDone });
-    },
+            if (Object.keys(downloadedMeta).length !== Object.keys(updatedDownloadedMeta).length) hasDataChanged = true;
+            if (hasDataChanged) file.writeText({ uri: FILE_DOWNLOADED_SONGS, text: JSON.stringify(updatedDownloadedMeta, null, 2) });
+
+            this.fullSongList = newFullSongList;
+            this.musicSize = totalMusicSize;
+            this.lyricsSize = totalLyricsSize;
+            this.hasUnknownSongs = unknownCount > 0;
+            this.updateDisplayList(0);
+            this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
+        } catch (e) {
+            console.error("处理扫描数据时出错:", e);
+        } finally {
+            this.isLoading = false;
+        }
+    };
+
+    // 4. 列出歌词文件 (任务链的倒数第二步)
+    const task4_listLyrics = () => {
+        file.list({
+            uri: DIR_LYRICS,
+            success: (data) => { lyricFiles = data.fileList || []; },
+            fail: () => { lyricFiles = []; },
+            complete: processScannedData // 完成后执行最终数据处理
+        });
+    };
+
+    // 3. 列出音乐文件
+    const task3_listMusic = () => {
+        file.list({
+            uri: DIR_MUSIC,
+            success: (data) => { musicFiles = data.fileList || []; },
+            fail: () => { musicFiles = []; },
+            complete: task4_listLyrics // 完成后执行下一步
+        });
+    };
+
+    // 2. 读取已下载歌曲元数据
+    const task2_readMeta = () => {
+        file.readText({
+            uri: FILE_DOWNLOADED_SONGS,
+            success: (data) => { try { downloadedMeta = JSON.parse(data.text) || {}; } catch (e) { downloadedMeta = {}; } },
+            fail: () => { downloadedMeta = {}; },
+            complete: task3_listMusic // 完成后执行下一步
+        });
+    };
+
+    // 1. 获取设备存储信息 (任务链的起点)
+    // getDeviceStorage 内部会等待两个存储API都完成后，才会调用 task2_readMeta
+    this.getDeviceStorage(task2_readMeta);
+},
+
 
     getDeviceStorage(callback) {
         let totalStorageDone = false;

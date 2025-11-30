@@ -12,54 +12,93 @@
             <!-- a. 播放控制按钮 -->
             <div class="controls">
                 <image class="icon" src="/common/icon/prev.png" onclick="change(-1)" />
-                <image class="icon" src="{{ playButtonIcon }}" onclick="playOrPause" />
+                <image class="icon-play-pause" src="{{ playButtonIcon }}" onclick="playOrPause" />
                 <image class="icon" src="/common/icon/next.png" onclick="change(1)" />
             </div>
             <!-- b. 播放进度条 -->
             <div class="progress">
-                <text class="play-time">{{ progressText }}</text>
-                <slider class="play-progress" min="0" max="{{ (currSong && currSong.duration) ? currSong.duration : 100 }}" step="1" value="{{ playerState.playDuration }}" onchange="onSliderChange"></slider>
+                <div class="progress-text">
+                <text class="play-time">{{ progressCurrentTime }}</text>
+                <text class="play-time">{{ progressTotalTime }}</text>
+                </div>
+                <slider class="play-progress" 
+                        min="0" 
+                        max="{{ (currSong && currSong.duration) ? currSong.duration : 100 }}" 
+                        step="1" 
+                        value="{{ playerState.playDuration }}" 
+                        onchange="onSliderChange"
+                        ontouchstart="onSliderTouchStart"
+                        ontouchend="onSliderTouchEnd">
+                </slider>
             </div>
+
             <!-- c. 底部操作栏 -->
             <div class="footer">
-                <div class="footer-content-rect" if="{{ screenShape === 'rect' }}">
+                <div class="footer-content">
                     <image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions"></image>
-                    <image class="footer-icon" src="{{ downloadIcon }}" onclick="initiateDownload"></image>
-                    <image class="footer-icon" src="{{ playModeIcon }}" onclick="togglePlayMode"></image>
-                    <image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu"></image>
-                </div>
-                <div class="footer-content-circle" else>
-                    <image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions"></image>
+                    <image class="footer-icon footer-icon-down" src="/common/icon/download.png" onclick="initiateDownload"></image>
                     <image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu"></image>
                 </div>
             </div>
         </div>
 
-        <!-- 视图 1: 歌词页 -->
-        <scroll
-            show="{{ swiperCurrentIndex === 1 }}"
-            id="lyricsScrollView"
-            class="lyrics-scroll-view"
-            scroll-y="true"
-            onswipe="handleSwipe"
-        >
-            <div class="lyrics-list-padding-top"></div>
-            <div
-                for="{{(index, line) in fullVisibleLyrics}}"
-                tid="line.id"
-                id="lyric-line-{{ index }}"
-                class="lyric-line-wrapper {{ line.isCurrent ? 'is-current-wrapper' : '' }} {{ line.isSelected ? 'is-selected-wrapper' : '' }}"
-                onclick="onLyricLineClick(line, index)"
-            >
-                <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}">
-                    {{ line.original }}
-                </text>
-                <text if="{{ line.isCurrent && line.extra }}" class="lyric-line extra-lyric">
-                    {{ line.extra }}
-                </text>
-            </div>
-            <div class="lyrics-list-padding-bottom"></div>
-        </scroll>
+        <image class="little-icon" src="{{ downloadIcon }}" if="{{ downloadIcon && swiperCurrentIndex === 0 }}"></image>
+
+<!-- 视图 1: 歌词页 -->
+<scroll
+    show="{{ swiperCurrentIndex === 1 }}"
+    id="lyricsScrollView"
+    class="lyrics-scroll-view"
+    scroll-y="true"
+    onswipe="handleSwipe"
+>
+    <div class="lyrics-list-padding-top"></div>
+
+    <!-- 硬编码10个渲染管道 -->
+    <div for="{{(index, line) in lyricGroup0}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup1}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup2}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup3}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup4}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup5}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup6}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup7}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup8}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+    <div for="{{(index, line) in lyricGroup9}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+    </div>
+
+    <div class="lyrics-list-padding-bottom"></div>
+</scroll>
+
                 <!-- 3. 手动添加的页面指示器 (放置在最外层，不影响 if/else 结构) -->
                 <div class="manual-indicator">
                     <div class="indicator-dot {{ swiperCurrentIndex === 0 ? 'indicator-dot-active' : '' }}"></div>
@@ -95,6 +134,7 @@
     lines: 1; 
     text-overflow: ellipsis; 
     text-align: center; 
+    font-weight: bold;
 }
 .singer-name { 
     width: 300px; 
@@ -104,6 +144,7 @@
     lines: 1; 
     text-overflow: ellipsis; 
     text-align: center; 
+    font-weight: bold;
 }
 
 /* --- Swiper 容器与子项 --- */
@@ -114,7 +155,7 @@
     indicator-size: 10px;
     /* 【修改】使用固定颜色代替透明度 */
     indicator-color: #555555;
-    indicator-selected-color: #3ae1ff;
+    indicator-selected-color: #BAC3FF;
     indicator-bottom: 10px; /* 指示器位置微调 */
 }
 /* --- Swiper 容器与子项 --- */
@@ -145,9 +186,8 @@
     margin: 0 5px;
 }
 .indicator-dot-active {
-    background-color: #3ae1ff; /* 对应原 indicator-selected-color */
+    background-color: #BAC3FF; /* 对应原 indicator-selected-color */
 }
-
 
 /* 播放器视图内部布局 */
 .player-view {
@@ -155,14 +195,18 @@
     padding: 20px 0;
 }
 .controls {
-	width: 380px;
-    height: 144px;
 	justify-content: space-around; /* 按钮间距更均匀 */
 	align-items: center;
 }
 .icon {
-	width: 90px;
-	height: 90px;
+	width: 85px;
+	height: 107px;
+    margin-top: 16px;
+}
+.icon-play-pause {
+    width: 132px;
+    height: 132px;
+    margin-bottom: 6px;
 }
 .progress { 
     height: 80px; 
@@ -170,45 +214,53 @@
     flex-direction: column; 
     align-items: center; 
 }
+.progress-text {
+    width: 80%;
+    justify-content: space-between;
+}
 .play-time { 
     text-align: left; 
     color: #ffffff; 
     font-size: 24px; 
     margin: 5px; 
+    font-weight: bold;
 }
 .play-progress { 
     width: 80%; 
-    selected-color: #3ae1ff; 
+    selected-color: #BAC3FF; 
     block-color: #ffffff; 
     padding-left: 0px; 
     padding-right: 0px; 
     margin: 0 20px; 
 }
 .footer { 
-    height: 75px; 
     width: 100%; 
     justify-content: center; 
     align-items: center; 
 }
-.footer-content-rect { 
-    width: 90%; 
+
+.footer-content{ 
+    width: 360px; 
     justify-content: space-around; 
-    align-items: center; 
-}
-.footer-content-circle { 
-    width: 320px; 
-    justify-content: space-around; 
-    align-items: center; 
 }
 .footer-icon { 
-    width: 64px; 
-    height: 64px; 
+    width: 91px; 
+    height: 66px; 
 }
-
+.little-icon {
+    position: absolute;
+    top: 333px;
+    left: 244px;
+    width: 41px;
+    height: 41px;
+}
+.footer-icon-down {
+    margin-top: 20px;
+}
 /* --- 歌词视图样式 (已优化 - 无透明度版) --- */
 .lyrics-scroll-view {
     width: 100%;
-    height: 100%;
+    height: 376px;
     padding:0 10px;
     flex-direction: column;
     align-items: center;
@@ -230,7 +282,7 @@
 }
 /* 【【【新增】】】 点击选中时的蓝色边框样式 */
 .is-selected-wrapper {
-    border: 2px solid #3ae1ff; /* 使用主题蓝色作为边框颜色 */
+    border: 2px solid #BAC3FF; /* 使用主题蓝色作为边框颜色 */
     border-radius: 50%;       /* 使用一个固定的圆角值 */
 }
 .lyric-line {
@@ -240,26 +292,23 @@
     
     /* 【核心修改】默认状态：非当前行，使用灰色代替白色+透明度 */
     color: #999999; 
-    font-size: 24px;
+    font-size: 26px;
 }
-
 /* 【核心修改】当前行的激活状态 */
 .current-lyric {
     /* 【移除】opacity: 1; (已是默认) */
-    color: #3ae1ff;
+    color: #BAC3FF;
     font-weight: bold;
-    font-size: 26px;
+    font-size: 28px;
     padding: 6px 0;
 }
 
 .extra-lyric {
-    font-size: 20px;
+    font-size: 22px;
     /* 【修改】使用固定颜色代替白色+透明度 */
     color: #BBBBBB;
     padding-bottom: 6px;
 }
-
-
 /* --- 评论区占位符 --- */
 .comments-view {
     justify-content: center;
@@ -276,15 +325,33 @@
     font-size: 24px;
     margin-top: 8px;
 }
-
 /* --- 媒体查询 --- */
 @media screen and (shape: rect) {
     .controls {
-        height: 180px;
+        height: 208px;
+        width: 380px;
+    }
+    .icon{
+        margin-top: 0px;
     }
     .progress {
-        width: 400px;
-        height: 100px;
+        width: 432px;
+        height: 80px;
+    }
+    .footer-content{ 
+    width: 90%; 
+    justify-content: space-around; 
+    align-items: center; 
+}
+.footer-icon-down {
+    margin-top: 0px;
+}.little-icon {
+    position: absolute;
+    top:384px;
+    left: 228px;
+}
+    .lyrics-scroll-view {
+        height: 424px;
     }
     .is-current-wrapper {
         /* 【修改】使用固定颜色代替透明度 */
@@ -344,51 +411,63 @@ const fileService = {
 };
 
 export default {
-    private: {
-        playerState: { isPlaying: false, playDuration: 0, currentLyricIndex: -1, lyricType: 'chinese' }, // 【优化】currentLyricIndex 初始为 -1
-        currSong: null,
-        lyrics: [],
-        swiperCurrentIndex: 0,
-        downloadedSongs: {},
-        settings: { lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
-                    lyricAdvanceTime:1.8,
-                    gestures: {
-                        left: 'lyrics',
-                right: 'playlist',
-                up: 'none',
-                down: 'none'
-            },
-                    audioQuality: { online: 64, download: 128 } },
-        // isPlaying: false, // 【移除】冗余状态，统一由 playerState.isPlaying 管理
-        cookie: null,
-        isDownloadingLocked: false,
-        // wasRestored: false, // 【移除】
-        retryCount: 0,
-        screenShape: 'circle',
-        playMode: 0,
-        songBeingDownloaded: null,
-        isFmMode: false,
-        fmQueue: [],
-        isFetchingFm: false,
-        pendingSongId: null,
-        playTimeoutId: null,
-        needsRefresh: false,
-        _lyricsScrollView: null, // 缓存滚动视图元素
-
-                // 【【【新增】】】 用于歌词点击跳转的状态
-                selectedLyricIndex: -1,     // 当前被选中的歌词行索引，-1表示没有选中
-        selectionTimeoutId: null,   // 用于3秒后自动取消选中的定时器ID
-        // 【【【核心优化】】】
-        // 将 fullVisibleLyrics 从 computed 移到 private data 中
-        // 我们将手动控制它的更新，而不是让框架自动计算
-        fullVisibleLyrics: [],
-                // 【新增】记录进入歌词页的手势方向
-                _gestureToLyrics: null, 
+// 【请替换此部分】
+private: {
+    playerState: { 
+        isPlaying: false, 
+        playDuration: 0, 
+        currentLyricIndex: -1, // 当前高亮行在原始lyrics数组中的索引
+        lyricType: 'chinese' 
     },
+    currSong: null,
+    lyrics: [], // 原始歌词数据 (带time, original, translation等)
+    
+    // --- 核心优化数据结构 ---
+    lyricLines: [], // 【新增】扁平化数组，管理所有歌词行的渲染状态
+    // 【新增】10个固定的渲染管道数组
+    lyricGroup0: [],
+    lyricGroup1: [],
+    lyricGroup2: [],
+    lyricGroup3: [],
+    lyricGroup4: [],
+    lyricGroup5: [],
+    lyricGroup6: [],
+    lyricGroup7: [],
+    lyricGroup8: [],
+    lyricGroup9: [],
+    // --- 核心优化数据结构 END ---
+
+    swiperCurrentIndex: 0,
+    downloadedSongs: {},
+    settings: { 
+        lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
+        lyricAdvanceTime: 1.8,
+        gestures: { left: 'lyrics', right: 'playlist', up: 'none', down: 'none' },
+        audioQuality: { online: 64, download: 128 } 
+    },
+    cookie: null,
+    isDownloadingLocked: false,
+    retryCount: 0,
+    screenShape: 'circle',
+    playMode: 0,
+    songBeingDownloaded: null,
+    isFmMode: false,
+    fmQueue: [],
+    isFetchingFm: false,
+    pendingSongId: null,
+    playTimeoutId: null,
+    needsRefresh: false,
+    _lyricsScrollView: null,
+    selectedLyricIndex: -1,
+    selectionTimeoutId: null,
+    _gestureToLyrics: null, 
+    isSliderDragging: false,
+},
 
     protected: {
         playList: [],
         currentIndex: 0,
+        currentLyricIndex: -1,
         songId: null,
         songInfo: null,
         triggerDownload: false,
@@ -406,12 +485,22 @@ export default {
             if (this.pendingSongId && !this.playerState.isPlaying) return '/common/icon/loading.png';
             return this.playerState.isPlaying ? '/common/icon/pause.png' : '/common/icon/play.png';
         },
-        progressText() {
-            const duration = this.currSong?.duration || 0;
-            return `${this.second2time(this.playerState.playDuration)}/${this.second2time(duration)}`;
-        },
+
+    // 【移除】旧的 progressText
+    // progressText() { ... },
+
+    // 【新增】当前播放时间
+    progressCurrentTime() {
+        return this.second2time(this.playerState.playDuration);
+    },
+
+    // 【新增】歌曲总时长
+    progressTotalTime() {
+        const duration = this.currSong?.duration || 0;
+        return this.second2time(duration);
+    },
         downloadIcon() {
-            const icons = { downloading: '/common/icon/downloading.png', downloaded: '/common/icon/downloaded.png', not_downloaded: '/common/icon/download.png' };
+            const icons = { downloading: '/common/icon/waiting_icon.png', downloaded: '/common/icon/done_icon.png', not_downloaded: null };
             if (!this.currSong) return icons.not_downloaded;
             if (this.songBeingDownloaded && this.currSong.id === this.songBeingDownloaded.id) return icons.downloading;
             if (this.downloadedSongs[this.currSong.id]) return icons.downloaded;
@@ -535,6 +624,12 @@ export default {
     handleSwipe(e) {
         const direction = e.direction; // 'left', 'right', 'up', 'down'
 
+        // 【新增】如果正在拖动进度条，忽略滑动手势
+        if (this.isSliderDragging) {
+            console.log("进度条拖动中，忽略滑动手势");
+            return;
+        }
+
         // 场景一：当前在播放器主页 (封面页)
         if (this.swiperCurrentIndex === 0) {
             const action = this.settings.gestures[direction];
@@ -553,7 +648,7 @@ export default {
         } 
         // 场景二：当前在歌词页
         else if (this.swiperCurrentIndex === 1) {
-            // 检查当前滑动方向是否是进入歌词页手势的“相反方向”
+            // 检查当前滑动方向是否是进入歌词页手势的"相反方向"
             if (this._gestureToLyrics && direction === REVERSE_DIRECTIONS[this._gestureToLyrics]) {
                 this.switchToPlayerView();
             }
@@ -564,12 +659,32 @@ export default {
         }
     },
 
+    /**
+     * 滑块触摸开始事件
+     * 设置拖动锁定标志
+     */
+    onSliderTouchStart() {
+        console.log("滑块触摸开始，设置拖动锁定");
+        this.isSliderDragging = true;
+    },
+
+    /**
+     * 滑块触摸结束事件
+     * 清除拖动锁定标志
+     */
+    onSliderTouchEnd() {
+        console.log("滑块触摸结束，清除拖动锁定");
+        this.isSliderDragging = false;
+    },
+
+
+
     // 辅助方法：执行通用手势操作 (不包括视图切换)
     executeGestureAction(action) {
         console.log(`执行手势操作: ${action}`);
         switch (action) {
             case 'playlist':
-                router.push({ uri: "/pages/list", params: { listType: "playlist" } });
+                router.push({ uri: "/pages/list", params: { listType: "playlist", targetSongId: this.currSong.id } });
                 break;
             case 'search':
                 router.push({ uri: "/pages/search" });
@@ -592,6 +707,246 @@ export default {
                 break;
         }
     },
+/**
+ * [规范化] 1. 数据入口：获取新歌词时调用
+ * - 职责：解析歌词，构建唯一的扁平状态数组 `lyricLines`，并分发引用到渲染管道。
+ */
+ processAndMergeLyrics(data) {
+    // a. 解析歌词，获得原始数据 this.lyrics (逻辑不变)
+    if (!data?.lrc?.lyric) {
+        this.lyrics = [{ time: 0, text: '暂无歌词' }];
+    } else {
+        const original = this.parseLyric(data.lrc.lyric);
+        const translation = data.tlyric?.lyric ? this.parseLyric(data.tlyric.lyric) : null;
+        const romaji = data.romalrc?.lyric ? this.parseLyric(data.romalrc.lyric) : null;
+        this.mergeLyrics(original, translation, romaji);
+    }
+    
+    // b. 构建【单一事实来源】的扁平状态数组 this.lyricLines
+    this.lyricLines = this.lyrics.map((line, index) => ({
+        id: `lyric-${line.time}-${index}`,
+        originalIndex: index, // 全局唯一索引，至关重要
+        original: line.original || line.text || '',
+        extra: null,
+        isCurrent: false,
+        isSelected: false,
+    }));
+
+    // c. 将 lyricLines 中的对象引用，分发到10个只读的渲染管道中
+    this.distributeLyricsToGroups();
+    
+    // d. 立即根据当前播放时间更新一次高亮状态
+    this.updateLyric();
+},
+
+/**
+ * [最终优化版] 分发算法
+ * - 算法逻辑更简单、清晰、可预测。
+ * - 完美处理任意数量的歌词行，包括大于100行的情况，保证负载均衡。
+ */
+ distributeLyricsToGroups() {
+    // 步骤 1: 清理工作 (保持不变)
+    for (let i = 0; i < 10; i++) {
+        this[`lyricGroup${i}`] = [];
+    }
+
+    const totalLines = this.lyricLines.length;
+
+    // 步骤 2: 【核心修正】采用更健壮、更均衡的分组策略
+    // 这个算法确保了无论总行数是多少，每个管道分配到的行数最多只相差1。
+    
+    let groupIndex = 0;
+    // 计算每个管道的基础行数
+    const baseLinesPerGroup = Math.floor(totalLines / 10);
+    // 计算有多少个管道需要分配额外的1行
+    let remainder = totalLines % 10;
+
+    for (let i = 0; i < totalLines; i++) {
+        // 将当前行（的引用）推入对应的管道
+        this[`lyricGroup${groupIndex}`].push(this.lyricLines[i]);
+
+        // 判断当前管道是否已满，如果满了，则移动到下一个管道
+        const currentGroupSize = this[`lyricGroup${groupIndex}`].length;
+        const targetSize = baseLinesPerGroup + (remainder > 0 ? 1 : 0);
+
+        if (currentGroupSize >= targetSize) {
+            groupIndex++;
+            remainder--; // 消耗一个额外的名额
+        }
+    }
+
+    console.log(`歌词总数(${totalLines})已按均衡负载方式分发。`);
+},
+
+
+/**
+ * [规范化] 3. 状态重置：切歌或重置播放器时调用
+ * - 职责：清空所有与歌词相关的数据状态。
+ */
+resetLyrics() {
+    this.lyrics = [];
+    this.lyricLines = [];
+    this.playerState.currentLyricIndex = -1;
+    this.selectedLyricIndex = -1;
+    
+    for (let i = 0; i < 10; i++) { this[`lyricGroup${i}`] = []; }
+
+    if (this.selectionTimeoutId) {
+        clearTimeout(this.selectionTimeoutId);
+        this.selectionTimeoutId = null;
+    }
+},
+
+// 【请只替换此函数】
+
+/**
+ * [最终修正] 高亮状态更新
+ * - 使用【纯粹的二分查找】算法，确保在任何情况下都能正确定位高亮行。
+ */
+ updateLyric() {
+    if (this.swiperCurrentIndex !== 1 || !this.lyricLines || this.lyricLines.length === 0) {
+        return;
+    }
+
+    const lookaheadTime = this.playerState.playDuration + (this.settings.lyricAdvanceTime || 1.8);
+    const oldIndex = this.playerState.currentLyricIndex;
+
+    // a. 【核心修正】始终使用高效且可靠的二分查找算法
+    let newIndex = 0;
+    let low = 0;
+    let high = this.lyrics.length - 1;
+
+    // 这个循环会在整个数组范围内，找到最后一个时间小于等于 lookaheadTime 的行
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (this.lyrics[mid].time > lookaheadTime) {
+            high = mid - 1;
+        } else {
+            // 只要中间行的时间小于预读时间，它就可能是目标行，
+            // 我们记录下来，并尝试在它的右半部分寻找更精确的匹配。
+            newIndex = mid;
+            low = mid + 1;
+        }
+    }
+
+    // b. 如果索引未变，则不执行任何操作
+    if (newIndex === oldIndex) return;
+
+    // c. 在状态中心 lyricLines 上修改属性
+    if (oldIndex >= 0) {
+        this.lyricLines[oldIndex].isCurrent = false;
+        this.lyricLines[oldIndex].extra = null;
+    }
+    if (newIndex >= 0) {
+        this.lyricLines[newIndex].isCurrent = true;
+        this.lyricLines[newIndex].extra = this.getExtraLyricText(this.lyrics[newIndex]);
+    }
+
+    // d. 轻量级地刷新需要更新的渲染管道
+    if (oldIndex >= 0) {
+        this.refreshLyricGroup(oldIndex);
+    }
+    if (newIndex >= 0) {
+        this.refreshLyricGroup(newIndex);
+    }
+
+    // e. 更新状态并触发滚动
+    this.playerState.currentLyricIndex = newIndex;
+    this.$nextTick(() => { this.scrollToCurrentLyric(); });
+},
+
+/**
+ * [新增] 轻量级刷新函数
+ * - 根据歌词行的全局索引，找到其所在的渲染管道，并为该管道创建一个新的数组引用。
+ * @param {number} lyricIndex - 发生状态变更的歌词行的全局索引。
+ */
+refreshLyricGroup(lyricIndex) {
+    if (lyricIndex < 0) return;
+
+    const totalLines = this.lyricLines.length;
+    let groupIndex;
+
+    if (totalLines < 10) {
+        groupIndex = 0;
+    } else {
+        const linesPerGroup = Math.ceil(totalLines / 10);
+        groupIndex = Math.floor(lyricIndex / linesPerGroup);
+        groupIndex = Math.min(groupIndex, 9); // 确保不越界
+    }
+
+    // 为需要更新的管道创建一个全新的数组拷贝，强制框架刷新这部分UI
+    this[`lyricGroup${groupIndex}`] = [...this[`lyricGroup${groupIndex}`]];
+},
+
+// 【请只替换这两个函数】
+
+/**
+ * [最终修正] 歌词行点击事件
+ * - 修正双击跳转逻辑，避免刷新冲突。
+ */
+ onLyricLineClick(line, originalIndex) {
+    const index = originalIndex;
+
+    if (this.selectedLyricIndex !== index) { // 首次点击
+        if (this.playerState.isPlaying) { audio.pause(); }
+        
+        this.clearSelectionTimeout();
+        this.updateLyricSelection(this.selectedLyricIndex, false);
+        this.selectedLyricIndex = index;
+        this.updateLyricSelection(index, true);
+
+        this.startSelectionTimeout();
+        prompt.showToast({ message: `已暂停，再次点击跳转` });
+    } 
+    else { // 第二次点击 (确认跳转)
+        this.clearSelectionTimeout();
+        
+        // 【核心修正】在这里，我们只在数据层面清除选中状态，不触发UI刷新。
+        // 把UI刷新的任务完全交给后续的 updateLyric()。
+        if (this.selectedLyricIndex !== -1) {
+            this.lyricLines[this.selectedLyricIndex].isSelected = false;
+            this.selectedLyricIndex = -1;
+        }
+
+        // 跳转并播放
+        const targetTime = this.lyrics[index].time;
+        audio.currentTime = targetTime;
+        audio.play();
+        prompt.showToast({ message: `已跳转到 ${this.second2time(targetTime)}` });
+        
+        // updateLyric() 会计算新的高亮行，并触发一次完整的、正确的UI刷新。
+        this.updateLyric(); 
+        this.$nextTick(() => this.scrollToCurrentLyric(true));
+    }
+},
+
+
+/**
+ * [最终修正] 重置选中状态 (例如在3秒超时后调用)
+ * - 这个函数现在只负责在需要明确取消选中框时，才触发UI刷新。
+ */
+resetLyricSelection() {
+    if (this.selectedLyricIndex !== -1) {
+        // 调用 updateLyricSelection 来确保UI上的选中框被移除
+        this.updateLyricSelection(this.selectedLyricIndex, false);
+        this.selectedLyricIndex = -1;
+    }
+},
+
+/**
+ * [最终方案] 更新选中状态的辅助函数
+ */
+updateLyricSelection(index, isSelected) {
+    if (index < 0 || index >= this.lyricLines.length) return;
+
+    const line = this.lyricLines[index];
+    if (line && line.isSelected !== isSelected) {
+        line.isSelected = isSelected;
+        // 【核心】同样使用轻量级刷新
+        this.refreshLyricGroup(index);
+    }
+},
+
 
     // 视图切换函数保持不变，但调用时机已由 handleSwipe 控制
     switchToLyricsView() {
@@ -626,67 +981,6 @@ export default {
     },
 
     /**
-     * 更新歌词行的选中状态 (此函数无需修改，保持原样)
-     */
-    updateLyricSelection(index, isSelected) {
-        if (index < 0 || index >= this.fullVisibleLyrics.length) {
-            return;
-        }
-        const line = this.fullVisibleLyrics[index];
-        if (line.isSelected !== isSelected) {
-            this.fullVisibleLyrics.splice(index, 1, {
-                ...line,
-                isSelected: isSelected,
-            });
-        }
-    },
-
-
-    /**
-     * 【【【逻辑修正】】】
-     * 歌词行点击事件处理函数
-     * 简化逻辑：首次点击暂停，二次点击跳转并继续播放。
-     */
-     onLyricLineClick(line, index) {
-        // 1. 如果是第一次点击 (包括从一个选中项切换到另一个)
-        if (this.selectedLyricIndex !== index) {
-            // a. 如果当前正在播放，则暂停
-            if (this.playerState.isPlaying) {
-                audio.pause();
-            }
-            
-            // b. 清理旧状态并设置新状态
-            this.clearSelectionTimeout();
-            this.updateLyricSelection(this.selectedLyricIndex, false); // 取消旧的
-            this.selectedLyricIndex = index;
-            this.updateLyricSelection(index, true); // 设置新的
-
-            // c. 启动自动取消定时器
-            this.startSelectionTimeout();
-            prompt.showToast({ message: `已暂停，再次点击跳转` });
-        } 
-        // 2. 如果是第二次点击 (确认跳转)
-        else {
-            // a. 清理定时器
-            this.clearSelectionTimeout();
-
-            // b. 获取时间并跳转
-            const targetTime = this.lyrics[index].time;
-            audio.currentTime = targetTime;
-            
-            // c. 【关键】无条件继续播放
-            audio.play();
-            prompt.showToast({ message: `已跳转到 ${this.second2time(targetTime)}` });
-
-            // d. 更新UI
-            this.updateLyric(); 
-            this.$nextTick(() => this.scrollToCurrentLyric(true));
-
-            // e. 清理选中状态
-            this.resetLyricSelection();
-        }
-    },
-    /**
      * 【【【逻辑修正】】】
      * 启动3秒后自动取消选中的定时器
      */
@@ -712,37 +1006,7 @@ export default {
         }
     },
 
-    /**
-     * 【【【逻辑修正】】】
-     * 重置所有与歌词选择相关的状态
-     */
-     resetLyricSelection() {
-        if (this.selectedLyricIndex !== -1) {
-            this.updateLyricSelection(this.selectedLyricIndex, false);
-        }
-        this.selectedLyricIndex = -1;
-        // 不再需要管理 wasPlayingBeforeSelection
-    },
-    /**
-     * 【【【新增】】】
-     * 更新歌词行的选中状态 (使用不可变性原则)
-     * @param {number} index - 要更新的行索引
-     * @param {boolean} isSelected - 是否设置为选中
-     */
-    updateLyricSelection(index, isSelected) {
-        if (index < 0 || index >= this.fullVisibleLyrics.length) {
-            return;
-        }
-        
-        const line = this.fullVisibleLyrics[index];
-        // 只有在状态确实需要改变时才操作，避免不必要的渲染
-        if (line.isSelected !== isSelected) {
-            this.fullVisibleLyrics.splice(index, 1, {
-                ...line,
-                isSelected: isSelected,
-            });
-        }
-    },
+
     getDeviceInfo() { device.getInfo({ success: (data) => { if (data.screenShape) this.screenShape = data.screenShape; }, fail: (data, code) => console.error(`获取设备信息失败, code = ${code}`) }); },
     async onSaveState() {
         if (!this.currSong || !this.currSong.duration) return;
@@ -1133,100 +1397,84 @@ export default {
         console.log("手动构建渲染歌词列表...");
         // 【【【核心修正】】】 将 (index, line) 改为 (line, index)
         this.fullVisibleLyrics = this.lyrics.map((line, index) => {
-            const uniqueId = `lyric-${line.time}-${index}`;
-            return {
-                id: uniqueId,
-                original: line.original || line.text || '',
-                // 现在这里的判断是正确的：对象.属性 === 数字
-                isCurrent: index === this.playerState.currentLyricIndex,
-                extra: index === this.playerState.currentLyricIndex ? this.getExtraLyricText(line) : null,
-                isSelected: false,
-            };
+        return {
+            id: `lyric-${line.time}-${index}`,
+            originalIndex: index, // 【重要】保留原始索引
+            original: line.original || line.text || '',
+            isCurrent: index === this.playerState.currentLyricIndex,
+            extra: index === this.playerState.currentLyricIndex ? this.getExtraLyricText(line) : null,
+            isSelected: false,
+        };
+    });
+
+    // 【新增】调用分组函数
+    this.groupVisibleLyrics();
+},
+groupVisibleLyrics() {
+    const groups = [];
+    const lyrics = this.fullVisibleLyrics;
+    for (let i = 0; i < lyrics.length; i += this.LINES_PER_GROUP) {
+        groups.push(lyrics.slice(i, i + this.LINES_PER_GROUP));
+    }
+    this.lyricGroups = groups;
+},
+
+/**
+ * 【【【核心重构：按您思路优化】】】
+ * 更新当前高亮行，只操作所在分组的数据
+ * @param {number} newIndex - 新的高亮行索引
+ */
+ updateCurrentLyricLine(newIndex) {
+    const oldIndex = this.playerState.currentLyricIndex;
+    if (oldIndex === newIndex) return;
+
+    const linesPerGroup = this.LINES_PER_GROUP;
+
+    // 1. 计算新、旧索引所在的组和组内索引
+    const oldGroupIndex = oldIndex >= 0 ? Math.floor(oldIndex / linesPerGroup) : -1;
+    const newGroupIndex = newIndex >= 0 ? Math.floor(newIndex / linesPerGroup) : -1;
+    
+    const oldLineIndexInGroup = oldIndex >= 0 ? oldIndex % linesPerGroup : -1;
+    const newLineIndexInGroup = newIndex >= 0 ? newIndex % linesPerGroup : -1;
+
+    // 2. 更新旧行（如果存在）
+    if (oldGroupIndex !== -1 && this.lyricGroups[oldGroupIndex] && this.lyricGroups[oldGroupIndex][oldLineIndexInGroup]) {
+        const oldGroup = [...this.lyricGroups[oldGroupIndex]]; // 复制要修改的组
+        const oldLine = oldGroup[oldLineIndexInGroup];
+        // 创建新对象替换旧行
+        oldGroup.splice(oldLineIndexInGroup, 1, {
+            ...oldLine,
+            isCurrent: false,
+            extra: null,
         });
-    },
+        // 用更新后的组替换整个大数组中的旧组
+        this.lyricGroups.splice(oldGroupIndex, 1, oldGroup);
+    }
 
-
-    /**
-     * 【【【UI Bug 修复】】】
-     * 更新当前高亮行，使用不可变性原则确保UI刷新
-     * @param {number} newIndex - 新的高亮行索引
-     */
-     updateCurrentLyricLine(newIndex) {
-        const oldIndex = this.playerState.currentLyricIndex;
-        if (oldIndex === newIndex) return; // 索引未变，无需操作
-
-        // 【【【核心修复】】】
-        // 遵循不可变性原则，通过创建新对象来触发UI更新
-
-        // 1. 更新旧行：创建一个新的、不含 isCurrent 的对象来替换旧对象
-        if (oldIndex >= 0 && oldIndex < this.fullVisibleLyrics.length) {
-            const oldLine = this.fullVisibleLyrics[oldIndex];
-            this.fullVisibleLyrics.splice(oldIndex, 1, {
-                ...oldLine,
-                isCurrent: false,
-                extra: null,
-            });
-        }
-
-        // 2. 更新新行：同样，创建一个新的、包含 isCurrent 的对象来替换
-        if (newIndex >= 0 && newIndex < this.fullVisibleLyrics.length) {
-            const newLineDataFromOriginal = this.lyrics[newIndex]; // 从原始数据获取
-            const newLine = this.fullVisibleLyrics[newIndex];
-            this.fullVisibleLyrics.splice(newIndex, 1, {
-                ...newLine,
-                isCurrent: true,
-                extra: this.getExtraLyricText(newLineDataFromOriginal),
-            });
-        }
+    // 3. 更新新行（如果存在）
+    if (newGroupIndex !== -1 && this.lyricGroups[newGroupIndex] && this.lyricGroups[newGroupIndex][newLineIndexInGroup]) {
+        // 如果新旧组是同一个，要基于上一步更新后的组来操作
+        const baseGroup = (oldGroupIndex === newGroupIndex) ? this.lyricGroups[newGroupIndex] : [...this.lyricGroups[newGroupIndex]];
+        const newGroup = [...baseGroup];
         
-        // 3. 更新状态
-        this.playerState.currentLyricIndex = newIndex;
-
-        // 4. 在DOM更新后滚动
-        this.$nextTick(() => {
-            this.scrollToCurrentLyric();
+        const newLineDataFromOriginal = this.lyrics[newIndex];
+        const newLine = newGroup[newLineIndexInGroup];
+        // 创建新对象替换新行
+        newGroup.splice(newLineIndexInGroup, 1, {
+            ...newLine,
+            isCurrent: true,
+            extra: this.getExtraLyricText(newLineDataFromOriginal),
         });
-    },
-
-
-    /**
-     * 【【【核心重构】】】
-     * 歌词时间更新逻辑
-     */
-    updateLyric() {
-        // 1. 只有在歌词页面才执行计算
-        if (this.swiperCurrentIndex !== 1 || !this.lyrics || this.lyrics.length === 0) {
-            return;
-        }
-
-        // 2. 幽灵时间
-        const lookaheadTime = this.playerState.playDuration + (this.settings.lyricAdvanceTime || 1.8);
-
-        // 3. 快速路径检查
-        const currentIndex = this.playerState.currentLyricIndex;
-        if (currentIndex > -1) {
-            const currentLine = this.lyrics[currentIndex];
-            const nextLine = this.lyrics[currentIndex + 1];
-            if (nextLine && lookaheadTime >= currentLine.time && lookaheadTime < nextLine.time) {
-                return; // 时间在当前行范围内，不计算
-            }
-        }
-
-        // 4. 二分查找优化，比 findIndex 更高效
-        let low = 0, high = this.lyrics.length - 1, newIndex = 0;
-        while(low <= high) {
-            let mid = Math.floor((low + high) / 2);
-            if (this.lyrics[mid].time > lookaheadTime) {
-                high = mid - 1;
-            } else {
-                newIndex = mid;
-                low = mid + 1;
-            }
-        }
-        
-        // 5. 【关键】调用新的更新函数，只修改数据，不重建数组
-        this.updateCurrentLyricLine(newIndex);
-    },
+        // 再次替换
+        this.lyricGroups.splice(newGroupIndex, 1, newGroup);
+    }
+    
+    // 4. 更新状态和滚动
+    this.playerState.currentLyricIndex = newIndex;
+    this.$nextTick(() => {
+        this.scrollToCurrentLyric();
+    });
+},
 
     /**
      * 【【【核心重构】】】
@@ -1261,45 +1509,6 @@ export default {
         });
     },
     
-    /**
-     * 【【【核心重构】】】
-     * 重置歌词时，不仅要清空原始数据，也要清空视图数据
-     * 这个函数在切歌开始时 (updateUiForNewSong) 被调用
-     */
-     resetLyrics() {
-        this.lyrics = [];
-        this.fullVisibleLyrics = []; // 【重要】确保清空，为新歌词腾出空间
-        this.playerState.currentLyricIndex = -1;
-        
-        // 同时重置选中状态
-        this.selectedLyricIndex = -1;
-        if (this.selectionTimeoutId) {
-            clearTimeout(this.selectionTimeoutId);
-            this.selectionTimeoutId = null;
-        }
-    },
-
-    /**
-     * 【【【核心重构】】】
-     * 此函数现在只在获取到新歌词数据时被调用一次。
-     */
-     processAndMergeLyrics(data) {
-        // 1. 解析歌词 (这部分逻辑不变)
-        if (!data?.lrc?.lyric) { this.lyrics = [{ time: 0, text: '暂无歌词' }]; }
-        else {
-            const original = this.parseLyric(data.lrc.lyric);
-            const translation = data.tlyric?.lyric ? this.parseLyric(data.tlyric.lyric) : null;
-            const romaji = data.romalrc?.lyric ? this.parseLyric(data.romalrc.lyric) : null;
-            this.mergeLyrics(original, translation, romaji);
-        }
-        
-        // 2. 【【【关键】】】解析完成后，立即构建一次用于渲染的歌词列表
-        this.buildVisibleLyrics();
-        
-        // 3. 立即定位到当前播放时间的歌词行
-        //    这可以确保即使用户在歌曲加载完成前已经滑到歌词页，也能看到正确的高亮
-        this.updateLyric();
-    },
     // --- 播放器事件绑定 (已补全系统全局控制事件) ---
     bindAudioEvents() {
         // 同步播放/暂停状态
@@ -1334,11 +1543,6 @@ export default {
             }
             this.pendingSongId = null;
             console.log("Event: onstop. 播放已停止。");
-        };
-
-        // 发生错误时触发
-        audio.onerror = () => {
-            this.handlePlaybackError("播放器发生错误");
         };
 
         // 播放进度更新时触发

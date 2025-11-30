@@ -78,12 +78,12 @@
   }
 
   /* --- 卡片样式 (保持不变) --- */
-  .license-capsule { width: 100%; background-color: rgba(255, 255, 255, 0.06); border-radius: 24px; margin-bottom: 20px; flex-direction: column; padding: 20px; }
+  .license-capsule { width: 100%; background-color: #191821; border-radius: 24px; margin-bottom: 20px; flex-direction: column; padding: 20px; }
   .header-info { width: 100%; flex-direction: column; }
   .item-title { font-size: 26px; font-weight: bold; color: #ffffff; }
   .item-author { font-size: 24px; color: rgba(255, 255, 255, 0.7); margin-top: 8px; }
   .project-link { font-size: 22px; color: #aaa; margin-top: 8px; text-decoration: underline; }
-  .license-name { font-size: 24px; color: #3ae1ff; margin-top: 4px; }
+  .license-name { font-size: 24px; color: #BAC3FF; margin-top: 4px; }
   .qrcode-section { width: 100%; flex-direction: column; align-items: center; margin-top: 15px; padding-top: 15px; }
   .qrcode-component { width: 240px; height: 240px; background-color: #ffffff; padding: 10px; border-radius: 8px; }
   .qrcode-tip { font-size: 22px; color: rgba(255, 255, 255, 0.7); margin-top: 10px; }

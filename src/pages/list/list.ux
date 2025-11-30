@@ -1,49 +1,33 @@
 <template>
     <div class="page-container">
-        <!-- 1. 固定的顶部栏 (保持不变) -->
+        <!-- 1. 固定的顶部栏 -->
         <div class="header" onclick="goBack">
             <text class="time-display">{{currentTime}}</text>
-            <text class="title">‹{{ pageTitle }}</text>
+            <text class="title">‹ {{ pageTitle }}</text>
         </div>
 
         <!-- 2. 独立滚动的内容区 -->
-        <scroll id="songListScroll" class="scroll-wrapper {{ isMultiSelectMode ? 'footer-padding' : '' }}" scroll-y="true" bounces="true"
-                onscrolltop="handleScrollTop"
-                onscrollbottom="handleScrollBottom"
-                onscroll="handleScroll">
+        <scroll id="songListScroll" class="scroll-wrapper {{ fullSongList.length > PAGE_SIZE ? 'footer-padding' : '' }}" scroll-y="true" bounces="true" onscrolltop="handleScrollTop">
 
-            <!-- 按钮容器 (保持原有结构) -->
+            <!-- 按钮容器 -->
             <div class="button-container">
                 <!-- 普通模式下的按钮 -->
-                <div if="{{ !isMultiSelectMode }}">
-                    <div class="action-button play-all" if="{{ (listType === 'downloadlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" onclick="playAll">
-                        <image class="button-icon" src="/common/icon/play.png"></image>
-                        <text class="button-text">{{ listType === 'personal_fm' ? '开启FM' : '播放全部' }}</text>
-                    </div>
-                    <div class="button-group" if="{{ listType === 'songlist' && fullSongList.length > 0 }}">
-                        <div class="group-button play" onclick="playAll"><image class="button-icon" src="/common/icon/play.png"></image><text class="button-text dark">播放全部</text></div>
-                        <div class="group-button favorite" onclick="addAllToFavorites"><image class="button-icon" src="/common/icon/liked.png"></image><text class="button-text dark">添加收藏</text></div>
-                    </div>
-                    <div class="action-button clear-list" if="{{ listType === 'playlist' && fullSongList.length > 0 }}" onclick="clearPlaylist">
-                        <image class="button-icon" src="/common/icon/delete.png"></image><text class="button-text">清空列表</text>
-                    </div>
+                <div class="action-button play-all" if="{{ (listType === 'downloadlist' || listType === 'personal_fm' || listType === 'daily_recommend') && fullSongList.length > 0 }}" onclick="playAll">
+                    <image class="button-icon" src="/common/icon/play-arrow.png"></image>
+                    <text class="button-text">{{ listType === 'personal_fm' ? '开启FM' : '播放全部' }}</text>
                 </div>
-
-                <!-- 多选模式下的“全选”和信息栏 -->
-                <div class="multi-select-header" if="{{ isMultiSelectMode }}">
-                    <div class="select-all-container" onclick="toggleSelectAll">
-                        <input type="checkbox" class="select-all-checkbox" checked="{{ isAllSelected }}"></input>
-                        <text class="select-all-text">全选</text>
-                    </div>
-                    <text class="selection-count-text">已选{{ selectedCount }}首</text>
+                <div class="button-group" if="{{ listType === 'songlist' && fullSongList.length > 0 }}">
+                    <div class="group-button play" onclick="playAll"><image class="button-icon" src="/common/icon/play-arrow.png"></image><text class="button-text dark">播放全部</text></div>
+                    <div class="group-button favorite" onclick="addAllToFavorites"><image class="button-icon" src="/common/icon/list-liked.png"></image><text class="button-text dark">添加收藏</text></div>
+                </div>
+                <div class="action-button clear-list" if="{{ listType === 'playlist' && fullSongList.length > 0 }}" onclick="clearPlaylist">
+                    <image class="button-icon" src="/common/icon/delete.png"></image><text class="button-text">清空列表</text>
                 </div>
             </div>
 
             <!-- 列表内容 -->
             <div class="list-content">
-                <div for="{{(index, item) in displaySongList}}"
-                     class="song-item {{ selectedSongIdsMap[item.id] ? 'selected' : '' }}"
-                     onclick="handleItemClick(item)">
+                <div for="{{(index, item) in displaySongList}}" class="song-item" onclick="play(item.id)">
 
                     <div class="item-prefix">
                         <text class="item-index">{{ item.displayIndex }}</text>
@@ -57,44 +41,34 @@
                         </div>
                     </div>
 
-                    <!-- 【【【修改】】】: 动态功能按钮 -->
-                    <div class="action-btn-wrapper"
-                         if="{{ !isMultiSelectMode }}"
-                         show="{{ listType === 'playlist' || listType === 'favorites' || listType === 'downloadlist' || listType === 'songlist' }}">
+                    <!-- 动态功能按钮 -->
+                    <div class="action-btn-wrapper" show="{{ listType === 'playlist' || listType === 'favorites' || listType === 'downloadlist' || listType === 'songlist' }}">
                         <!-- 在播放列表或收藏页显示删除按钮 -->
                         <div if="{{ listType === 'playlist' || listType === 'favorites' }}" onclick="deleteSong(item)">
                             <image class="action-btn" src="/common/icon/cancel.png"></image>
                         </div>
-                        <!-- 在下载页或歌单页显示添加到下一首按钮 -->
+                        <!-- 在下载页或歌单页显示添加到下一首按钮 (此功能暂未实现，可作占位) -->
                         <div if="{{ listType === 'downloadlist' || listType === 'songlist' }}" onclick="addSongToNext(item)">
                             <image class="action-btn" src="/common/icon/plus.png"></image>
                         </div>
                     </div>
-
-                    <!-- 复选框 (保持原有逻辑) -->
-                    <input type="checkbox"
-                           class="song-checkbox"
-                           if="{{ isMultiSelectMode }}"
-                           checked="{{ selectedSongIdsMap[item.id] }}"
-                           onchange="(e) => handleCheckboxChange(e, item.id)" />
                 </div>
             </div>
-            <!-- 加载提示 -->
+            
+            <!-- 加载与空状态提示 -->
             <text class="loading-tip" if="{{ isLoading }}">正在加载...</text>
             <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">列表为空</text>
-            <text class="loading-tip" if="{{ !isLoading && !hasMoreDown && fullSongList.length > 0 }}">已加载全部</text>
+            <text class="loading-tip" if="{{ !isLoading && fullSongList.length > 0 }}">加载完成</text>
         </scroll>
 
-        <!-- 底部操作栏 -->
-        <div class="multi-select-footer {{ isMultiSelectMode ? 'visible' : '' }}" if="{{ isMultiSelectMode }}">
-            <text class="footer-text-button download" onclick="downloadSelectedSongs">下载</text>
-            <text class="footer-text-button delete" onclick="deleteSelectedSongs">删除</text>
-            <text class="footer-text-button cancel" onclick="toggleMultiSelectMode">取消</text>
+        <!-- 悬浮的底部翻页操作栏 -->
+        <div class="pagination-footer" if="{{ fullSongList.length > PAGE_SIZE }}">
+            <text class="item-value-btn {{ currentPage === 1 ? 'item-value-btn-disabled' : '' }}" onclick="loadPrevPage">上一页</text>
+            <text class="pagination-text">{{ currentPage }} / {{ totalPages }}</text>
+            <text class="item-value-btn {{ currentPage >= totalPages ? 'item-value-btn-disabled' : '' }}" onclick="loadNextPage">下一页</text>
         </div>
     </div>
 </template>
-
-
 <style>
     /* --- 页面整体布局 --- */
     .page-container {
@@ -104,7 +78,7 @@
         position: relative;
     }
 
-    /* --- 顶栏样式 (保持不变) --- */
+    /* --- 顶栏样式 --- */
     .header {
         width: 100%;
         height: 90px;
@@ -127,166 +101,113 @@
         width: 100%;
         flex-direction: column;
         align-items: center;
-        transition: bottom 0.2s ease-in-out;
     }
 
-    /* --- 按钮区域 --- */
+    /* --- 顶部按钮区域 --- */
     .button-container {
         width: 360px;
-        margin: 10px 0;
+        margin: 5px 0;
         flex-direction: column;
         align-items: center;
     }
     .action-button { width: 160px; height: 100px; border-radius: 24px; justify-content: center; align-items: center; flex-direction: column; }
-    .action-button.play-all { background-color: #3ae1ff; }
-    .action-button.clear-list { background-color: rgb(255, 58, 48); }
+    .play-all { background-color: #BAC3FF; }
+    .clear-list { background-color: #BAC3FF; }
     .button-group { width: 100%; flex-direction: row; justify-content: space-around; margin: 10px 0; }
     .group-button { width: 160px; height: 100px; border-radius: 24px; justify-content: center; align-items: center; flex-direction: column; }
-    .group-button.play { background-color: #3ae1ff; }
-    .group-button.favorite { background-color: #ff9a3c; }
+    .play { background-color: #BAC3FF; }
+    .favorite { background-color: #BAC3FF; }
     .button-icon { width: 36px; height: 36px; }
     .button-text { font-size: 26px; color: #fff; font-weight: bold; margin-top: 4px; }
     .button-text.dark { color: #000000; }
-
-    .header-action-btn-wrapper {
-        margin-top: 15px;
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        padding: 10px 20px;
-        border-radius: 25px;
-        align-self: flex-start; /* 按钮靠左对齐 */
-    }
-    .header-action-btn-wrapper.select-mode-btn {
-        background-color: rgba(58, 225, 255, 0.2); /* 使用主题色 */
-    }
-    .header-action-btn-icon {
-        width: 32px;
-        height: 32px;
-        margin-right: 8px;
-    }
-    .header-action-btn-text {
-        color: #3ae1ff; /* 使用主题色 */
-        font-size: 24px;
-        font-weight: bold;
-    }
-
-    /* --- 列表样式修改 --- */
     .list-content { flex-direction: column; padding-bottom: 60px; width: 100%; align-items: center; }
-    .song-item { padding: 0 10px 0 0; width: 360px; height: 120px; margin: 5px; background-color: rgba(255, 255, 255, 0.06); border-radius: 36px; justify-content: flex-start; align-items: center; }
+    .song-item { padding: 0 10px 0 0; width: 400px; height: 120px; margin: 5px; background-color: #191821; border-radius: 60px; justify-content: flex-start; align-items: center; }
     .item-prefix { width: 80px; height: 100%; justify-content: center; align-items: center; flex-shrink: 0; }
-    .item-index { text-align: center; font-size: 28px; color: rgba(255, 255, 255, 0.6); }
-    .song-checkbox { width: 40px; height: 40px; }
+    .item-index { text-align: center; font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.6); }
     .song-info { flex-grow: 1; width: 0; flex-direction: column; justify-content: center; }
-    .song-title { font-size: 26px; color: #fff; lines: 1; text-overflow: ellipsis; }
-    .song-artist { font-size: 22px; color: #888; lines: 1; text-overflow: ellipsis; }
+    .song-title { font-size: 26px; font-weight: bold; color: #fff; lines: 1; text-overflow: ellipsis; }
+    .song-artist { font-size: 22px; font-weight: bold; color: #888; lines: 1; text-overflow: ellipsis; }
     .song-meta { flex-direction: row; align-items: center; margin-top: 4px; }
-    .download-tag { background-color: rgba(58, 225, 255, 0.2); color: #3ae1ff; font-size: 18px; padding: 2px 8px; border-radius: 6px; margin-right: 10px; }
-    /* 【【【修改】】】: 统一右侧按钮样式 */
+    .download-tag { background-color: #2E323C; color: #BAC3FF; font-size: 18px; font-weight: bold; padding: 2px 8px; border-radius: 6px; }
     .action-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
     .action-btn { width: 64px; height: 64px; }
     .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px; }
 
-    /* --- 【新增】多选模式头部样式 --- */
-.multi-select-header {
-    width: 100%; /* 宽度与父容器 .button-container 一致 */
-    height: 60px; /* 高度与原有的 .action-button 保持一致 */
-    flex-direction: row;
-    justify-content: space-between; /* “全选”居左，“计数”居右 */
-    align-items: center;
-    padding: 0 10px; /* 左右留出一些边距 */
-}
-
-.select-all-container {
-    flex-direction: row;
-    align-items: center;
-    padding: 10px; /* 增大点击区域 */
-}
-
-.select-all-checkbox {
-    width: 40px;
-    height: 40px;
-    margin-right: 15px;
-}
-
-.select-all-text {
-    font-size: 26px; /* 与 .button-text 字体大小保持一致 */
-    color: #fff; /* 与 .button-text 颜色保持一致 */
-    font-weight: bold;
-}
-
-.selection-count-text {
-    font-size: 24px;
-    color: #888; /* 使用次要文字颜色 */
-}
-
-    /*
-      【核心修改】
-      - 多选操作栏使用 absolute 定位悬浮。
-      - 内部按钮是纯文本样式。
-    */
-    .multi-select-footer {
-        position: absolute; /* 改为 absolute 定位 */
-        bottom: 30px; /* 距离页面底部 30px */
-        left: 36%;
-        width: 360px; /* 固定宽度 */
-        height: 80px;
-        background-color: rgba(28, 28, 30, 0.85); /* 半透明深色背景，增加毛玻璃效果感 */
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 40px; /* 完全圆角 */
+    /* --- 【【【核心修改】】】: 透明悬浮的底部翻页栏 --- */
+    .pagination-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 100px;
         flex-direction: row;
+        padding: 0 20px;
         justify-content: space-around;
         align-items: center;
-        z-index: 20; /* 确保在滚动内容之上 */
+        /* border-top: 1px solid rgba(255, 255, 255, 0.1); <-- 移除边框 */
+        z-index: 20;
     }
-    .footer-text-button {
+    .pagination-text {
         font-size: 28px;
         font-weight: bold;
-        padding: 10px 20px; /* 增加点击区域 */
+        color: #ffffff;
     }
-    .footer-text-button.download {
-        color: #3ae1ff; /* 下载 - 主题色 */
+
+    /* --- 翻页按钮样式 (保持不变) --- */
+    .item-value-btn {
+        height: 50px;
+        padding: 0 20px;
+        background-color: #2E323C;
+        border-radius: 25px;
+        color: #BAC3FF;
+        font-size: 26px;
+        font-weight: bold;
+        text-align: center;
+        line-height: 50px;
     }
-    .footer-text-button.delete {
-        color: #ff453a; /* 删除 - 红色警告 */
+    .item-value-btn-disabled {
+        background-color: #2E323C;
+        color: #888;
     }
-    .footer-text-button.cancel {
-        color: #ffffff; /* 取消 - 白色 */
-    }
-    /* --- 媒体查询 --- */
+
+    /* --- 媒体查询 (适配方形屏幕) --- */
     @media screen and (shape: rect) {
         .header {
-            height: 65px; /* 顶栏高度变化 */
+            height: 65px;
             flex-direction: row-reverse;
             padding-top: 10px;
             justify-content: space-around;
         }
-        /* 关键: 滚动区域的起始位置也要相应调整 */
         .scroll-wrapper {
-            top: 65px; /* 与变化后的顶栏高度保持一致 */
+            top: 65px;
         }
         .time-display {
-		font-size: 32px;
-		padding-top: 0px;
-	}
-        .multi-select-toggle { flex-shrink: 0; }
+            font-size: 32px;
+            padding-top: 0px;
+        }
     }
 </style>
 
-<script>
-import downloadService from "../../services/download.js";
 
+<script>
 import router from "@system.router";
 import file from "@system.file";
 import prompt from "@system.prompt";
 
-// 文件服务封装 (无变化)
+// 文件服务封装 (保持不变)
 const fileService = {
     _promisify(fn, options) {
         return new Promise((resolve, reject) => {
-            fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
+            fn({ 
+                ...options, 
+                success: resolve, 
+                // 【【【修改】】】: 确保 reject 一个真正的 Error 对象
+                fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)) 
+            });
         });
     },
+
     async readJson(uri, defaultValue = null) {
         try {
             const data = await this._promisify(file.readText, { uri });
@@ -327,29 +248,22 @@ export default {
     protected: {
         listType: 'playlist',
         songlistId: null,
+        targetSongId: null, 
     },
 
     private: {
         fullSongList: [],
         displaySongList: [],
         
-        WINDOW_SIZE: 30,
-        PAGE_SIZE: 15,
-        ITEM_HEIGHT: 130,
+        PAGE_SIZE: 10,
+        currentPage: 1,
         TOTAL_LIMIT: 200,
         API_PAGE_SIZE: 50,
+        ITEM_HEIGHT: 130, 
         
-        displayStartIndex: 0,
         isLoading: false,
-        isScrolling: false,
-        isFetchingAll: false, // 新增：标记是否正在获取全部歌曲
-        hasMoreUp: false,
-        hasMoreDown: true,
-
-        isRefreshing: false,     // 【【【新增】】】标记是否正在网络刷新
-        justReachedTop: false,   // 【【【新增】】】标记用户是否刚滚动到顶部
-
-        downloadedSongsMap: null,
+        isRefreshing: false,
+        justReachedTop: false,
 
         pageTitle: "播放列表",
         currentTime: "00:00",
@@ -357,39 +271,47 @@ export default {
         listFileUri: 'internal://files/play_list.json',
         downloadedFileUri: 'internal://files/downloaded_songs.json',
         favoritesFileUri: 'internal://files/favorites.json',
-        isMultiSelectMode: false,
-    // 【核心修改】用一个普通对象来模拟 Set
-    selectedSongIdsMap: {}, 
-
-    // 【新增】下载队列相关状态
-    downloadQueue: [],
-    activeDownloads: 0,
-    MAX_CONCURRENT_DOWNLOADS: 3,
     },
 
-        // 【【【新增：Computed 计算属性】】】
-        computed: {
-        // 计算已选中的歌曲数量
-        selectedCount() {
-            return Object.keys(this.selectedSongIdsMap).length;
-        },
-        // 判断是否已全选
-        isAllSelected() {
-            const selectableCount = this.fullSongList.length;
-            if (selectableCount === 0) {
-                return false;
+    computed: {
+        totalPages() {
+            if (!this.fullSongList || this.fullSongList.length === 0) {
+                return 1;
             }
-            return this.selectedCount === selectableCount;
+            return Math.ceil(this.fullSongList.length / this.PAGE_SIZE);
         }
     },
 
     async onInit() {
+        // 检查并保存传入的 targetSongId
+        if (this.targetSongId) {
+            console.log(`接收到定位请求，目标歌曲ID: ${this.targetSongId}`);
+        }
+
         this.updateTime();
-        setInterval(() => this.updateTime(), 1000); // 减少更新频率
+        setInterval(() => this.updateTime(), 1000);
         this.updatePageTitle();
         await this.applySettings();
         await fileService.ensureDirExists(this.songlistsDir);
-        this.loadData();
+        
+        // loadData 方法现在需要知道是否要去定位歌曲
+        this.loadData(!!this.targetSongId); 
+    },
+
+        /**
+     * 【新增】: 组件销毁时的清理操作
+     */
+     onDestroy() {
+        // 如果定时器存在，则在页面销毁时清除它
+        if (this._updateTimeInterval) {
+            clearInterval(this._updateTimeInterval);
+            this._updateTimeInterval = null;
+        }
+        // 清除可能存在的下拉手势超时计时器
+        if (this._justReachedTopTimeoutId) {
+            clearTimeout(this._justReachedTopTimeoutId);
+            this._justReachedTopTimeoutId = null;
+        }
     },
 
     async applySettings() {
@@ -397,8 +319,7 @@ export default {
             const data = await fileService.readJson(SETTINGS_FILE_URI);
             if (data) {
                 if (data.performance) {
-                    this.WINDOW_SIZE = data.performance.windowSize || this.WINDOW_SIZE;
-                    this.PAGE_SIZE = data.performance.pageSize || this.PAGE_SIZE;
+                    this.PAGE_SIZE = data.performance.windowSize || this.PAGE_SIZE;
                 }
                 if (data.network) {
                     this.TOTAL_LIMIT = data.network.totalLimit || this.TOTAL_LIMIT;
@@ -416,50 +337,46 @@ export default {
             'songlist': "歌单详情",
             'favorites': "我的收藏",
             'playlist': "播放列表",
-            'daily_recommend': "每日推荐", // 新增
-            'personal_fm': "私人FM",     // 新增
+            'daily_recommend': "每日推荐",
+            'personal_fm': "私人FM",
         };
         this.pageTitle = titles[this.listType] || "播放列表";
     },
-
 
     updateTime() {
         const now = new Date();
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
 
-// 在 list.ux 的 <script> 中
-async loadData() {
-    if (this.isLoading) return;
+    /**
+     * 【【【重写优化版】】】: loadData 方法
+     * 1. 移除了未使用的 downloadedIds 变量。
+     * 2. 将 isDownloaded 状态的计算和赋值操作后置，确保只执行一次。
+     */
+     async loadData(shouldLocate = false) {
+        if (this.isLoading) return;
+        this.isLoading = true;
 
-    this.isLoading = true;
-    // 重置核心状态
-    this.fullSongList = [];
-    this.displaySongList = [];
-    this.hasMoreDown = true;
-    this.justReachedTop = false;
+        this.fullSongList = [];
+        this.displaySongList = [];
+        this.currentPage = 1;
+        this.justReachedTop = false;
 
-    try {
-        const downloadedMeta = await fileService.readJson(this.downloadedFileUri, {});
-        const downloadedIds = new Set(Object.keys(downloadedMeta));
-
-        // 对于 songlist，调用一个不会强制刷新的 fetch 方法
-        if (this.listType === 'songlist') {
-            // 【修复】await 确保 fetch 执行完毕后，才进入 finally
-            await this.fetchSonglistFromNetwork(downloadedIds, false); // forceAll = false
-        }
-        // --- 处理其他本地数据源的逻辑 (保持不变) ---
-        else {
+        try {
             let sourceData = [];
+            // 1. 根据列表类型，获取最原始的歌曲数据（不含 isDownloaded 状态）
             switch (this.listType) {
+                case 'songlist':
+                    sourceData = await this.fetchSonglistFromNetwork(false);
+                    break;
                 case 'daily_recommend':
-                    await this.fetchDailyRecommendSongs(downloadedIds);
-                    break; // fetch 方法内部会处理 isLoading
+                    sourceData = await this.fetchDailyRecommendSongs();
+                    break;
                 case 'personal_fm':
-                    await this.fetchPersonalFmSongs(downloadedIds);
-                    break; // fetch 方法内部会处理 isLoading
+                    sourceData = await this.fetchPersonalFmSongs();
+                    break;
                 case 'downloadlist':
-                    sourceData = Object.values(downloadedMeta);
+                    sourceData = Object.values(await fileService.readJson(this.downloadedFileUri, {}));
                     break;
                 case 'favorites':
                     sourceData = Object.values(await fileService.readJson(this.favoritesFileUri, {}));
@@ -468,371 +385,291 @@ async loadData() {
                     sourceData = await fileService.readJson(this.listFileUri, []);
                     break;
             }
-            if (sourceData.length > 0) {
-                this.fullSongList = sourceData.map((song, index) => ({
+
+            // 2. 检查获取到的数据是否有效
+            if (sourceData && sourceData.length > 0) {
+                // 3. 【核心优化】: 在确认有数据后，才读取“已下载”列表，并进行一次性的状态标记
+                let downloadedIds = new Set();
+                try {
+                    downloadedIds = new Set(Object.keys(await fileService.readJson(this.downloadedFileUri, {})));
+                } catch (e) {
+                    console.warn("读取已下载歌曲文件失败，将继续执行:", e.message);
+                }
+
+                this.fullSongList = sourceData.map((song) => ({
                     ...song,
-                    originalIndex: index + 1,
                     isDownloaded: downloadedIds.has(String(song.id))
                 }));
-                this.updateDisplayList(0);
-                this.hasMoreDown = this.fullSongList.length > this.displaySongList.length;
+                
+                // 4. 根据需要执行定位或加载第一页
+                if (shouldLocate) {
+                    this.locateSongAndLoadPage();
+                } else {
+                    this.loadPage(1);
+                }
             }
-        }
-    } catch (error) {
-        console.error("加载数据源失败:", error);
-        prompt.showToast({ message: `加载失败: ${error.message || '未知错误'}` });
-        this.hasMoreDown = false;
-    } finally {
-        // 【修复】统一在 finally 中设置 isLoading，确保状态正确
-        this.isLoading = false;
-    }
-},
-
-
-
-    // --- 3. 新增获取日推歌曲的方法 ---
-    async fetchDailyRecommendSongs(downloadedIds) {
-        const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误: requestService 未找到");
-
-        try {
-            const response = await request.fetch({ url: 'https://163api.qijieya.cn/recommend/songs' });
-            if (response.data.code !== 200 || !response.data.data.dailySongs) {
-                throw new Error(response.message || '返回数据格式不正确');
-            }
-
-            const songs = response.data.data.dailySongs;
-            this.fullSongList = songs.map(s => ({
-                id: s.id,
-                name: s.name,
-                artists: s.ar.map(a => a.name).join(' / '),
-                isDownloaded: downloadedIds.has(String(s.id))
-            }));
-
-            this.updateDisplayList(0);
-            this.hasMoreDown = false; // 日推一次性加载完
-
         } catch (error) {
-            console.error("获取每日推荐失败:", error);
-            prompt.showToast({ message: '获取每日推荐失败，请确认cookie登录和网络状态稍后重试' });
-            this.hasMoreDown = false;
+            console.error("加载数据源失败:", error.message || error);
+            prompt.showToast({ message: `加载失败` });
         } finally {
             this.isLoading = false;
         }
     },
 
-    // --- 4. 新增获取私人FM歌曲的方法 ---
-    async fetchPersonalFmSongs(downloadedIds) {
-        const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误: requestService 未找到");
 
-        try {
-            const url = `https://163api.qijieya.cn/personal_fm?timestamp=${new Date().getTime()}`;
-            const response = await request.fetch({ url });
-            if (!response.data.data) {
-                throw new Error(response.message || '返回数据格式不正确');
-            }
 
-            const songs = response.data.data;
-            this.fullSongList = songs.map(s => ({
-                id: s.id,
-                name: s.name,
-                artists: s.artists.map(a => a.name).join(' / '),
-                isDownloaded: downloadedIds.has(String(s.id))
-            }));
-
-            this.updateDisplayList(0);
-            this.hasMoreDown = true; // FM模式理论上可以无限加载
-
-        } catch (error) {
-            console.error("获取私人FM失败:", error);
-            prompt.showToast({ message: '获取私人FM失败，请确认cookie登录和网络状态稍后重试' });
-            this.hasMoreDown = false;
-        } finally {
-            this.isLoading = false;
+    /**
+     * 【【【修改】】】: locateSongAndLoadPage 方法
+     * 在加载页面后，增加滚动到指定歌曲位置的逻辑。
+     */
+     locateSongAndLoadPage() {
+        const targetId = this.targetSongId;
+        if (!targetId || !this.fullSongList || this.fullSongList.length === 0) {
+            this.loadPage(1);
+            return;
         }
-    },
 
-// 在 list.ux 的 <script> 中
-    // 【【【最终完整版】】】
-    async fetchSonglistFromNetwork(downloadedIds, forceAll = false) {
+        const songIndex = this.fullSongList.findIndex(song => String(song.id) === String(targetId));
+
+        if (songIndex !== -1) {
+            const targetPage = Math.floor(songIndex / this.PAGE_SIZE) + 1;
+            console.log(`歌曲 ${targetId} 找到，位于第 ${songIndex} 位，跳转到第 ${targetPage} 页。`);
+            
+            // 1. 先加载页面，这会更新 displaySongList
+            this.loadPage(targetPage);
+
+            // 2. 【【【核心新增逻辑】】】: 计算并滚动到歌曲位置
+            // 使用 this.$nextTick 确保 DOM 更新完毕后再执行滚动
+            this.$nextTick(() => {
+                // 计算歌曲在当前页的索引
+                const indexInPage = songIndex % this.PAGE_SIZE;
+                // 计算滚动偏移量
+                const scrollOffset = indexInPage * this.ITEM_HEIGHT;
+
+                console.log(`滚动到位置: ${scrollOffset}`);
+                this.$element('songListScroll').scrollTo({
+                    top: scrollOffset,
+                    behavior: 'smooth' // 使用平滑滚动效果
+                });
+            });
+
+        } else {
+            console.warn(`未在列表中找到歌曲ID: ${targetId}，将显示第一页。`);
+            prompt.showToast({ message: '未在列表中找到指定歌曲' });
+            this.loadPage(1);
+        }
+
+        // 清除目标ID，防止下次刷新时再次定位
+        this.targetSongId = null;
+    },
+    /**
+     * 【【【核心修正】】】: fetchSonglistFromNetwork
+     * 现在只返回歌曲数组，不再操作UI。
+     */
+     async fetchSonglistFromNetwork(forceAll = false) {
         if (!this.songlistId) {
-            this.isLoading = false;
-            this.hasMoreDown = false;
             throw new Error("未提供歌单ID");
         }
-
-        if (!(downloadedIds instanceof Set)) {
-            downloadedIds = new Set();
-        }
-
+        
         const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
-        const request = this.$app.$def.requestService;
-        if (!request) {
-            throw new Error("内部服务错误: requestService 未找到");
-        }
-
-        // 1. 【【【核心修正】】】如果不是强制刷新，并且当前列表为空，则优先尝试加载缓存
-        if (!forceAll && this.fullSongList.length === 0) {
+        
+        // 尝试从缓存加载
+        if (!forceAll) {
             const cachedList = await fileService.readJson(cacheFileUri, null);
             if (cachedList && cachedList.length > 0) {
-                console.log(`已从缓存加载 ${cachedList.length} 首歌曲。`);
-                this.fullSongList = cachedList.map(song => ({
-                    ...song,
-                    isDownloaded: downloadedIds.has(String(song.id))
-                }));
-                this.updateDisplayList(0);
-                // 标记仍有可能需要网络加载更多（如果缓存不完整）
-                this.hasMoreDown = true; 
-                // 即使加载了缓存，也让加载状态结束，UI可以交互
-                this.isLoading = false; 
-                return; // 【【【关键】】】加载缓存成功后，直接返回，不再执行网络请求
+                console.log("从缓存加载歌单");
+                return cachedList; // 直接返回缓存数据
             }
         }
 
-        // 2. 执行网络请求逻辑（仅在强制刷新或无缓存时）
-        console.log(forceAll ? "强制刷新：开始从网络获取全新数据..." : "无缓存或需要加载更多，开始网络请求...");
-        
-        // 如果是强制刷新，清空列表
-        if (forceAll) {
-            this.fullSongList = [];
-        }
-        
-        let offset = forceAll ? 0 : this.fullSongList.length;
+        // 从网络获取
+        const request = this.$app.$def.requestService;
+        if (!request) throw new Error("内部服务错误");
+
+        let offset = 0;
         let hasMore = true;
-        let networkSongs = forceAll ? [] : [...this.fullSongList]; // 从现有列表开始或从空列表开始
+        let networkSongs = [];
 
         while (hasMore && networkSongs.length < this.TOTAL_LIMIT) {
-            const url = `https://163api.qijieya.cn/playlist/track/all?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
+            const timestamp = new Date().getTime();
+            const url = `https://163api.qijieya.cn/playlist/track/all?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}&_t=${timestamp}`;
             
             try {
                 const response = await request.fetch({ url } );
-                if (response.status !== 'success') throw new Error(response.message || '网络响应状态异常');
-
                 const songs = response.data?.songs;
                 if (songs && songs.length > 0) {
-                    const newSongs = songs.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        artists: s.ar.map(a => a.name).join(' / '),
-                        isDownloaded: downloadedIds.has(String(s.id))
-                    }));
-
-                    // 使用一个临时变量来合并，避免频繁操作 this.fullSongList
-                    networkSongs.push(...newSongs);
+                    networkSongs.push(...songs.map(s => ({ id: s.id, name: s.name, artists: s.ar.map(a => a.name).join(' / ') })));
                     offset += songs.length;
-
-                    if (songs.length < this.API_PAGE_SIZE) {
-                        hasMore = false;
-                    }
+                    if (songs.length < this.API_PAGE_SIZE) hasMore = false;
                 } else {
                     hasMore = false;
                 }
             } catch (error) {
                 console.error("分页获取歌单失败:", error);
-                hasMore = false; // 发生错误时，停止继续请求
-                // 只有在列表完全为空（首次加载就失败）时才抛出错误或提示
-                if (networkSongs.length === 0) {
-                    prompt.showToast({ message: '网络请求失败' });
-                }
+                hasMore = false;
+                if (networkSongs.length === 0) prompt.showToast({ message: '网络请求失败' });
             }
         }
         
-        // 3. 所有网络请求结束后，用最终的完整数据更新UI
-        this.fullSongList = networkSongs;
-        this.updateDisplayList(this.displayStartIndex);
-        this.hasMoreDown = hasMore;
-
-        // 4. 【【【核心修正】】】用最新的、最完整的网络数据覆盖旧缓存
-        if (this.fullSongList.length > 0) {
-            // 创建不含 isDownloaded 字段的纯净数据用于缓存
-            const songsToCache = this.fullSongList.map(({ id, name, artists }) => ({ id, name, artists }));
-            await fileService.writeJson(cacheFileUri, songsToCache);
-            console.log(`缓存已更新，共 ${songsToCache.length} 首歌曲。`);
+        // 缓存新获取的数据
+        if (networkSongs.length > 0) {
+            await fileService.writeJson(cacheFileUri, networkSongs);
         }
-    },
-
-
-
-
-    // --- 新增：添加到收藏的方法 ---
-    async addAllToFavorites() {
-        if (this.isFetchingAll) {
-            prompt.showToast({ message: '正在处理，请稍候...' });
-            return;
-        }
-
-        prompt.showDialog({
-            title: '添加到收藏',
-            message: `确定要将此歌单的所有歌曲（约 ${this.fullSongList.length} 首）添加到本地收藏吗？`,
-            buttons: [{ text: '取消' }, { text: '确定', color: '#ff9500' }],
-            success: async () => {
-                this.isFetchingAll = true;
-                prompt.showToast({ message: '正在加载歌单全部歌曲...' });
-
-                try {
-                    // 1. 确保歌单已完全加载
-                    await this.fetchSonglistFromNetwork(new Set(), true); // forceAll = true
-                    prompt.showToast({ message: `歌单加载完毕，共 ${this.fullSongList.length} 首。正在添加到收藏...` });
-
-                    // 2. 读取现有的收藏
-                    const favorites = await fileService.readJson(this.favoritesFileUri, {});
-                    let addedCount = 0;
-
-                    // 3. 合并歌曲，避免重复添加
-                    this.fullSongList.forEach(song => {
-                        const songId = String(song.id);
-                        if (!favorites[songId]) {
-                            favorites[songId] = {
-                                id: song.id,
-                                name: song.name,
-                                artists: song.artists,
-                            };
-                            addedCount++;
-                        }
-                    });
-
-                    // 4. 写入新的收藏文件
-                    const success = await fileService.writeJson(this.favoritesFileUri, favorites);
-                    if (success) {
-                        prompt.showToast({ message: `操作成功！新增 ${addedCount} 首歌曲到收藏。` });
-                    } else {
-                        throw new Error("写入收藏文件失败");
-                    }
-
-                } catch (error) {
-                    console.error("添加到收藏失败:", error);
-                    prompt.showToast({ message: `操作失败: ${error.message}` });
-                } finally {
-                    this.isFetchingAll = false;
-                }
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
-
-    updateDisplayList(startIndex) {
-        this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullSongList.length - this.PAGE_SIZE));
-        const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullSongList.length);
         
-        this.displaySongList = this.fullSongList.slice(this.displayStartIndex, endIndex).map((song, index) => ({
-            ...song,
-            displayIndex: this.displayStartIndex + index + 1,
-        }));
-
-        this.hasMoreUp = this.displayStartIndex > 0;
-        this.hasMoreDown = endIndex < this.fullSongList.length;
+        return networkSongs; // 返回网络数据
     },
 
-        // 【【【新增】】】
-        handleScroll(e) {
-        // 当用户向下滑动，离开顶部区域后，重置“刚刚触顶”的状态
-        // 5px 的阈值是为了防止微小抖动造成的误判
-        if (e.scrollY > 5 && this.justReachedTop) {
-            this.justReachedTop = false;
-        }
-    },
-
-
-    // 【【【完整替换】】】
-    handleScrollTop() {
-        // 1. 如果正在加载或刷新或滚动，则直接返回
-        if (this.isLoading || this.isRefreshing || this.isScrolling) return;
-
-        // 2. 判断是“向上加载更多”还是“顶部操作”
-        //    如果 hasMoreUp 为 true，说明上方还有数据，执行“向上加载更多”
-        if (this.hasMoreUp) {
-            console.log("触发向上加载更多...");
-            this.isScrolling = true;
-            const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
-            
-            if (prevStartIndex < 0) {
-                this.isScrolling = false;
-                return;
-            }
-
-            this.updateDisplayList(prevStartIndex);
-            
-            const scrollOffset = (this.PAGE_SIZE / 2) * this.ITEM_HEIGHT;
-            this.$element('songListScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
-            
-            setTimeout(() => { this.isScrolling = false; }, 100);
-        }
-        // 否则，说明列表已经滚动到最顶部，执行“顶部操作”逻辑
-        else {
-            // 【【【核心逻辑】】】
-            // 只有在线歌单、日推、FM 这几种网络列表才支持下拉刷新
-            if (this.listType !== 'songlist' && this.listType !== 'daily_recommend' && this.listType !== 'personal_fm') {
-                // 对于本地列表，只提示已到顶部
-                prompt.showToast({ message: '已到顶部' });
-                return;
-            }
-
-            // 判断是“首次触顶”还是“再次下拉”
-            if (this.justReachedTop) {
-                console.log("在顶部再次下拉，触发刷新...");
-                this.isRefreshing = true;
-                prompt.showToast({ message: '正在尝试刷新...' });
-
-                // 根据不同列表类型，调用对应的刷新方法
-                let refreshPromise;
-                if (this.listType === 'songlist') {
-                    refreshPromise = this.fetchSonglistFromNetwork(new Set(), true);
-                } else if (this.listType === 'daily_recommend') {
-                    refreshPromise = this.fetchDailyRecommendSongs(new Set());
-                } else if (this.listType === 'personal_fm') {
-                    refreshPromise = this.fetchPersonalFmSongs(new Set());
-                }
-
-                refreshPromise
-                    .then(() => {
-                        prompt.showToast({ message: '刷新成功' });
-                    })
-                    .catch(error => {
-                        console.error("下拉刷新失败:", error);
-                        prompt.showToast({ message: `刷新失败: ${error.message}` });
-                    })
-                    .finally(() => {
-                        this.isRefreshing = false;
-                        this.justReachedTop = false; 
-                    });
-            } 
-            // 否则，说明是第一次滚动到顶部
-            else {
-                console.log("首次滚动到顶部...");
-                prompt.showToast({ message: '已到顶部，再次下拉可刷新' });
-                this.justReachedTop = true;
-            }
-        }
-    },
-
-
-    handleScrollBottom() {
-        if (this.isScrolling) return;
-        
-        if (this.displayStartIndex + this.PAGE_SIZE < this.fullSongList.length) {
-            this.isScrolling = true;
-            const nextStartIndex = this.displayStartIndex + this.PAGE_SIZE;
-            
-            this.updateDisplayList(nextStartIndex);
-            prompt.showToast({ message: `加载下页，避免操作` });
-            
-            const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
-            this.$element('songListScroll').scrollBy({ top: -scrollOffset, behavior: 'instant' });
-            
-            setTimeout(() => { this.isScrolling = false; }, 100);
+    /**
+     * 【【【核心修正】】】: fetchDailyRecommendSongs
+     * 现在只返回歌曲数组。
+     */
+    async fetchDailyRecommendSongs() {
+        try {
+            const request = this.$app.$def.requestService;
+            const timestamp = new Date().getTime();
+            const response = await request.fetch({ url: `https://163api.qijieya.cn/recommend/songs?_t=${timestamp}` } );
+            const songs = response.data.data.dailySongs;
+            return songs.map(s => ({ id: s.id, name: s.name, artists: s.ar.map(a => a.name).join(' / ') }));
+        } catch (error) {
+            console.error("获取每日推荐失败:", error);
+            prompt.showToast({ message: '获取每日推荐失败' });
+            return []; // 出错时返回空数组
         }
     },
 
     /**
-     * **最终修正**: 移除所有与 event 相关的参数和调用
+     * 【【【核心修正】】】: fetchPersonalFmSongs
+     * 现在只返回歌曲数组。
      */
-     async deleteSong(songToDelete) {
-        // **关键**: 由于这个方法现在是由一个独立的 div 调用的，
-        // 它不会再冒泡到 play 事件，所以不再需要 stopPropagation。
-        
+    async fetchPersonalFmSongs() {
+        try {
+            const request = this.$app.$def.requestService;
+            const timestamp = new Date().getTime();
+            const url = `https://163api.qijieya.cn/personal_fm?_t=${timestamp}`;
+            const response = await request.fetch({ url } );
+            const songs = response.data.data;
+            return songs.map(s => ({ id: s.id, name: s.name, artists: s.artists.map(a => a.name).join(' / ') }));
+        } catch (error) {
+            console.error("获取私人FM失败:", error);
+            prompt.showToast({ message: '获取私人FM失败' });
+            return []; // 出错时返回空数组
+        }
+    },
+
+    loadPage(pageNumber) {
+    if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0)) {
+        return;
+    }
+    const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
+    const endIndex = startIndex + this.PAGE_SIZE;
+    this.displaySongList = this.fullSongList.slice(startIndex, endIndex).map((song, index) => ({
+        ...song,
+        displayIndex: startIndex + index + 1,
+    }));
+    this.currentPage = pageNumber;
+    // 【【【修正】】】: 确保翻页后列表回到顶部
+    this.$nextTick(() => {
+        this.$element('songListScroll').scrollTo({ top: 1 });
+    });
+},
+
+
+
+    loadPrevPage() {
+        if (this.currentPage > 1) {
+            this.loadPage(this.currentPage - 1);
+        }
+    },
+
+    loadNextPage() {
+        if (this.currentPage < this.totalPages) {
+            this.loadPage(this.currentPage + 1);
+        }
+    },
+
+    /**
+     * 【【【最终完整版】】】: handleScrollTop 方法
+     * 1. 实现了下拉手势超时逻辑。
+     * 2. 修正了刷新成功后UI不更新的问题。
+     */
+     handleScrollTop() {
+        // 如果正在加载或正在刷新，则忽略任何操作
+        if (this.isLoading || this.isRefreshing) return;
+
+        // 检查列表类型是否支持刷新
+        const isRefreshable = ['songlist', 'personal_fm'].includes(this.listType);
+        if (!isRefreshable) {
+            return;
+        }
+
+        // 如果“再次下拉可刷新”状态是激活的，则执行刷新
+        if (this.justReachedTop) {
+            this.isRefreshing = true;
+            prompt.showToast({ message: '正在刷新...' });
+
+            // 刷新一旦触发，清除可能存在的计时器
+            if (this._justReachedTopTimeoutId) {
+                clearTimeout(this._justReachedTopTimeoutId);
+                this._justReachedTopTimeoutId = null;
+            }
+
+            let refreshPromise;
+            if (this.listType === 'songlist') refreshPromise = this.fetchSonglistFromNetwork(true); // forceAll = true
+            else if (this.listType === 'daily_recommend') refreshPromise = this.fetchDailyRecommendSongs();
+            else if (this.listType === 'personal_fm') refreshPromise = this.fetchPersonalFmSongs();
+
+            // 【核心优化】: 在刷新成功后，用新数据更新UI
+            refreshPromise.then(async (newData) => {
+                if (newData && newData.length > 0) {
+                    // 重新获取最新的“已下载”列表以正确显示状态
+                    const downloadedIds = new Set(Object.keys(await fileService.readJson(this.downloadedFileUri, {})));
+                    
+                    // 更新 fullSongList
+                    this.fullSongList = newData.map(song => ({
+                        ...song,
+                        isDownloaded: downloadedIds.has(String(song.id))
+                    }));
+                    
+                    // 重新加载第一页以刷新视图
+                    this.loadPage(1); 
+                    prompt.showToast({ message: '刷新成功' });
+                } else {
+                    // 如果没有返回数据，也应该提示用户
+                    prompt.showToast({ message: '列表为空或刷新失败' });
+                }
+            })
+            .catch(error => {
+                prompt.showToast({ message: `刷新失败: ${error.message || '未知错误'}` });
+            })
+            .finally(() => {
+                this.isRefreshing = false;
+                this.justReachedTop = false;
+            });
+        } 
+        // 否则，这是第一次下拉
+        else {
+            prompt.showToast({ message: '再次下拉刷新' });
+            this.justReachedTop = true;
+
+            // 设置一个计时器，在3秒后自动重置 justReachedTop 状态
+            const GESTURE_TIMEOUT = 3000; 
+
+            // 先清除上一个可能存在的计时器
+            if (this._justReachedTopTimeoutId) {
+                clearTimeout(this._justReachedTopTimeoutId);
+            }
+
+            this._justReachedTopTimeoutId = setTimeout(() => {
+                if (this.justReachedTop) {
+                    console.log("下拉手势超时，重置状态。");
+                    this.justReachedTop = false;
+                }
+            }, GESTURE_TIMEOUT);
+        }
+    },
+
+
+    async deleteSong(songToDelete) {
         if (this.listType === 'songlist') {
             prompt.showToast({ message: '在线歌单不支持删除' });
             return;
@@ -840,336 +677,84 @@ async loadData() {
         const fullIndex = this.fullSongList.findIndex(item => item.id === songToDelete.id);
         if (fullIndex > -1) {
             this.fullSongList.splice(fullIndex, 1);
-            this.fullSongList.forEach((song, index) => song.originalIndex = index + 1);
-            this.updateDisplayList(this.displayStartIndex);
+            const newTotalPages = this.totalPages;
+            const targetPage = this.currentPage > newTotalPages ? Math.max(1, newTotalPages) : this.currentPage;
+            this.loadPage(targetPage);
             prompt.showToast({ message: '已移除' });
-        } else {
-            prompt.showToast({ message: '歌曲不存在' });
-            return;
-        }
-        try {
-            await this.persistDeletion(songToDelete);
-        } catch (error) {
-            console.error(`持久化删除失败 for song ${songToDelete.id}:`, error);
-            prompt.showToast({ message: '删除时发生错误' });
+            try {
+                await this.persistDeletion(songToDelete);
+            } catch (error) {
+                console.error(`持久化删除失败:`, error);
+                prompt.showToast({ message: '删除时发生错误' });
+            }
         }
     },
 
-
-    /**
-     * **核心修改**: 彻底改造持久化删除逻辑，确保数据一致性
-     */
     async persistDeletion(songToDelete) {
         const songId = songToDelete.id;
         let promises = [];
-
-        switch (this.listType) {
-            case 'playlist':
-                // 场景: 在播放列表页删除
-                // 动作: 只更新播放列表文件
-                promises.push(fileService.writeJson(this.listFileUri, this.fullSongList));
-                break;
-
-            case 'favorites': {
-                // 场景: 在收藏页删除
-                // 动作: 从 favorites.json 中移除
-                const favorites = await fileService.readJson(this.favoritesFileUri, {});
-                if (favorites[songId]) {
-                    delete favorites[songId];
-                    promises.push(fileService.writeJson(this.favoritesFileUri, favorites));
-                }
-                break;
-            }
-
-            case 'downloadlist': {
-                // **关键场景**: 在下载页删除
-                // **动作**: 必须同时清理下载记录、实体文件、收藏列表和播放列表
-
-                // 1. 清理下载记录和文件
-                const downloaded = await fileService.readJson(this.downloadedFileUri, {});
-                const songInfo = downloaded[songId];
-                if (songInfo) {
-                    if (songInfo.localUri) promises.push(fileService.delete(songInfo.localUri));
-                    if (songInfo.localLyricUri) promises.push(fileService.delete(songInfo.localLyricUri));
-                    delete downloaded[songId];
-                    promises.push(fileService.writeJson(this.downloadedFileUri, downloaded));
-                }
-
-                // 2. 清理收藏列表 (如果存在)
-                const favs = await fileService.readJson(this.favoritesFileUri, {});
-                if (favs[songId]) {
-                    console.log(`同步删除收藏列表中的歌曲: ${songId}`);
-                    delete favs[songId];
-                    promises.push(fileService.writeJson(this.favoritesFileUri, favs));
-                }
-
-                // 3. 清理播放列表 (如果存在)
-                const playlist = await fileService.readJson(this.listFileUri, []);
-                const updatedPlaylist = playlist.filter(song => song.id !== songId);
-                if (playlist.length !== updatedPlaylist.length) {
-                    console.log(`同步删除播放列表中的歌曲: ${songId}`);
-                    promises.push(fileService.writeJson(this.listFileUri, updatedPlaylist));
-                }
-                break;
+        if (this.listType === 'playlist') {
+            promises.push(fileService.writeJson(this.listFileUri, this.fullSongList));
+        } else if (this.listType === 'favorites') {
+            const favorites = await fileService.readJson(this.favoritesFileUri, {});
+            if (favorites[songId]) {
+                delete favorites[songId];
+                promises.push(fileService.writeJson(this.favoritesFileUri, favorites));
             }
         }
-
-        // 并行执行所有文件写入和删除操作
         await Promise.all(promises);
     },
 
-    // ... 其他方法保持不变 ...
-
-
     async playAll() {
         if (!this.fullSongList || this.fullSongList.length === 0) {
-            prompt.showToast({ message: '列表为空，无法播放' });
+            prompt.showToast({ message: '列表为空' });
             return;
         }
-                // 对于私人FM，播放全部就是启动FM模式
-                if (this.listType === 'personal_fm') {
-            this.play(this.fullSongList[0].id); // 调用play方法，它会处理FM逻辑
+        if (this.listType === 'personal_fm') {
+            this.play(this.fullSongList[0].id);
             return;
         }
-        prompt.showToast({ message: '即将替换播放列表并播放...' });
-        const success = await fileService.writeJson(this.listFileUri, this.fullSongList);
-        if (!success) {
-            prompt.showToast({ message: '设置播放列表失败' });
-            return;
-        }
-        const firstSongId = this.fullSongList[0].id;
-        const songToPlay = this.fullSongList[0];
-        const songInfo = { id: songToPlay.id, name: songToPlay.name, artists: songToPlay.artists };
-
-        router.push({
-            uri: "/pages/player",
-            params: { 
-                songId: firstSongId,
-                songInfo: JSON.stringify(songInfo)
-            },
-        });
+        await fileService.writeJson(this.listFileUri, this.fullSongList);
+        this.play(this.fullSongList[0].id);
     },
 
-
-    // --- 5. 修改播放逻辑 ---
     async play(songId) {
-        // 对于私人FM，点击任何歌曲都应该启动FM模式
-        if (this.listType === 'personal_fm') {
-            prompt.showToast({ message: '即将开启私人FM...' });
-            router.push({
-                uri: "/pages/player",
-                params: {
-                    // 传递一个明确的标志给播放器
-                    startFmMode: true,
-                    // 可以选择传递当前点击的歌曲作为第一首
-                    songId: songId, 
-                    songInfo: JSON.stringify(this.fullSongList.find(s => s.id === songId))
-                },
-            });
-            return;
-        }
-
-        // 其他列表类型的播放逻辑保持不变
         const songToPlay = this.fullSongList.find(song => song.id === songId);
         if (!songToPlay) {
-            prompt.showToast({ message: '找不到歌曲信息或歌曲已删除' });
+            prompt.showToast({ message: '找不到歌曲信息' });
             return;
         }
+        const params = { songId: songId, songInfo: JSON.stringify({ id: songToPlay.id, name: songToPlay.name, artists: songToPlay.artists }) };
+        if (this.listType === 'personal_fm') {
+            params.startFmMode = true;
+        }
+        router.push({ uri: "/pages/player", params });
+    },
 
-        const songInfo = {
-            id: songToPlay.id,
-            name: songToPlay.name,
-            artists: songToPlay.artists,
-        };
-
-        router.push({
-            uri: "/pages/player",
-            params: { 
-                songId: songId,
-                songInfo: JSON.stringify(songInfo)
-            },
+    clearPlaylist() {
+        prompt.showDialog({
+            title: '清空播放列表',
+            message: '您确定要清空当前播放列表中的所有歌曲吗？',
+            buttons: [{ text: '取消' }, { text: '确定清空', color: '#FF453A' }],
+            success: async () => {
+                this.fullSongList = [];
+                this.displaySongList = [];
+                await fileService.writeJson(this.listFileUri, []);
+                prompt.showToast({ message: '播放列表已清空' });
+            }
         });
     },
 
     goBack() {
         router.back();
     },
-
-    clearPlaylist() {
-        prompt.showDialog({
-            title: '清空播放列表',
-            message: '您确定要清空当前播放列表中的所有歌曲吗？此操作不可撤销。',
-            buttons: [
-                { text: '取消', color: '#999999' },
-                { text: '确定清空', color: '#FF453A' }
-            ],
-            success: async () => {
-                try {
-                    // **核心修复**: 立即更新UI状态
-                    this.fullSongList = [];
-                    this.displaySongList = [];
-                    this.hasMoreDown = false;
-                    this.isLoading = false; // 确保加载状态也关闭
-                    
-                    const success = await fileService.writeJson(this.listFileUri, []);
-                    
-                    if (success) {
-                        prompt.showToast({ message: '播放列表已清空' });
-                    } else {
-                        prompt.showToast({ message: '操作失败，请重试' });
-                        this.loadData(); // 回滚UI
-                    }
-                } catch (error) {
-                    console.error("清空播放列表失败:", error);
-                    prompt.showToast({ message: '操作时发生错误' });
-                }
-            },
-            cancel: () => {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
+    
+    // 占位方法，防止模板中调用时报错
+    addAllToFavorites() {
+        prompt.showToast({ message: '此功能正在开发中' });
     },
-
-    // --- 交互方法 (部分新增和修改) ---
-    handleItemClick(item) {
-        if (this.isMultiSelectMode) {
-            this.toggleSongSelection(item.id);
-        } else {
-            this.play(item.id);
-        }
-    },
-
-    toggleMultiSelectMode() {
-        this.isMultiSelectMode = !this.isMultiSelectMode;
-        if (!this.isMultiSelectMode) {
-            this.selectedSongIdsMap = {}; // 退出时清空选择
-        }
-    },
-
-    toggleSongSelection(songId) {
-        if (this.selectedSongIdsMap[songId]) {
-            delete this.selectedSongIdsMap[songId];
-        } else {
-            this.selectedSongIdsMap[songId] = true;
-        }
-        this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
-    },
-
-    handleCheckboxChange(event, songId) {
-        if (event.checked) {
-            this.selectedSongIdsMap[songId] = true;
-        } else {
-            delete this.selectedSongIdsMap[songId];
-        }
-        this.selectedSongIdsMap = { ...this.selectedSongIdsMap };
-    },
-
-    // 【【【新增：全选/取消全选逻辑】】】
-    toggleSelectAll() {
-        // 如果当前已全选，则取消全选 (清空)
-        if (this.isAllSelected) {
-            this.selectedSongIdsMap = {};
-        } 
-        // 否则，全选所有歌曲
-        else {
-            const newSelectedMap = {};
-            this.fullSongList.forEach(song => {
-                newSelectedMap[song.id] = true;
-            });
-            this.selectedSongIdsMap = newSelectedMap;
-        }
-    },
-
-    deleteSelectedSongs() {
-        if (this.selectedCount === 0) {
-            prompt.showToast({ message: '请先选择歌曲' });
-            return;
-        }
-        prompt.showDialog({
-            title: '删除歌曲',
-            message: `确定要删除选中的 ${this.selectedCount} 首歌曲吗？`,
-            buttons: [{ text: '取消' }, { text: '确定', color: '#ff3b30' }],
-            success: async () => {
-                const idsToDelete = Object.keys(this.selectedSongIdsMap);
-                this.fullSongList = this.fullSongList.filter(song => !idsToDelete.includes(String(song.id)));
-                this.updateDisplayList(this.displayStartIndex);
-                try {
-                    for (const songId of idsToDelete) {
-                        await this.persistDeletion({ id: songId });
-                    }
-                    prompt.showToast({ message: '删除成功' });
-                } catch (error) {
-                    prompt.showToast({ message: '部分删除失败，请刷新' });
-                }
-                this.toggleMultiSelectMode(); // 操作完成后退出多选模式
-            }
-        });
-    },
-
-    downloadSelectedSongs() {
-        if (this.selectedCount === 0) {
-            prompt.showToast({ message: '请先选择歌曲' });
-            return;
-        }
-        const songsToDownload = this.fullSongList.filter(song => 
-            this.selectedSongIdsMap[song.id] && !song.isDownloaded
-        );
-        if (songsToDownload.length === 0) {
-            prompt.showToast({ message: '所选歌曲均已下载' });
-            return;
-        }
-        this.downloadQueue.push(...songsToDownload);
-        prompt.showToast({ message: `${songsToDownload.length} 首歌曲已加入下载队列` });
-        this.toggleMultiSelectMode(); // 操作完成后退出多选模式
-        this.processDownloadQueue();
-    },
-
-
-    // 4. 新增下载队列处理逻辑
-    processDownloadQueue() {
-        // 如果队列为空，或者正在下载的任务已达上限，则暂停
-        if (this.downloadQueue.length === 0 || this.activeDownloads >= this.MAX_CONCURRENT_DOWNLOADS) {
-            return;
-        }
-
-        // 从队列中取出一个任务
-        const songToDownload = this.downloadQueue.shift();
-        this.activeDownloads++;
-
-        if (!downloadService) {
-            console.error("Download service is not available.");
-            this.activeDownloads--;
-            return;
-        }
-
-        downloadService.start(
-            songToDownload,
-            { cookie: this.cookie, downloadBitrate: this.settings.audioQuality.download }, // 假设这些依赖存在
-            {
-                onStart: () => console.log(`开始下载: ${songToDownload.name}`),
-                onSuccess: async (downloadedInfo) => {
-                    console.log(`${songToDownload.name} 下载成功`);
-                    const downloaded = await fileService.readJson(this.downloadedFileUri, {});
-                    downloaded[downloadedInfo.id] = downloadedInfo;
-                    await fileService.writeJson(this.downloadedFileUri, downloaded);
-                    
-                    const songInList = this.fullSongList.find(s => s.id === downloadedInfo.id);
-                    if (songInList) songInList.isDownloaded = true;
-                    this.updateDisplayList(this.displayStartIndex);
-                },
-                onError: (errorMessage) => {
-                    console.error(`${songToDownload.name} 下载失败: ${errorMessage}`);
-                    prompt.showToast({ message: `${songToDownload.name.slice(0, 10)}... 下载失败` });
-                },
-                onFinish: () => {
-                    this.activeDownloads--;
-                    this.processDownloadQueue(); // 处理下一个
-                }
-            }
-        );
-
-        // 立即尝试启动下一个并行任务
-        this.processDownloadQueue();
-    },
+    addSongToNext() {
+        prompt.showToast({ message: '此功能正在开发中' });
+    }
 };
 </script>

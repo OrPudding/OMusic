@@ -167,6 +167,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
+					(已弃用)
 					每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。
 				</text>
 			</div>
@@ -313,7 +314,7 @@
 .menu-item {
     width: 100%;
     height: 80px;
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: #191821;
     margin: 5px 0;
     border-radius: 36px;
     align-items: center;
@@ -345,7 +346,7 @@
 	height: 80px;
 	padding: 0 20px;
 	margin: 5px 0;
-	background-color: rgba(255, 255, 255, 0.06);
+	background-color: #191821;
 	border-radius: 40px;
 	justify-content: space-between;
 	align-items: center;
@@ -359,9 +360,9 @@
 	min-width: 100px;
 	height: 50px;
 	padding: 0 20px;
-	background-color: rgba(58, 225, 255, 0.2);
+	background-color: #040718;
 	border-radius: 25px;
-	color: #3ae1ff;
+	color: #BAC3FF;
 	font-size: 26px;  /* <-- 从 24px 增大到 26px */
 	font-weight: bold;
 	text-align: center;
@@ -439,7 +440,7 @@
         lyrics: { japaneseMode: ['translation', 'romaji', 'original'], cantoneseMode: ['romaji', 'original'], englishMode: ['translation', 'original'], },
         lyricAdvanceTime: [0, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2], // 单位：秒
         audioQuality: { online: [64, 128, 192, 320, 990], download: [64, 128, 192, 320] },
-        performance: { windowSize: [20, 30, 40], pageSize: [10, 15, 20], },
+        performance: { windowSize: [10, 20, 40], pageSize: [10, 15, 20], },
         network: { totalLimit: [50, 200, 500], apiPageSize: [20, 50, 100], },
         search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25], }
     };

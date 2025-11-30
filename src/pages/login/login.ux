@@ -72,17 +72,17 @@
     .tip { font-size: 26px; color: #fff; }
     .manual-input-trigger { font-size: 22px; color: #888; text-decoration: underline; margin-top: 15px; }
     .guidance-panel { width: 90%; max-width: 380px; padding: 20px; margin-top: 20px;margin-bottom: 80px; background-color: rgba(255, 255, 255, 0.08); border-radius: 24px; flex-direction: column; align-items: center; }
-    .guidance-title { font-size: 30px; font-weight: bold; color: #3ae1ff; margin-bottom: 15px; }
+    .guidance-title { font-size: 30px; font-weight: bold; color: #BAC3FF; margin-bottom: 15px; }
     .guidance-text { font-size: 24px; color: #eee; text-align: center; margin-bottom: 8px; line-height: 32px; }
     .uid-input-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; justify-content: center; align-items: center; z-index: 20; }
     .input-panel { width: 320px; flex-direction: column; align-items: center; }
-    .uid-display-wrapper { width: 60%; height: 50px; background-color: rgba(255, 255, 255, 0.06); border-radius: 18px; justify-content: center; align-items: center; margin-top: 10px; margin-bottom: 20px; }
+    .uid-display-wrapper { width: 60%; height: 50px; background-color: #191821; border-radius: 18px; justify-content: center; align-items: center; margin-top: 10px; margin-bottom: 20px; }
     .uid-display { color: #fff; font-size: 26px; }
     .keyboard { width: 100%; flex-direction: column; }
     .key-row { width: 100%; justify-content: space-between; margin-bottom: 12px; }
     .key { width: 100px; height: 55px; background-color: rgba(255, 255, 255, 0.1); border-radius: 27.5px; color: #fff; font-size: 28px; font-weight: bold; text-align: center; }
     .action-key { font-size: 26px; font-weight: bold; background-color: rgba(255, 255, 255, 0.05); }
-    .confirm-button { width: 60%; height: 60px; border-radius: 30px; background-color: #3ae1ff; color: #000; font-size: 26px; font-weight: bold; text-align: center; margin-top: 10px; }
+    .confirm-button { width: 60%; height: 60px; border-radius: 30px; background-color: #BAC3FF; color: #000; font-size: 26px; font-weight: bold; text-align: center; margin-top: 10px; }
     @media screen and (shape: rect) {
         .header { height: 65px; padding-top: 10px; flex-direction: row-reverse; justify-content: space-around; }
         .scroll-wrapper { top: 65px; }
@@ -93,11 +93,10 @@
 </style>
 
 <script>
-// --- script部分与上一版完全相同，功能和错误处理逻辑保持不变 ---
 import router from '@system.router';
 import prompt from '@system.prompt';
 import file from '@system.file';
-const API_BASE = 'http://75.127.89.154:4000';
+const API_BASE = 'https://163api.qijieya.cn';
 const API_USER_DETAIL = `${API_BASE}/user/detail?uid=`;
 const PROFILE_FILE_URI = 'internal://files/user_profile.json';
 const COOKIE_FILE_URI = 'internal://files/cookie.txt';
@@ -199,7 +198,7 @@ export default {
         if (show) {
             prompt.showDialog({
                 title: '请注意', message: '此种登录方式仅能获取到用户的公开歌单，无法享受对应账号的VIP权益，部分歌曲只能试听30-45S。',
-                buttons: [{ text: '继续输入', color: '#3ae1ff' }, { text: '取消' }],
+                buttons: [{ text: '继续输入', color: '#BAC3FF' }, { text: '取消' }],
                 success: () => { this.showUidInput = true; this.uidInput = ''; },
             });
         } else { this.showUidInput = false; this.uidInput = ''; }
