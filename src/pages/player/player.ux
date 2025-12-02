@@ -1,8 +1,8 @@
 <template>
 	<div class="demo-page">
 		<!-- 1. 歌曲信息 (保持在顶部) -->
-		<div class="song">
-			<marquee class="song-name" scrollamount="36" onclick="exit">{{ songName }}</marquee>
+		<div class="song" onswipe="handleHeaderSwipe">
+			<marquee class="song-name" scrollamount="36">{{ songName }}</marquee>
 			<marquee class="singer-name" scrollamount="36">{{ songArtists }}</marquee>
 		</div>
 		<!-- 2. 核心内容区域: 使用 show 属性切换视图，避免销毁和重建 -->
@@ -54,47 +54,265 @@
 >
     <div class="lyrics-list-padding-top"></div>
 
-    <!-- 硬编码10个渲染管道 -->
-    <div for="{{(index, line) in lyricGroup0}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup1}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup2}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup3}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup4}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup5}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup6}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup7}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup8}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
-    <div for="{{(index, line) in lyricGroup9}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
-        <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
-        <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
-    </div>
+<!-- 【请替换此部分】 -->
+<!-- 硬编码64个渲染管道 -->
+<div for="{{(index, line) in lyricGroup0}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup1}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup2}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup3}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup4}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup5}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup6}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup7}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup8}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup9}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup10}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup11}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup12}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup13}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup14}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup15}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup16}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup17}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup18}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup19}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup20}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup21}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup22}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup23}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup24}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup25}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup26}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup27}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup28}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup29}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup30}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup31}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup32}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup33}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup34}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup35}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup36}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup37}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup38}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup39}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup40}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup41}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup42}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup43}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup44}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup45}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup46}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup47}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup48}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup49}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup50}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup51}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup52}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup53}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup54}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup55}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup56}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup57}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup58}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup59}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup60}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup61}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup62}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+<div for="{{(index, line) in lyricGroup63}}" tid="line.id" id="lyric-line-{{line.originalIndex}}" class="lyric-line-wrapper {{line.isCurrent ? 'is-current-wrapper' : ''}} {{line.isSelected ? 'is-selected-wrapper' : ''}}" onclick="onLyricLineClick(line, line.originalIndex)">
+    <text class="lyric-line {{line.isCurrent ? 'current-lyric' : 'secondary-lyric'}}">{{ line.original }}</text>
+    <text if="{{line.isCurrent && line.extra}}" class="lyric-line extra-lyric">{{ line.extra }}</text>
+</div>
+
 
     <div class="lyrics-list-padding-bottom"></div>
 </scroll>
@@ -128,7 +346,7 @@
     padding-top: 30px;
 }
 .song-name { 
-    width: 320px; 
+    width: 360px; 
     font-size: 32px; 
     color: #ffffff; 
     lines: 1; 
@@ -140,7 +358,7 @@
     width: 300px; 
     font-size: 24px; 
     /* 【修改】使用固定颜色代替透明度 */
-    color: #CCCCCC; 
+    color: #cccccc; 
     lines: 1; 
     text-overflow: ellipsis; 
     text-align: center; 
@@ -371,6 +589,11 @@
     .current-lyric { font-size: 26px; }
     .extra-lyric { font-size: 19px; }
 }
+@media screen and (shape: circle) {
+    .song-name { 
+        width: 260px; }
+    
+}
 </style>
 
 
@@ -424,19 +647,25 @@ private: {
     lyrics: [], // 原始歌词数据 (带time, original, translation等)
     
     // --- 核心优化数据结构 ---
-    lyricLines: [], // 【新增】扁平化数组，管理所有歌词行的渲染状态
-    // 【新增】10个固定的渲染管道数组
-    lyricGroup0: [],
-    lyricGroup1: [],
-    lyricGroup2: [],
-    lyricGroup3: [],
-    lyricGroup4: [],
-    lyricGroup5: [],
-    lyricGroup6: [],
-    lyricGroup7: [],
-    lyricGroup8: [],
-    lyricGroup9: [],
-    // --- 核心优化数据结构 END ---
+    lyricLines: [],
+    
+    // 声明64个渲染管道
+    lyricGroup0: [], lyricGroup1: [], lyricGroup2: [], lyricGroup3: [],
+    lyricGroup4: [], lyricGroup5: [], lyricGroup6: [], lyricGroup7: [],
+    lyricGroup8: [], lyricGroup9: [], lyricGroup10: [], lyricGroup11: [],
+    lyricGroup12: [], lyricGroup13: [], lyricGroup14: [], lyricGroup15: [],
+    lyricGroup16: [], lyricGroup17: [], lyricGroup18: [], lyricGroup19: [],
+    lyricGroup20: [], lyricGroup21: [], lyricGroup22: [], lyricGroup23: [],
+    lyricGroup24: [], lyricGroup25: [], lyricGroup26: [], lyricGroup27: [],
+    lyricGroup28: [], lyricGroup29: [], lyricGroup30: [], lyricGroup31: [],
+    lyricGroup32: [], lyricGroup33: [], lyricGroup34: [], lyricGroup35: [],
+    lyricGroup36: [], lyricGroup37: [], lyricGroup38: [], lyricGroup39: [],
+    lyricGroup40: [], lyricGroup41: [], lyricGroup42: [], lyricGroup43: [],
+    lyricGroup44: [], lyricGroup45: [], lyricGroup46: [], lyricGroup47: [],
+    lyricGroup48: [], lyricGroup49: [], lyricGroup50: [], lyricGroup51: [],
+    lyricGroup52: [], lyricGroup53: [], lyricGroup54: [], lyricGroup55: [],
+    lyricGroup56: [], lyricGroup57: [], lyricGroup58: [], lyricGroup59: [],
+    lyricGroup60: [], lyricGroup61: [], lyricGroup62: [], lyricGroup63: [],
 
     swiperCurrentIndex: 0,
     downloadedSongs: {},
@@ -587,7 +816,7 @@ private: {
         if (this.isDownloadingLocked) { prompt.showToast({ message: '正在下载，请勿退出' }); return true; }
         this.onSaveState();
         // 优化提示，让用户知道如何真正退出
-        prompt.showToast({ message: '防误退出，点顶部歌名退出应用' });
+        prompt.showToast({ message: '顶栏右滑退出应用' });
         return true; // 返回 true 表示消费该事件，应用不会退出
     },
 
@@ -621,7 +850,12 @@ private: {
     },
 
     // --- 交互与UI方法 ---
-    // 【【【核心重构】】】
+    handleHeaderSwipe(e) {
+        const direction = e.direction; // 'left', 'right', 'up', 'down'
+        if (direction === 'right') {
+            this.exit();
+        }
+    },
     handleSwipe(e) {
         const direction = e.direction; // 'left', 'right', 'up', 'down'
 
@@ -740,43 +974,25 @@ private: {
     this.updateLyric();
 },
 
-/**
- * [最终优化版] 分发算法
- * - 算法逻辑更简单、清晰、可预测。
- * - 完美处理任意数量的歌词行，包括大于100行的情况，保证负载均衡。
- */
- distributeLyricsToGroups() {
-    // 步骤 1: 清理工作 (保持不变)
-    for (let i = 0; i < 10; i++) {
+distributeLyricsToGroups() {
+    const NUM_GROUPS = 64;
+    for (let i = 0; i < NUM_GROUPS; i++) {
         this[`lyricGroup${i}`] = [];
     }
-
     const totalLines = this.lyricLines.length;
-
-    // 步骤 2: 【核心修正】采用更健壮、更均衡的分组策略
-    // 这个算法确保了无论总行数是多少，每个管道分配到的行数最多只相差1。
-    
-    let groupIndex = 0;
-    // 计算每个管道的基础行数
-    const baseLinesPerGroup = Math.floor(totalLines / 10);
-    // 计算有多少个管道需要分配额外的1行
-    let remainder = totalLines % 10;
-
+    if (totalLines === 0) return;
     for (let i = 0; i < totalLines; i++) {
-        // 将当前行（的引用）推入对应的管道
-        this[`lyricGroup${groupIndex}`].push(this.lyricLines[i]);
-
-        // 判断当前管道是否已满，如果满了，则移动到下一个管道
-        const currentGroupSize = this[`lyricGroup${groupIndex}`].length;
-        const targetSize = baseLinesPerGroup + (remainder > 0 ? 1 : 0);
-
-        if (currentGroupSize >= targetSize) {
-            groupIndex++;
-            remainder--; // 消耗一个额外的名额
+        if (i < NUM_GROUPS) {
+            this[`lyricGroup${i}`].push(this.lyricLines[i]);
         }
     }
+    console.log(`歌词总数(${totalLines})已按“一行一管”方式分发到${NUM_GROUPS}个管道。`);
+},
 
-    console.log(`歌词总数(${totalLines})已按均衡负载方式分发。`);
+refreshLyricGroup(lyricIndex) {
+    const NUM_GROUPS = 64;
+    if (lyricIndex < 0 || lyricIndex >= NUM_GROUPS) return;
+    this[`lyricGroup${lyricIndex}`] = [...this[`lyricGroup${lyricIndex}`]];
 },
 
 
@@ -855,31 +1071,6 @@ resetLyrics() {
     this.playerState.currentLyricIndex = newIndex;
     this.$nextTick(() => { this.scrollToCurrentLyric(); });
 },
-
-/**
- * [新增] 轻量级刷新函数
- * - 根据歌词行的全局索引，找到其所在的渲染管道，并为该管道创建一个新的数组引用。
- * @param {number} lyricIndex - 发生状态变更的歌词行的全局索引。
- */
-refreshLyricGroup(lyricIndex) {
-    if (lyricIndex < 0) return;
-
-    const totalLines = this.lyricLines.length;
-    let groupIndex;
-
-    if (totalLines < 10) {
-        groupIndex = 0;
-    } else {
-        const linesPerGroup = Math.ceil(totalLines / 10);
-        groupIndex = Math.floor(lyricIndex / linesPerGroup);
-        groupIndex = Math.min(groupIndex, 9); // 确保不越界
-    }
-
-    // 为需要更新的管道创建一个全新的数组拷贝，强制框架刷新这部分UI
-    this[`lyricGroup${groupIndex}`] = [...this[`lyricGroup${groupIndex}`]];
-},
-
-// 【请只替换这两个函数】
 
 /**
  * [最终修正] 歌词行点击事件
@@ -1217,14 +1408,16 @@ updateLyricSelection(index, isSelected) {
         });
     },
     async playOnline(song) {
-        this.isEnding = false;
-        try {
-            const songInfo = await apiService.getSongPlaybackInfo(song.id, this.settings.audioQuality.online, this.cookie);
-            const fullSongInfo = { ...song, playUrl: songInfo.url, duration: songInfo.duration };
-            this.startPlayback(fullSongInfo, songInfo.url);
-            this.fetchLyricOnline(song.id);
-        } catch (error) { console.error("playOnline 失败:", error); throw error; }
-    },
+    this.isEnding = false;
+    try {
+        const songInfo = await apiService.getSongPlaybackInfo(song.id, this.settings.audioQuality.online, this.cookie);
+        const fullSongInfo = { ...song, playUrl: songInfo.url, duration: songInfo.duration };
+        this.startPlayback(fullSongInfo, songInfo.url);
+    } catch (error) {
+        console.error("playOnline 失败:", error);
+        throw error;
+    }
+},
     startPlayback(songWithDuration, src) {
         if (!src || typeof src !== 'string') { this.handlePlaybackError("无效的播放源"); return; }
         if (this.currSong && songWithDuration && songWithDuration.duration) this.currSong.duration = songWithDuration.duration;
@@ -1308,13 +1501,31 @@ updateLyricSelection(index, isSelected) {
         }
     },
 
-    // --- 歌词处理逻辑 (保持不变) ---
-    fetchLyric(songId) {
-        this.resetLyrics();
-        const downloadedInfo = this.downloadedSongs[songId];
-        if (downloadedInfo?.localLyricUri) this.loadLyricFromFile(downloadedInfo.localLyricUri, songId);
-        else this.fetchLyricOnline(songId);
-    },
+// 【【【进阶优化：更可靠的缓存检查】】】
+fetchLyric(songId) {
+    this.resetLyrics();
+    const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
+    const downloadedInfo = this.downloadedSongs[songId];
+
+    // 优先使用下载记录中的路径（如果有）
+    const finalLyricPath = downloadedInfo?.localLyricUri || lyricFilePath;
+
+    // 直接检查文件是否存在
+    file.access({
+        uri: finalLyricPath,
+        success: () => {
+            // 文件存在，直接从本地加载
+            console.log(`发现本地歌词缓存: ${finalLyricPath}`);
+            this.loadLyricFromFile(finalLyricPath, songId);
+        },
+        fail: () => {
+            // 文件不存在，从在线获取（并会自动缓存）
+            console.log(`本地无歌词缓存，从网络获取: ${songId}`);
+            this.fetchLyricOnline(songId);
+        }
+    });
+},
+
     loadLyricFromFile(uri, songId) {
         file.readText({
             uri: uri,
@@ -1322,14 +1533,37 @@ updateLyricSelection(index, isSelected) {
             fail: () => this.fetchLyricOnline(songId)
         });
     },
-    async fetchLyricOnline(songId) {
-        try {
-            const lyricData = await apiService.getLyricData(songId, this.cookie);
-            this.processAndMergeLyrics(lyricData);
-        } catch (error) { 
-            this.lyrics = [{ time: 0, text: '歌词加载失败' }]; 
-        }
-    },
+// 【【【核心修改：播放在线歌曲时也缓存歌词】】】
+async fetchLyricOnline(songId) {
+    const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
+
+    try {
+        // 1. 从网络获取歌词数据
+        const lyricData = await apiService.getLyricData(songId, this.cookie);
+
+        // 2. 异步将歌词数据写入本地文件进行缓存
+        //    我们不需要等待它完成，可以立即尝试从本地加载。
+        //    使用 fileService 封装的方法，它内部处理了 Promise。
+        fileService.writeJson(lyricFilePath, lyricData)
+            .then(() => {
+                console.log(`歌词缓存成功: ${songId}.json`);
+            })
+            .catch(err => {
+                console.error(`歌词文件写入失败: ${err.message}`);
+            });
+
+        // 3. 立即使用刚获取的数据渲染歌词，保证首次播放的体验
+        this.processAndMergeLyrics(lyricData);
+
+    } catch (error) {
+        // 如果网络请求失败，则显示加载失败
+        console.error("在线获取歌词失败:", error);
+        this.lyrics = [{ time: 0, text: '歌词加载失败' }];
+        // 清空可能存在的旧的、不完整的渲染数据
+        this.processAndMergeLyrics(null);
+    }
+},
+
     parseLyric(lrcString) {
         const lines = lrcString.split('\n'), result = [], timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
         for (const line of lines) {

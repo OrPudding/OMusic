@@ -63,7 +63,6 @@
     align-items: center;
     flex-shrink: 0;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   .header-top {
       width: 100%;

@@ -92,10 +92,10 @@
     }
     .playlist-item {
         width: 45%;
-        height: 180px;
+        height: 128px;
         flex-direction: column;
         padding: 10px;
-        margin: 10px 2.5%; /* 使用百分比外边距实现间隙 */
+        margin: 5px 5%; /* 使用百分比外边距实现间隙 */
         background-color: #191821;
         border-radius: 20px;
     }
@@ -119,7 +119,7 @@
         text-align: center;
         color: #888;
         font-size: 24px;
-        padding: 30px;
+        padding-bottom: 60px;
     }
 
     /* --- 媒体查询 (同步调整) --- */

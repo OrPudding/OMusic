@@ -25,7 +25,7 @@
     <div elif="{{ verificationState === 'verifying' }}" class="verifying-content">
         <image class="logo" src="/common/icon.png"></image>
         <text class="app-name">OMusic</text>
-        <text class="status-text">v2.0-preview</text>
+        <text class="status-text">v2.0</text>
     </div>
 
     <!-- 状态二：验证失败，显示最终优化后的引导页 -->
@@ -122,6 +122,8 @@
     import device from '@system.device';
     import app from '@system.app'; // 新增：用于退出应用
 
+    import eulaTextContent from '../../common/eula.json';
+
     const LICENSE_FILE_URI = 'internal://files/license.json';
     const PROFILE_FILE_URI = 'internal://files/user_profile.json';
     const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
@@ -131,7 +133,6 @@
     const STATUS_FILE_URI = 'internal://files/app_status.json';
     const ALL_CACHE_FILES = [LICENSE_FILE_URI, PROFILE_FILE_URI, AVATAR_CACHE_URI, COOKIE_FILE_URI, STATUS_FILE_URI];
 
-    import eulaTextContent from '../../common/eula.json';
     
     export default {
         private: {
@@ -166,7 +167,7 @@
         // 核心流程修改：先检查 EULA，再决定后续流程
         this.checkEulaStatus();
                             }
-        }, 1000);
+        }, 800);
         })
     },
 

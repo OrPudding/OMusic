@@ -441,7 +441,7 @@
         lyricAdvanceTime: [0, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2], // 单位：秒
         audioQuality: { online: [64, 128, 192, 320, 990], download: [64, 128, 192, 320] },
         performance: { windowSize: [10, 20, 40], pageSize: [10, 15, 20], },
-        network: { totalLimit: [50, 200, 500], apiPageSize: [20, 50, 100], },
+        network: { totalLimit: [50, 200, 500], apiPageSize: [10, 20, 50], },
         search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25], }
     };
 	// 在 PRESETS 同级位置定义手势常量
@@ -476,7 +476,7 @@ const GESTURE_ACTION_TEXTS = {
                 lyricAdvanceTime: 1.8,
                 audioQuality: { online: 64, download: 128 },
                 performance: { windowSize: 30, pageSize: 15 },
-                network: { totalLimit: 200, apiPageSize: 50 },
+                network: { totalLimit: 200, apiPageSize: 20 },
                 search: { totalLimit: 25, apiPageSize: 10 },
 				gestures: {
                 left: 'lyrics',       // 左滑默认切换到歌词页

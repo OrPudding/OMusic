@@ -1,7 +1,7 @@
 {
   "package": "moe.orpu.omusic",
   "name": "OMusic",
-  "versionName": "2.0-preview",
+  "versionName": "2.0",
   "versionCode": 200,
   "minPlatformVersion": 1000,
   "icon": "/common/icon.png",
@@ -54,7 +54,7 @@
   ],
   "config": {
     "logLevel": "log",
-    "designWidth": "device-width",
+    "designWidth": "432",
     "background": {
       "features": [
         "system.audio",

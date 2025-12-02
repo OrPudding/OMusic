@@ -14,7 +14,7 @@
             <image class="app-icon" src="/common/icon.png"></image>
             <div class="app-details">
               <text class="app-name">OMusic</text>
-              <text class="app-version">v2.0-preview</text>
+              <text class="app-version">v2.0</text>
             </div>
           </div>
         </list-item>

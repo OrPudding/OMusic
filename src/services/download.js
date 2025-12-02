@@ -4,6 +4,7 @@ import request from '@system.request';
 import file from '@system.file';
 import prompt from '@system.prompt';
 import apiService from './api.js'; // 依赖 api.js
+import brightness from '@system.brightness'; // 导入模块
 
 const DIR_MUSIC = 'internal://files/music/';
 const DIR_LYRICS = 'internal://files/lyrics/';
@@ -74,7 +75,18 @@ export default {
         const { cookie, downloadBitrate } = dependencies;
         const { onStart, onSuccess, onError, onFinish } = callbacks;
 
-        // 定义最终文件路径，用于后续操作和清理
+        // 【【【核心修改】】】安全地开启屏幕常亮
+        if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+            try {
+                brightness.setKeepScreenOn({ keepScreenOn: true });
+                console.log(`开始下载 ${songToDownload.name}，开启屏幕常亮。`);
+            } catch (e) {
+                console.error("调用 setKeepScreenOn(true) 失败:", e);
+            }
+        } else {
+            console.warn("brightness.setKeepScreenOn 方法不存在，跳过开启常亮。");
+        }
+
         const lyricFilePath = `${DIR_LYRICS}${songToDownload.id}.json`;
         const songFilePath = `${DIR_MUSIC}${songToDownload.id}.mp3`;
 
@@ -118,7 +130,20 @@ export default {
             onError(error.message || '下载过程中发生未知错误');
 
         } finally {
-            onFinish(); // 无论成功失败，都通知UI结束下载状态
+            // 【【【核心修改】】】安全地关闭屏幕常亮
+            if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+                try {
+                    brightness.setKeepScreenOn({ keepScreenOn: false });
+                    console.log(`下载流程结束，关闭屏幕常亮。`);
+                } catch (e) {
+                    console.error("调用 setKeepScreenOn(false) 失败:", e);
+                }
+            } else {
+                console.warn("brightness.setKeepScreenOn 方法不存在，跳过关闭常亮。");
+            }
+            
+            // onFinish 仍然需要被调用
+            onFinish(songToDownload); 
         }
     }
 };
