@@ -150,14 +150,62 @@ const downloadManager = {
      */
     _downloadFile(url, destinationUri) {
         return new Promise((resolve, reject) => {
+            const safeReject = (message) => {
+                if (message instanceof Error) {
+                    reject(message);
+                } else {
+                    reject(new Error(message || '下载失败'));
+                }
+            };
+
+            if (!request || typeof request.download !== 'function') {
+                safeReject('系统不支持下载接口');
+                return;
+            }
+
+            const filename = destinationUri.startsWith('internal://files/')
+                ? destinationUri.replace('internal://files/', '')
+                : destinationUri;
+
+            let settled = false;
+            const settleOnce = (fn) => {
+                if (settled) return;
+                settled = true;
+                fn();
+            };
+
             request.download({
-                url: url,
-                filename: destinationUri.replace('internal://files/', ''),
-                success: (task) => {
-                    task.on('complete', (data) => resolve(data.uri));
-                    task.on('fail', (data, code) => reject({ message: `下载过程中失败, code: ${code}` }));
+                url,
+                filename,
+                success: (data = {}) => {
+                    const token = data.token;
+                    if (!token) {
+                        settleOnce(() => safeReject('下载任务创建失败'));
+                        return;
+                    }
+
+                    if (typeof request.onDownloadComplete !== 'function') {
+                        settleOnce(() => safeReject('系统不支持下载回调'));
+                        return;
+                    }
+
+                    request.onDownloadComplete({
+                        token,
+                        success: (resp = {}) => {
+                            const uri = resp.uri;
+                            settleOnce(() => resolve(uri || destinationUri));
+                        },
+                        fail: (_err, code) => {
+                            const reason = code === 1001 ? '下载任务不存在' : '下载过程中失败';
+                            settleOnce(() => safeReject(`${reason}${code ? `, code: ${code}` : ''}`));
+                        },
+                        complete: () => {},
+                    });
                 },
-                fail: (err, code) => reject({ message: `无法开始下载, code: ${code}` })
+                fail: (_err, code) => {
+                    settleOnce(() => safeReject(code ? `无法开始下载, code: ${code}` : '无法开始下载'));
+                },
+                complete: () => {},
             });
         });
     },
