@@ -1,374 +1,436 @@
 <template>
-    <div class="volume">
-        <div class="song">
-			<marquee class="song-name" scrollamount="36" onclick="goBack">{{ currentSong.name || '未知歌曲' }}</marquee>
-			<marquee class="singer-name" scrollamount="36">{{ currentSong.artists || '未知歌手' }}</marquee>
-		</div>
-  
-      <!-- 操作控制 -->
-      <div class="control-container">
-        <!-- 收藏图标 (所有屏幕都显示) -->
-        <image class="icon" id="favoriteIcon" src="{{ favoriteIcon }}" onclick="toggleFavorite"></image>
-  
-          <image class="icon" src="/common/icon/vol-download.png" onclick="handleDownloadClick"></image>
-          <image class="icon" src="{{ playModeIcon }}" onclick="handlePlayModeClick"></image>
-
-      </div>
-      <image class="little-icon" src="{{ downloadIcon }}" if="{{ downloadIcon }}"></image>
-            <!-- 音量控制 (无变化) -->
-            <div class="volume-bar-container">
-                <image class="action-icon" src="/common/icon/minus.png" onclick="changeVolume(-1)"></image>
-                <div class="volume-progress-container">
-                  <progress class="volume-progress" percent="{{volume}}"></progress>
-                </div>
-                <image class="action-icon" src="/common/icon/plus.png" onclick="changeVolume(1)"></image>
-              </div>
+  <div class="volume">
+    <div class="song">
+      <marquee
+        class="song-name"
+        scrollamount="36"
+        onclick="goBack"
+      >{{ currentSong.name || '未知歌曲' }}</marquee>
+      <marquee
+        class="singer-name"
+        scrollamount="36"
+      >{{ currentSong.artists || '未知歌手' }}</marquee>
     </div>
-  </template>
-  
+
+    <!-- 操作控制 -->
+    <div class="control-container">
+      <!-- 收藏图标 (所有屏幕都显示) -->
+      <image
+        class="icon"
+        id="favoriteIcon"
+        src="{{ favoriteIcon }}"
+        onclick="toggleFavorite"
+      ></image>
+
+      <image
+        class="icon"
+        src="/common/icon/vol-download.png"
+        onclick="handleDownloadClick"
+      ></image>
+      <image
+        class="icon"
+        src="{{ playModeIcon }}"
+        onclick="handlePlayModeClick"
+      ></image>
+    </div>
+
+    <image
+      class="little-icon"
+      src="{{ downloadIcon }}"
+      if="{{ downloadIcon }}"
+    ></image>
+
+    <!-- 音量控制 -->
+    <div class="volume-bar-container">
+      <image
+        class="action-icon"
+        src="/common/icon/minus.png"
+        onclick="changeVolume(-1)"
+      ></image>
+      <div class="volume-progress-container">
+        <progress
+          class="volume-progress"
+          percent="{{ volume }}"
+        ></progress>
+      </div>
+      <image
+        class="action-icon"
+        src="/common/icon/plus.png"
+        onclick="changeVolume(1)"
+      ></image>
+    </div>
+  </div>
+</template>
+
 <script>
+  import router from '@system.router';
+  import audio from '@system.audio';
+  import prompt from '@system.prompt';
 
-  import router from "@system.router";
-  import audio from "@system.audio";
-  import prompt from "@system.prompt";
-
-export default {
+  export default {
     private: {
-        volume: 0,
-          isFavorited: false,
-          downloadState: 'not_downloaded', // 'not_downloaded', 'downloading', 'downloaded'
+      volume: 0,
+      isFavorited: false,
+      // not_downloaded / downloading / downloaded
+      downloadState: 'not_downloaded',
     },
-  
-      computed: {
-          downloadIcon() {
-              const icons = { downloading: '/common/icon/waiting_icon.png', downloaded: '/common/icon/done_icon.png', not_downloaded: null };
-              return icons[this.downloadState] || icons.not_downloaded;
-          },
-          favoriteIcon() {
-              return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
-          },
-          playModeIcon() {
-              if (this.isFmMode) {
-                  return '/common/icon/fm.png';
-              }
-              const icons = ['/common/icon/loop.png', '/common/icon/single-loop.png', '/common/icon/shuffle.png'];
-              return icons[this.playMode] || icons[0];
-          },
-      },
 
-      protected: {
-          // 【核心修正】protected 数据现在只用于接收路由参数
-          currentSong: {},
-          screenShape: 'circle',
-          playMode: 0,
-          isFmMode: false,
+    // 由路由/服务驱动的 UI 计算属性
+    computed: {
+      downloadIcon() {
+        const icons = {
+          downloading: '/common/icon/waiting_icon.png',
+          downloaded: '/common/icon/done_icon.png',
+          not_downloaded: null,
+        };
+        return icons[this.downloadState] || null;
       },
+      favoriteIcon() {
+        return this.isFavorited
+          ? '/common/icon/liked.png'
+          : '/common/icon/like.png';
+      },
+      playModeIcon() {
+        if (this.isFmMode) {
+          return '/common/icon/fm.png';
+        }
+        const icons = [
+          '/common/icon/loop.png',
+          '/common/icon/single-loop.png',
+          '/common/icon/shuffle.png',
+        ];
+        return icons[this.playMode] || icons[0];
+      },
+    },
 
-      constants: {
-          FAVORITES_FILE_URI: 'internal://files/favorites.json',
-          DOWNLOADED_FILE_URI: 'internal://files/downloaded_songs.json',
-      },
-  
+    // 路由参数/外部状态
+    protected: {
+      currentSong: {},
+      screenShape: 'circle',
+      playMode: 0, // 0：列表循环，1：单曲循环，2：随机
+      isFmMode: false,
+    },
+
     async onInit() {
-        this.volume = audio.volume * 100;
+      // 初始化音量
+      this.volume = audio.volume * 100;
 
-        // 确保从路由正确接收到布尔值
-          this.isFmMode = String(this.isFmMode) === 'true';
+      // 保证 isFmMode 为布尔值
+      this.isFmMode = String(this.isFmMode) === 'true';
 
-          try {
-              if (typeof this.currentSong === 'string') {
-                  this.currentSong = JSON.parse(this.currentSong);
-              }
-          } catch (e) {
-              prompt.showToast({ message: '歌曲信息错误' });
-              router.back();
-              return;
-          }
+      // currentSong 可能通过路由 string 传入
+      try {
+        if (typeof this.currentSong === 'string') {
+          this.currentSong = JSON.parse(this.currentSong);
+        }
+      } catch (e) {
+        prompt.showToast({ message: '歌曲信息错误' });
+        router.back();
+        return;
+      }
 
-          if (!this.currentSong || !this.currentSong.id) {
-              prompt.showToast({ message: '歌曲信息无效' });
-              router.back();
-              return;
-          }
+      if (!this.currentSong || !this.currentSong.id) {
+        prompt.showToast({ message: '歌曲信息无效' });
+        router.back();
+        return;
+      }
 
-          await this.loadInitialState();
-      },
+      await this.loadInitialState();
+    },
 
     async onShow() {
-        // 弹窗页面每次显示时都应该刷新状态
-        await this.loadInitialState();
+      // 弹窗每次显示刷新一下收藏/下载状态
+      await this.loadInitialState();
     },
-  
-      /**
-       * 【核心修正】加载初始状态，只负责调用服务和更新UI
-       */
+
+    /**
+     * 加载收藏 & 下载状态，由各自的 service 提供
+     */
     async loadInitialState() {
-        const { file, download } = this.getServices();
-        if (!file || !download) {
-            prompt.showToast({ message: '服务未初始化，请重启应用' });
-            return;
+      const { player, download } = this.getServices();
+      if (!player || !download) {
+        prompt.showToast({ message: '服务未初始化，请重启应用' });
+        return;
+      }
+
+      // 收藏状态
+      try {
+        if (typeof player.isFavorited === 'function') {
+          this.isFavorited = await player.isFavorited(this.currentSong.id);
+        }
+      } catch (error) {
+        prompt.showToast({ message: '获取收藏状态失败' });
+      }
+
+      // 下载状态
+      try {
+        if (typeof download.getSongDownloadState === 'function') {
+          this.downloadState = download.getSongDownloadState(
+            this.currentSong.id
+          );
+        } else {
+          // 兜底：没有实现 getSongDownloadState 就认为未下载
+          this.downloadState = 'not_downloaded';
+        }
+      } catch (error) {
+        prompt.showToast({ message: '获取下载状态失败' });
+      }
+
+      // 播放模式（如果 player 内部有状态，可以同步一下）
+      try {
+        if (typeof player.getPlayMode === 'function') {
+          this.playMode = player.getPlayMode();
+        }
+        if (typeof player.isFmMode === 'function') {
+          this.isFmMode = player.isFmMode();
+        }
+      } catch (e) {
+        // 非关键逻辑，忽略错误
+      }
+    },
+
+    changeVolume(direction) {
+      const newVolume = this.volume + direction * 10;
+      this.volume = Math.max(0, Math.min(100, newVolume));
+      audio.volume = this.volume / 100;
+    },
+
+    /**
+     * 切换收藏，仅调用 playerService，不再直接操作文件
+     */
+    async toggleFavorite() {
+      if (!this.currentSong) return;
+      const { player } = this.getServices();
+      if (!player) {
+        prompt.showToast({ message: '播放服务未就绪' });
+        return;
+      }
+
+      try {
+        // 建议在 playerService 里实现 toggleFavorite(song) 并返回最新状态
+        if (typeof player.toggleFavorite === 'function') {
+          const result = await player.toggleFavorite(this.currentSong);
+          // 如果服务返回了显式布尔值就用返回值，否则反转本地状态
+          if (typeof result === 'boolean') {
+            this.isFavorited = result;
+          } else {
+            this.isFavorited = !this.isFavorited;
+          }
+        } else if (typeof player.isFavorited === 'function') {
+          // 如果没有 toggleFavorite，退而求其次：让 service 自己判断/存储
+          const before = await player.isFavorited(this.currentSong.id);
+          if (typeof player.setFavorite === 'function') {
+            await player.setFavorite(this.currentSong, !before);
+          }
+          this.isFavorited = !before;
+        } else {
+          // service 没有提供收藏能力
+          prompt.showToast({ message: '收藏功能未实现' });
+          return;
         }
 
-          // 【核心】从文件中读取收藏状态
-          try {
-              const songId = String(this.currentSong.id);
-              const favorites = await file.readJson(this.FAVORITES_FILE_URI, {});
-              const favoritesMap = favorites && typeof favorites === 'object' ? favorites : {};
-              this.isFavorited = Boolean(favoritesMap[songId]);
-          } catch (error) {
-              prompt.showToast({ message: '获取收藏状态失败' });
-          }
+        prompt.showToast({
+          message: this.isFavorited ? '已收藏' : '已取消收藏',
+        });
+      } catch (error) {
+        prompt.showToast({ message: `操作失败: ${error.message || error}` });
+      }
+    },
 
-          // 【核心】根据下载记录与队列确定下载状态
-          try {
-              const songId = String(this.currentSong.id);
-              const downloadedMap = await file.readJson(this.DOWNLOADED_FILE_URI, {});
-              const downloadedMapSafe = downloadedMap && typeof downloadedMap === 'object' ? downloadedMap : {};
-              const isDownloaded = Boolean(downloadedMapSafe[songId]);
-
-              const queueTasks = typeof download.getQueue === 'function' ? download.getQueue() : [];
-              const currentTask = typeof download.getCurrentTask === 'function' ? download.getCurrentTask() : null;
-              const isQueued = Array.isArray(queueTasks) && queueTasks.some(task => task && task.id === this.currentSong.id)
-                  || (currentTask && currentTask.id === this.currentSong.id);
-
-              if (isDownloaded) {
-                  this.downloadState = 'downloaded';
-              } else if (isQueued) {
-                  this.downloadState = 'downloading';
-              } else {
-                  this.downloadState = 'not_downloaded';
-              }
-          } catch (error) {
-              prompt.showToast({ message: '获取下载状态失败' });
-          }
-      },
-  
-      // 【移除】updateFavoriteStatus, updateDownloadStatus, 因为逻辑已合并到 loadInitialState
-  
-      changeVolume(direction) {
-          const newVolume = this.volume + (direction * 10);
-          this.volume = Math.max(0, Math.min(100, newVolume));
-          audio.volume = this.volume / 100;
-      },
-  
-      /**
-       * 【核心修正】切换收藏，只负责调用服务
-       */
-      async toggleFavorite() {
-        if (!this.currentSong) return;
-        const { file } = this.getServices();
-        if (!file) {
-            prompt.showToast({ message: '文件服务未就绪' });
-            return;
-        }
-
-          try {
-              const songId = String(this.currentSong.id);
-              const favorites = await file.readJson(this.FAVORITES_FILE_URI, {});
-              const favoritesMap = favorites && typeof favorites === 'object' ? favorites : {};
-              const exists = Boolean(favoritesMap[songId]);
-
-              if (exists) {
-                  await file.deleteFromJson(this.FAVORITES_FILE_URI, songId);
-                  this.isFavorited = false;
-                  prompt.showToast({ message: '已取消收藏' });
-              } else {
-                  favoritesMap[songId] = {
-                      id: this.currentSong.id,
-                      name: this.currentSong.name,
-                      artists: this.currentSong.artists,
-                      duration: this.currentSong.duration || 0,
-                  };
-                  await file.writeJson(this.FAVORITES_FILE_URI, favoritesMap);
-                  this.isFavorited = true;
-                  prompt.showToast({ message: '已收藏' });
-              }
-          } catch (error) {
-              prompt.showToast({ message: `操作失败: ${error.message}` });
-          }
-      },
-  
-      /**
-       * 【核心修正】处理下载点击，只负责调用服务
-       */
+    /**
+     * 处理下载点击，只负责调用 downloadService
+     */
     handleDownloadClick() {
-        if (this.downloadState === 'downloaded') {
-            prompt.showToast({ message: '歌曲已下载' });
-            return;
-        }
-          if (this.downloadState === 'downloading') {
-              prompt.showToast({ message: '已在下载队列中' });
-              return;
-          }
+      if (this.downloadState === 'downloaded') {
+        prompt.showToast({ message: '歌曲已下载' });
+        return;
+      }
+      if (this.downloadState === 'downloading') {
+        prompt.showToast({ message: '已在下载队列中' });
+        return;
+      }
 
-        const { download } = this.getServices();
-        if (!download) {
-            prompt.showToast({ message: '下载服务未就绪' });
-            return;
-        }
-          // 【核心】调用 downloadService 的方法来添加任务，并同步状态
-          if (typeof download.addTask !== 'function') {
-              prompt.showToast({ message: '下载服务不可用' });
-              return;
-          }
+      const { download } = this.getServices();
+      if (!download) {
+        prompt.showToast({ message: '下载服务未就绪' });
+        return;
+      }
 
-          download.addTask(this.currentSong, {
-              onStart: () => { this.downloadState = 'downloading'; },
-              onSuccess: async (downloadedInfo) => {
-                  const { file } = this.getServices();
-                  if (file) {
-                      const downloadedMap = await file.readJson(this.DOWNLOADED_FILE_URI, {});
-                      const downloadedMapSafe = downloadedMap && typeof downloadedMap === 'object' ? downloadedMap : {};
-                      downloadedMapSafe[downloadedInfo.id] = downloadedInfo;
-                      await file.writeJson(this.DOWNLOADED_FILE_URI, downloadedMapSafe);
-                  }
-                  this.downloadState = 'downloaded';
-              },
-              onError: () => { this.downloadState = 'not_downloaded'; },
-          });
-      },
-  
-      /**
-       * 【核心修正】处理播放模式点击，只负责调用服务
-       */
+      if (typeof download.addTask !== 'function') {
+        prompt.showToast({ message: '下载服务不可用' });
+        return;
+      }
+
+      try {
+        // 仅负责把任务交给服务，具体队列/文件落盘由 service 处理
+        download.addTask(this.currentSong);
+        // UI 先乐观更新成下载中
+        this.downloadState = 'downloading';
+      } catch (e) {
+        this.downloadState = 'not_downloaded';
+        prompt.showToast({ message: '添加下载任务失败' });
+      }
+    },
+
+    /**
+     * 切换播放模式：交给 playerService 处理，组件只同步显示
+     */
     handlePlayModeClick() {
-        const { player } = this.getServices();
-        if (!player) {
-            prompt.showToast({ message: '播放服务未就绪' });
-            return;
-        }
-        // 【核心】调用 playerService 的方法来切换模式
+      const { player } = this.getServices();
+      if (!player) {
+        prompt.showToast({ message: '播放服务未就绪' });
+        return;
+      }
+
+      if (typeof player.togglePlayMode === 'function') {
         player.togglePlayMode();
-        // 无需做任何操作，playerService 内部会处理提示和状态变更
-        // 为了UI即时响应，可以手动更新一下
+      }
+
+      // 同步最新状态以响应 UI
+      if (typeof player.getPlayMode === 'function') {
         this.playMode = player.getPlayMode();
+      }
+      if (typeof player.isFmMode === 'function') {
         this.isFmMode = player.isFmMode();
+      }
     },
 
     getServices() {
-        return {
-            player: this.$app.$def.player,
-            download: this.$app.$def.download,
-            file: this.$app.$def.file,
-        };
+      return {
+        player: this.$app && this.$app.$def && this.$app.$def.player,
+        download: this.$app && this.$app.$def && this.$app.$def.download,
+      };
     },
-  
-      goBack() {
-          router.back();
-      },
+
+    goBack() {
+      router.back();
+    },
   };
-  </script>
-  
-  <style>
-  .volume {
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    background-color: #000;
-  }
-  .song { 
-    width: 100%; 
-    height: 80px; /* 歌曲信息区域高度 */
-    flex-direction: column; 
-    justify-content: center; 
-    align-items: center; 
-    flex-shrink: 0; /* 防止被压缩 */
-    padding-top: 20px;
+</script>
+
+<style>
+.volume {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  background-color: #000;
 }
-.song-name { 
-    width: 320px; 
-    font-size: 32px; 
-    color: #ffffff; 
-    lines: 1; 
-    text-overflow: ellipsis; 
-    text-align: center; 
-    font-weight: bold;
+
+.song {
+  width: 100%;
+  height: 80px; /* 歌曲信息区域高度 */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0; /* 防止被压缩 */
+  padding-top: 20px;
 }
-.singer-name { 
-    width: 300px; 
-    font-size: 24px; 
-    /* 【修改】使用固定颜色代替透明度 */
-    color: #CCCCCC; 
-    lines: 1; 
-    text-overflow: ellipsis; 
-    text-align: center; 
-    font-weight: bold;
+
+.song-name {
+  width: 320px;
+  font-size: 32px;
+  color: #ffffff;
+  lines: 1;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-weight: bold;
 }
-  .volume-bar-container {
-    width: 364px;
-    height: 96px;
-    padding: 0 10px;
-    margin-top: 18px;
-    justify-content: space-around;
-    align-items: center;
-    background-color: #2E323C;
-    border-radius: 59px;
-    margin-bottom: 84px;
-  }
-  .volume-progress-container {
-    width: 50%;
-    height: 30px;
-    justify-content: center;
-    align-items: center;
-  }
-  .action-icon {
-    width: 60px;
-    height: 60px;
-  }
+
+.singer-name {
+  width: 300px;
+  font-size: 24px;
+  /* 使用固定颜色代替透明度 */
+  color: #cccccc;
+  lines: 1;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-weight: bold;
+}
+
+.volume-bar-container {
+  width: 364px;
+  height: 96px;
+  padding: 0 10px;
+  margin-top: 18px;
+  justify-content: space-around;
+  align-items: center;
+  background-color: #2e323c;
+  border-radius: 59px;
+  margin-bottom: 84px;
+}
+
+.volume-progress-container {
+  width: 50%;
+  height: 30px;
+  justify-content: center;
+  align-items: center;
+}
+
+.action-icon {
+  width: 60px;
+  height: 60px;
+}
+
+.control-container {
+  width: 92%;
+  margin-top: 50px;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.icon {
+  width: 132px;
+  height: 118px;
+}
+
+.little-icon {
+  top: 136px;
+  left: 244px;
+  position: absolute;
+  width: 56px;
+  height: 56px;
+}
+
+.volume-progress {
+  color: #bac3ff;
+  stroke-width: 30px;
+  layer-color: rgba(255, 255, 255, 0.1);
+}
+
+.cancel-container {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  bottom: 18px;
+  justify-content: center;
+  align-items: center;
+}
+
+@media screen and (shape: rect) {
   .control-container {
-    width: 92%;
-    margin-top: 50px;
-    justify-content: space-around;
-    align-items: center;
+    margin-top: 78px;
+    width: 392px;
   }
+
   .icon {
-    width: 132px;
-    height:118px;
+    width: 124px;
+    height: 112px;
   }
+
   .little-icon {
-    top: 136px;
-    left: 244px;
+    top: 154px;
+    left: 224px;
     position: absolute;
     width: 56px;
     height: 56px;
   }
-  .volume-progress {
-    color: #BAC3FF;
-    stroke-width: 30px;
-    layer-color: rgba(255, 255, 255, 0.1);
-  }
-  .cancel-container {
-    position: absolute;
-    width: 100px;
-    height: 100px;
-    bottom: 18px;
-    justify-content: center;
-    align-items: center;
-  }
 
-  @media screen and (shape: rect){
-    .control-container {
-      margin-top: 78px;
-      width: 392px;
-    }
-    .icon {
-      width: 124px;
-      height:112px;
-    }
-    .little-icon {
-      top: 154px;
-      left: 224px;
-      position: absolute;
-      width: 56px;
-      height: 56px;
-    }
-    .volume-bar-container {
-        width: 392px;
-        margin-top: 48px;
-      margin-bottom: 80px;
-    }
+  .volume-bar-container {
+    width: 392px;
+    margin-top: 48px;
+    margin-bottom: 80px;
   }
-  </style>
-  
+}
+</style>
