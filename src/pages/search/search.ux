@@ -159,13 +159,20 @@
   }
 </style>
 <script>
-import fetch from "@system.fetch";
+// 【最终净化版，请用此版本完整替换 search.ux 的 <script> 部分】
+
 import router from "@system.router";
-import file from "@system.file";
-// **新增**: 导入 device 模块
+import prompt from "@system.prompt";
 import device from "@system.device";
 
+// 辅助函数，方便地从全局获取所有需要的服务
+const getServices = () => ({
+    api: this.$app.$def.api,
+    file: this.$app.$def.file,
+});
+
 const SETTINGS_FILE_URI = 'internal://files/settings.json';
+const SEARCH_HISTORY_FILE_URI = 'internal://files/search_history.json';
 
 export default {
     private: {
@@ -178,9 +185,7 @@ export default {
         WINDOW_SIZE: 10,
         PAGE_SIZE: 5,
         ITEM_HEIGHT: 110,
-        TOTAL_LIMIT: 25,
-        API_PAGE_SIZE: 10,
-
+        
         displayStartIndex: 0,
         isLoading: false,
         searchInitiated: false,
@@ -188,56 +193,31 @@ export default {
         hasMoreUp: false,
         hasMoreDown: true,
         
-        searchHistoryFileUri: 'internal://files/search_history.json',
         searchHistory: [],
         hide: true,
         keyboardtype: "QWERTY",
         vibratemode: "short",
-        // **修改**: 提供一个安全的默认值
         screentype: "rect", 
     },
     
-    /**
-     * **核心修改**: 在 onInit 中检测屏幕类型
-     */
     async onInit() {
+        const { file } = getServices();
+
         // 1. 异步获取设备信息
         device.getInfo({
             success: (data) => {
-                if (data.screenShape) {
-                    console.log(`检测到屏幕形状: ${data.screenShape}`);
-                    // 2. 将获取到的屏幕形状赋值给 screentype
-                    this.screentype = data.screenShape;
-                }
+                if (data.screenShape) this.screentype = data.screenShape;
             },
-            fail: (data, code) => {
-                console.error(`获取设备信息失败, code=${code}, data=${data}. 将使用默认屏幕类型: ${this.screentype}`);
-            }
         });
 
-        // 3. 其他初始化操作继续执行
-        await this.applySettings();
-        this.loadSearchHistory();
-    },
-
-    async applySettings() {
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri: SETTINGS_FILE_URI, success: resolve, fail: reject }));
-            const settings = JSON.parse(data.text);
-            if (settings) {
-                if (settings.search) {
-                    this.TOTAL_LIMIT = settings.search.totalLimit || this.TOTAL_LIMIT;
-                    this.API_PAGE_SIZE = settings.search.apiPageSize || this.API_PAGE_SIZE;
-                }
-                if (settings.performance) {
-                    this.WINDOW_SIZE = settings.performance.windowSize || this.WINDOW_SIZE;
-                    this.PAGE_SIZE = settings.performance.pageSize || this.PAGE_SIZE;
-                }
-                console.log(`搜索页设置已应用: Search(Total:${this.TOTAL_LIMIT}, APIPage:${this.API_PAGE_SIZE}), Perf(Win:${this.WINDOW_SIZE}, Page:${this.PAGE_SIZE})`);
-            }
-        } catch (e) {
-            console.log("搜索页无法加载设置，使用默认值。");
+        // 2. 加载设置和历史记录
+        const settings = await file.readJson(SETTINGS_FILE_URI, {});
+        if (settings.search) {
+            // 可以保留这些UI相关的参数，因为它们控制的是懒加载行为
+            this.WINDOW_SIZE = settings.search.windowSize || this.WINDOW_SIZE;
+            this.PAGE_SIZE = settings.search.pageSize || this.PAGE_SIZE;
         }
+        this.searchHistory = await file.readJson(SEARCH_HISTORY_FILE_URI, []);
     },
 
     onVisibilityChange() {
@@ -258,30 +238,16 @@ export default {
         this.textValue += evt.detail.content;
     },
 
-    loadSearchHistory() {
-        file.readText({
-            uri: this.searchHistoryFileUri,
-            success: (data) => {
-                try { this.searchHistory = JSON.parse(data.text || "[]"); } catch (e) { this.searchHistory = []; }
-            },
-            fail: () => { this.searchHistory = []; }
-        });
-    },
-
-    saveSearchHistory() {
-        file.writeText({
-            uri: this.searchHistoryFileUri,
-            text: JSON.stringify(this.searchHistory, null, 2),
-        });
-    },
-
-    addAndSaveHistory(keyword) {
+    async addAndSaveHistory(keyword) {
         if (!keyword) return;
+        const { file } = getServices();
         const index = this.searchHistory.indexOf(keyword);
         if (index > -1) this.searchHistory.splice(index, 1);
         this.searchHistory.unshift(keyword);
         if (this.searchHistory.length > 10) this.searchHistory.pop();
-        this.saveSearchHistory();
+        
+        // 使用全局 fileService 保存
+        await file.writeJson(SEARCH_HISTORY_FILE_URI, this.searchHistory);
     },
 
     searchFromHistory(keyword) {
@@ -293,7 +259,7 @@ export default {
         const keywords = this.textValue.trim();
         if (!keywords || this.isLoading) return;
         
-        this.addAndSaveHistory(keywords);
+        await this.addAndSaveHistory(keywords);
         
         this.isLoading = true;
         this.searchInitiated = true;
@@ -303,50 +269,38 @@ export default {
         this.hasMoreUp = false;
         this.hasMoreDown = true;
 
-        await this.fetchAllSearchResults();
-        
-        this.isLoading = false;
-        this.updateDisplayList(this.displayStartIndex);
-    },
-
-    async fetchAllSearchResults() {
-        let offset = 0;
-        let hasMore = true;
-        while (hasMore && this.fullResultList.length < this.TOTAL_LIMIT) {
-            const apiUrl = `https://163api.qijieya.cn/search?keywords=${encodeURIComponent(this.textValue  )}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
-            try {
-                const response = await new Promise((resolve, reject) => {
-                    fetch.fetch({ url: apiUrl, responseType: 'text', success: resolve, fail: reject });
-                });
-                const result = JSON.parse(response.data);
-                if (result.code === 200 && result.result?.songs?.length > 0) {
-                    const newSongs = result.result.songs.map(s => ({ id: s.id, name: s.name, artists: s.artists || [] }));
-                    
-                    this.fullResultList.push(...newSongs);
-                    this.updateDisplayList(this.displayStartIndex);
-
-                    offset += newSongs.length;
-                    if (newSongs.length < this.API_PAGE_SIZE) {
-                        hasMore = false;
-                        this.hasMoreDown = false;
-                    }
-                } else {
-                    hasMore = false;
-                    this.hasMoreDown = false;
-                }
-            } catch (error) {
-                console.error("分页搜索失败:", error);
-                hasMore = false;
+        try {
+            const { api } = getServices();
+            // 【核心修正】调用 apiService 的 searchSongs 方法
+            const searchResults = await api.searchSongs(keywords);
+            this.fullResultList = searchResults;
+            
+            // 如果结果为空，也需要更新UI
+            if (searchResults.length === 0) {
                 this.hasMoreDown = false;
             }
+
+        } catch (error) {
+            console.error("搜索失败:", error);
+            prompt.showToast({ message: "搜索失败，请检查网络" });
+            this.fullResultList = [];
+            this.hasMoreDown = false;
+        } finally {
+            this.isLoading = false;
+            // 初始加载显示列表
+            this.updateDisplayList(0);
         }
     },
+
+    // 【移除】fetchAllSearchResults 方法，逻辑已移入 api.js
 
     updateDisplayList(startIndex) {
         this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullResultList.length - this.PAGE_SIZE));
         const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullResultList.length);
         this.displayResultList = this.fullResultList.slice(this.displayStartIndex, endIndex);
         this.hasMoreUp = this.displayStartIndex > 0;
+        // 只有当列表末尾不再可见时，才认为没有更多向下的内容
+        this.hasMoreDown = endIndex < this.fullResultList.length;
     },
 
     handleScrollTop() {

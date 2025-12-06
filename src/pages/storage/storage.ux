@@ -112,59 +112,28 @@
 </style>
 
 <script>
+// 【最终净化版，请用此版本完整替换 storage.ux 的 <script> 部分】
+
 import router from "@system.router";
-import file from "@system.file";
 import prompt from "@system.prompt";
-import device from "@system.device";
-import fetch from "@system.fetch";
 
-// 【【【核心新增】】】 将 fileService 封装完整地放入
-const fileService = {
-    _promisify(fn, options) {
-        return new Promise((resolve, reject) => {
-            fn({ ...options, success: resolve, fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)) });
-        });
-    },
-    async readJson(uri, defaultValue = null) {
-        try {
-            const data = await this._promisify(file.readText, { uri });
-            return JSON.parse(data.text || '{}');
-        } catch (error) {
-            if (error.code !== 301) console.error(`[FileService] readJson 失败: ${uri}`, error);
-            return defaultValue;
-        }
-    },
-    async writeJson(uri, data) {
-        try {
-            await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
-            return true;
-        } catch (error) {
-            console.error(`[FileService] writeJson 失败: ${uri}`, error);
-            return false;
-        }
-    },
-    async delete(uri) {
-        try {
-            await this._promisify(file.delete, { uri });
-            return true;
-        } catch (error) {
-            if (error.code !== 301) console.error(`[FileService] delete 失败: ${uri}`, error);
-            return false;
-        }
-    }
-};
-
-const DIR_MUSIC = 'internal://files/music/';
-const DIR_LYRICS = 'internal://files/lyrics/';
-const FILE_DOWNLOADED_SONGS = 'internal://files/downloaded_songs.json';
-const API_SONG_DETAIL = 'https://163api.qijieya.cn/song/detail?ids=';
+// 辅助函数，方便地从全局获取所有需要的服务
+const getServices = () => ({
+    file: this.$app.$def.file,
+    api: this.$app.$def.api, // 需要 api 来修复未知歌曲
+});
 
 export default {
     private: {
-        totalStorage: 0,
-        availableStorage: 0,
-        musicSize: 0,
-        lyricsSize: 0,
+        // --- 存储信息，完全由 fileService 驱动 ---
+        storageInfo: {
+            totalStorage: 0,
+            availableStorage: 0,
+            musicSize: 0,
+            lyricsSize: 0,
+        },
+        
+        // --- 歌曲列表与UI状态 ---
         fullSongList: [],
         displaySongList: [],
         PAGE_SIZE: 10,
@@ -177,13 +146,13 @@ export default {
     },
 
     computed: {
-        usedStorage( ) { return this.totalStorage - this.availableStorage; },
-        usedPercent() { return this.totalStorage > 0 ? Math.round((this.usedStorage / this.totalStorage) * 100) : 0; },
-        totalStorageText() { return this.formatSize(this.totalStorage); },
-        availableStorageText() { return this.formatSize(this.availableStorage); },
+        usedStorage() { return this.storageInfo.totalStorage - this.storageInfo.availableStorage; },
+        usedPercent() { return this.storageInfo.totalStorage > 0 ? Math.round((this.usedStorage / this.storageInfo.totalStorage) * 100) : 0; },
+        totalStorageText() { return this.formatSize(this.storageInfo.totalStorage); },
+        availableStorageText() { return this.formatSize(this.storageInfo.availableStorage); },
         usedStorageText() { return this.formatSize(this.usedStorage); },
-        musicSizeText() { return this.formatSize(this.musicSize); },
-        lyricsSizeText() { return this.formatSize(this.lyricsSize); },
+        musicSizeText() { return this.formatSize(this.storageInfo.musicSize); },
+        lyricsSizeText() { return this.formatSize(this.storageInfo.lyricsSize); },
     },
 
     onInit() {
@@ -201,9 +170,7 @@ export default {
     },
 
     loadPage(pageNumber) {
-        if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0)) {
-            return;
-        }
+        if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0)) return;
         const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
         const endIndex = startIndex + this.PAGE_SIZE;
         this.displaySongList = this.fullSongList.slice(startIndex, endIndex).map((song, index) => ({
@@ -211,76 +178,28 @@ export default {
             displayIndex: startIndex + index + 1,
         }));
         this.currentPage = pageNumber;
-        this.$nextTick(() => {
-            this.$element('songListScroll').scrollTo({ top: 1 });
-        });
+        this.$nextTick(() => { this.$element('songListScroll').scrollTo({ top: 1 }); });
     },
 
-    loadPrevPage() {
-        if (this.currentPage > 1) {
-            this.loadPage(this.currentPage - 1);
-        }
-    },
+    loadPrevPage() { if (this.currentPage > 1) this.loadPage(this.currentPage - 1); },
+    loadNextPage() { if (this.currentPage < this.totalPages) this.loadPage(this.currentPage + 1); },
 
-    loadNextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.loadPage(this.currentPage + 1);
-        }
-    },
-
+    /**
+     * 【核心修正】加载和扫描存储，只负责调用服务和更新UI
+     */
     async loadAndScanStorage() {
         if (this.isLoading && this.fullSongList.length > 0) return;
         this.isLoading = true;
-        this.fullSongList = [];
-        this.hasUnknownSongs = false;
 
         try {
-            const [
-                totalStorageData,
-                availableStorageData,
-                downloadedMeta,
-                musicFilesData,
-                lyricFilesData
-            ] = await Promise.all([
-                fileService._promisify(device.getTotalStorage).catch(() => ({ totalStorage: 0 })),
-                fileService._promisify(device.getAvailableStorage).catch(() => ({ availableStorage: 0 })),
-                fileService.readJson(FILE_DOWNLOADED_SONGS, {}),
-                fileService._promisify(file.list, { uri: DIR_MUSIC }).catch(() => ({ fileList: [] })),
-                fileService._promisify(file.list, { uri: DIR_LYRICS }).catch(() => ({ fileList: [] }))
-            ]);
-
-            this.totalStorage = totalStorageData.totalStorage;
-            this.availableStorage = availableStorageData.availableStorage;
-
-            const musicFiles = musicFilesData.fileList || [];
-            const lyricFiles = lyricFilesData.fileList || [];
-            const musicFileMap = new Map(musicFiles.map(f => [f.uri.split('/').pop().replace('.mp3', ''), { uri: f.uri, size: f.length }]));
-            const lyricFileMap = new Map(lyricFiles.map(f => [f.uri.split('/').pop().replace('.json', ''), { uri: f.uri, size: f.length }]));
-
-            let newFullSongList = [], updatedDownloadedMeta = {}, totalMusicSize = 0, totalLyricsSize = 0, unknownCount = 0;
-
-            for (const [songId, musicFileInfo] of musicFileMap.entries()) {
-                const meta = downloadedMeta[songId];
-                const lyricFileInfo = lyricFileMap.get(songId);
-                if (meta) {
-                    newFullSongList.push({ ...meta, isUnknown: false, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
-                    updatedDownloadedMeta[songId] = meta;
-                } else {
-                    unknownCount++;
-                    newFullSongList.push({ id: songId, name: '未知歌曲', artists: `ID: ${songId}`, isUnknown: true, localUri: musicFileInfo.uri, localLyricUri: lyricFileInfo ? lyricFileInfo.uri : null, musicFileSize: musicFileInfo.size, lyricFileSize: lyricFileInfo ? lyricFileInfo.size : 0 });
-                }
-                totalMusicSize += musicFileInfo.size;
-                if (lyricFileInfo) totalLyricsSize += lyricFileInfo.size;
-            }
-
-            if (Object.keys(downloadedMeta).length !== Object.keys(updatedDownloadedMeta).length) {
-                fileService.writeJson(FILE_DOWNLOADED_SONGS, updatedDownloadedMeta);
-            }
-
-            this.fullSongList = newFullSongList;
-            this.musicSize = totalMusicSize;
-            this.lyricsSize = totalLyricsSize;
-            this.hasUnknownSongs = unknownCount > 0;
+            const { file } = getServices();
+            // 【核心】调用 fileService 的一个高级方法来完成所有扫描和计算
+            const result = await file.scanStorage();
+            
+            this.storageInfo = result.storageInfo;
+            this.fullSongList = result.songList;
+            this.hasUnknownSongs = result.hasUnknownSongs;
+            
             this.totalPages = Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
             this.loadPage(1);
 
@@ -293,101 +212,54 @@ export default {
     },
 
     /**
-     * 【【【核心重构】】】
-     * 删除歌曲的入口函数
+     * 【核心修正】删除歌曲，只负责调用服务
      */
-    deleteSong: function(songToDelete) {
-        var that = this;
+    deleteSong(songToDelete) {
         prompt.showDialog({
             title: '删除歌曲',
             message: `您确定要删除《${songToDelete.name}》吗？`,
             buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-            success: function() {
-                const songId = songToDelete.id;
-                const index = that.fullSongList.findIndex(s => s.id === songId);
-                if (index > -1) {
-                    that.fullSongList.splice(index, 1);
-                    that.totalPages = Math.ceil(that.fullSongList.length / that.PAGE_SIZE) || 1;
-                    const targetPage = that.currentPage > that.totalPages ? that.totalPages : that.currentPage;
-                    that.loadPage(targetPage);
-                    prompt.showToast({ message: '已移除' });
+            success: async () => {
+                const { file } = getServices();
+                try {
+                    await file.deleteSong(songToDelete.id);
+                    prompt.showToast({ message: '删除成功' });
+                    // 删除成功后，重新扫描以更新UI
+                    this.loadAndScanStorage();
+                } catch (error) {
+                    prompt.showToast({ message: `删除失败: ${error.message}` });
                 }
-                that.persistDeletion(songId);
             },
-            cancel: function() {
-                prompt.showToast({ message: '操作已取消' });
-            }
         });
     },
 
     /**
-     * 【【【核心重构】】】
-     * 持久化删除操作 (删除物理文件和元数据)
-     * @param {string} songId - 要删除的歌曲ID
+     * 【核心修正】修复未知歌曲，只负责调用服务
      */
-    persistDeletion: async function(songId) {
-        try {
-            await fileService.delete(`${DIR_MUSIC}${songId}.mp3`);
-            await fileService.delete(`${DIR_LYRICS}${songId}.json`);
-
-            const downloaded = await fileService.readJson(FILE_DOWNLOADED_SONGS, {});
-            if (downloaded[String(songId)]) {
-                delete downloaded[String(songId)];
-                await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
-            }
-            
-            // 删除成功后，重新扫描存储以确保数据完全同步
-            this.loadAndScanStorage();
-
-        } catch (error) {
-            console.error("持久化删除失败:", error);
-            prompt.showToast({ message: '删除文件时发生错误' });
-        }
-    },
-
-    fixAllUnknownSongs() {
+    async fixAllUnknownSongs() {
         const unknownSongIds = this.fullSongList.filter(song => song.isUnknown).map(song => song.id);
         if (unknownSongIds.length === 0) {
             prompt.showToast({ message: '没有需要修复的歌曲' });
             return;
         }
         prompt.showToast({ message: `正在批量修复 ${unknownSongIds.length} 首歌曲...` });
-        const idsString = unknownSongIds.join(',');
-        fetch.fetch({
-            url: `${API_SONG_DETAIL}${idsString}`,
-            responseType: 'text',
-            success: (response) => {
-                try {
-                    const data = JSON.parse(response.data);
-                    const songDetails = data?.songs;
-                    if (!songDetails || songDetails.length === 0) throw new Error("API未返回有效的歌曲信息");
-                    
-                    (async () => {
-                        const downloaded = await fileService.readJson(FILE_DOWNLOADED_SONGS, {});
-                        let fixedCount = 0;
-                        songDetails.forEach(songDetail => {
-                            const originalSong = this.fullSongList.find(s => s.id == songDetail.id);
-                            if (originalSong) {
-                                downloaded[String(songDetail.id)] = { id: songDetail.id, name: songDetail.name, artists: songDetail.ar.map(a => a.name).join(' / '), duration: Math.floor(songDetail.dt / 1000) };
-                                fixedCount++;
-                            }
-                        });
-                        if (fixedCount > 0) {
-                            const success = await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
-                            prompt.showToast({ message: success ? `成功修复 ${fixedCount} 首歌曲！` : '保存修复信息失败' });
-                            this.loadAndScanStorage();
-                        } else {
-                            prompt.showToast({ message: '未能从返回数据中匹配到可修复的歌曲' });
-                        }
-                    })();
 
-                } catch (e) {
-                    console.error("批量修复失败:", e);
-                    prompt.showToast({ message: '修复失败，请检查网络或API' });
-                }
-            },
-            fail: () => prompt.showToast({ message: '网络请求失败' })
-        });
+        try {
+            const { file } = getServices();
+            // 【核心】调用 fileService 的一个高级方法来完成修复
+            const fixedCount = await file.fixUnknownSongs(unknownSongIds);
+            
+            if (fixedCount > 0) {
+                prompt.showToast({ message: `成功修复 ${fixedCount} 首歌曲！` });
+                // 修复成功后，重新扫描以更新UI
+                this.loadAndScanStorage();
+            } else {
+                prompt.showToast({ message: '未能从网络数据中匹配到可修复的歌曲' });
+            }
+        } catch (error) {
+            console.error("批量修复失败:", error);
+            prompt.showToast({ message: `修复失败: ${error.message}` });
+        }
     },
 
     formatSize(bytes, forceUnit = null) {

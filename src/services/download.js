@@ -1,149 +1,179 @@
-// src/services/download.js
+// 【请用此版本完整替换您的 src/services/download.js 文件】
 
 import request from '@system.request';
-import file from '@system.file';
 import prompt from '@system.prompt';
-import apiService from './api.js'; // 依赖 api.js
-import brightness from '@system.brightness'; // 导入模块
+import screenKeep from '../utils/screenKeep.js';
+
+// 【核心修正】直接导入所有需要的服务模块
+import api from './api.js';
+import file from './file.js';
+import settings from './settings.js';
 
 const DIR_MUSIC = 'internal://files/music/';
 const DIR_LYRICS = 'internal://files/lyrics/';
 
-// 内部函数：写歌词文件
-function saveLyricFile(path, data) {
-    return new Promise((resolve, reject) => {
-        if (!data) {
-            resolve(); // 如果没有歌词数据，直接成功
+const downloadManager = {
+    queue: [],
+    isProcessing: false,
+    currentTask: null,
+
+    /**
+     * 【公共】初始化下载服务。
+     */
+    async initialize() {
+        if (!file) {
+            console.error("DownloadService: 初始化失败，file 服务模块未导入！");
             return;
         }
-        file.writeText({
-            uri: path,
-            text: JSON.stringify(data, null, 2),
-            success: resolve,
-            fail: (err, code) => reject({ message: `保存歌词失败, code: ${code}`, code })
-        });
-    });
-}
-
-// 内部函数：下载歌曲文件到最终位置
-function downloadSongToDestination(url, destinationUri) {
-    return new Promise((resolve, reject) => {
-        prompt.showToast({ message: '已开始下载，请稍候...' });
-        request.download({
-            url: url,
-            // 【核心修正】直接指定包含目录的最终文件名
-            // 注意：filename 参数在这里期望的是不含协议头的文件路径
-            filename: destinationUri.replace('internal://files/', ''),
-            success: (task) => {
-                request.onDownloadComplete({
-                    token: task.token,
-                    success: (data) => {
-                        prompt.showToast({ message: '歌曲文件下载完成', duration: 500 });
-                        resolve(data.uri); // 成功时返回最终的URI
-                    },
-                    fail: (err, code) => {
-                        reject({ message: `下载任务失败, code: ${code}`, code });
-                    },
-                });
-            },
-            fail: (err, code) => {
-                reject({ message: `无法开始下载, code: ${code}`, code });
-            },
-        });
-    });
-}
-
-export default {
-    /**
-     * 【重要】此方法应在 app.ux 的 onCreate 中调用
-     * 确保所有下载所需的目录都已存在
-     */
-    initialize() {
-        return Promise.all([
-            new Promise(resolve => file.mkdir({ uri: DIR_MUSIC, complete: resolve })),
-            new Promise(resolve => file.mkdir({ uri: DIR_LYRICS, complete: resolve }))
-        ]);
+        try {
+            await file.ensureDirExists(DIR_MUSIC);
+            await file.ensureDirExists(DIR_LYRICS);
+            console.log('下载管理器初始化完成');
+        } catch (error) {
+            console.error('下载目录创建失败:', error);
+        }
     },
 
     /**
-     * 启动歌曲下载流程
-     * @param {object} songToDownload - 要下载的歌曲对象
-     * @param {object} dependencies - 依赖项，如 cookie 和音质设置
-     * @param {object} callbacks - 用于状态更新的回调函数
+     * 【公共】添加下载任务。
      */
-    async start(songToDownload, dependencies, callbacks) {
-        const { cookie, downloadBitrate } = dependencies;
-        const { onStart, onSuccess, onError, onFinish } = callbacks;
+    addTask(song, callbacks) {
+        if (this.currentTask?.id === song.id || this.queue.some(t => t.id === song.id)) {
+            prompt.showToast({ message: `已在下载队列中` });
+            return;
+        }
 
-        // 【【【核心修改】】】安全地开启屏幕常亮
-        if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+        const task = {
+            id: song.id,
+            song: song,
+            callbacks: callbacks || {},
+            status: 'pending'
+        };
+
+        this.queue.push(task);
+        prompt.showToast({ message: `已加入下载队列` });
+
+        this._processQueue();
+    },
+
+    /**
+     * 【内部】处理下载队列。
+     */
+    async _processQueue() {
+        if (this.isProcessing || this.queue.length === 0) {
+            return;
+        }
+
+        this.isProcessing = true;
+        screenKeep.enable();
+        console.log('开始处理下载队列，开启屏幕常亮');
+
+        while (this.queue.length > 0) {
+            const task = this.queue[0];
+            this.currentTask = task;
+            task.status = 'downloading';
+            
+            prompt.showToast({ message: `开始下载: ${task.song.name}` });
+            task.callbacks.onStart?.(task.song);
+
             try {
-                brightness.setKeepScreenOn({ keepScreenOn: true });
-                console.log(`开始下载 ${songToDownload.name}，开启屏幕常亮。`);
-            } catch (e) {
-                console.error("调用 setKeepScreenOn(true) 失败:", e);
-            }
-        } else {
-            console.warn("brightness.setKeepScreenOn 方法不存在，跳过开启常亮。");
-        }
+                const downloadedInfo = await this._downloadSong(task);
+                
+                task.callbacks.onSuccess?.(downloadedInfo);
+                prompt.showToast({ message: `${task.song.name} 下载成功` });
 
-        const lyricFilePath = `${DIR_LYRICS}${songToDownload.id}.json`;
-        const songFilePath = `${DIR_MUSIC}${songToDownload.id}.mp3`;
-
-        onStart(songToDownload);
-
-        try {
-            // 1. 并行获取歌曲和歌词信息
-            const [songPlaybackInfo, lyricData] = await Promise.all([
-                apiService.getSongPlaybackInfo(songToDownload.id, downloadBitrate, cookie),
-                apiService.getLyricData(songToDownload.id, cookie)
-            ]);
-
-            if (!songPlaybackInfo?.url) {
-                throw new Error('无法获取歌曲下载链接');
-            }
-
-            // 2. 并行下载歌曲和保存歌词
-            await Promise.all([
-                downloadSongToDestination(songPlaybackInfo.url, songFilePath),
-                saveLyricFile(lyricFilePath, lyricData)
-            ]);
-
-            // 3. 构建最终的下载信息并通知成功
-            const downloadedInfo = {
-                ...songToDownload,
-                localUri: songFilePath,
-                localLyricUri: lyricData ? lyricFilePath : null,
-                duration: songPlaybackInfo.duration
-            };
-            onSuccess(downloadedInfo);
-
-        } catch (error) {
-            console.error("下载服务失败:", error);
-            
-            // 【核心修正】增强的错误清理逻辑
-            // 无论错误发生在哪一步，都尝试删除所有可能已创建的文件
-            file.delete({ uri: songFilePath });
-            file.delete({ uri: lyricFilePath });
-
-            // 向UI层报告更具体的错误信息
-            onError(error.message || '下载过程中发生未知错误');
-
-        } finally {
-            // 【【【核心修改】】】安全地关闭屏幕常亮
-            if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                try {
-                    brightness.setKeepScreenOn({ keepScreenOn: false });
-                    console.log(`下载流程结束，关闭屏幕常亮。`);
-                } catch (e) {
-                    console.error("调用 setKeepScreenOn(false) 失败:", e);
+            } catch (error) {
+                const errorMessage = error.message || '未知下载错误';
+                prompt.showToast({ message: `下载失败: ${errorMessage}` });
+                task.callbacks.onError?.(errorMessage);
+                console.error(`下载失败 ${task.song.name}:`, errorMessage);
+            } finally {
+                task.callbacks.onFinish?.();
+                this.queue.shift();
+                this.currentTask = null;
+                if (this.queue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
-            } else {
-                console.warn("brightness.setKeepScreenOn 方法不存在，跳过关闭常亮。");
             }
-            
-            // onFinish 仍然需要被调用
-            onFinish(songToDownload); 
         }
+
+        this.isProcessing = false;
+        screenKeep.disable();
+        console.log('下载队列处理完成，关闭屏幕常亮');
+    },
+
+    /**
+     * 【内部】执行单首歌曲的下载流程。
+     */
+    async _downloadSong(task) {
+        const { song } = task;
+        
+        if (!api || !file || !settings) {
+            throw new Error("下载任务缺少必要的服务模块依赖");
+        }
+
+        const downloadBitrate = settings.get('audioQuality.download');
+        const lyricFilePath = `${DIR_LYRICS}${song.id}.json`;
+        const songFilePath = `${DIR_MUSIC}${song.id}.mp3`;
+
+        const [songPlaybackInfo, lyricData] = await Promise.all([
+            api.getSongPlaybackInfo(song.id, downloadBitrate),
+            api.getLyricData(song.id)
+        ]);
+
+        if (!songPlaybackInfo?.url) {
+            throw new Error('无法获取歌曲下载链接');
+        }
+
+        const [songResult, lyricResult] = await Promise.allSettled([
+            this._downloadFile(songPlaybackInfo.url, songFilePath),
+            file.writeJson(lyricFilePath, lyricData)
+        ]);
+
+        if (songResult.status === 'rejected') {
+            throw songResult.reason;
+        }
+        if (lyricResult.status === 'rejected') {
+            console.warn(`歌曲 ${song.name} 的歌词保存失败:`, lyricResult.reason.message);
+        }
+
+        return {
+            ...song,
+            localUri: songResult.value,
+            localLyricUri: lyricData && lyricResult.status === 'fulfilled' ? lyricFilePath : null,
+            duration: songPlaybackInfo.duration
+        };
+    },
+
+    /**
+     * 【内部】使用原生 request.download 下载文件。
+     */
+    _downloadFile(url, destinationUri) {
+        return new Promise((resolve, reject) => {
+            request.download({
+                url: url,
+                filename: destinationUri.replace('internal://files/', ''),
+                success: (task) => {
+                    task.on('complete', (data) => resolve(data.uri));
+                    task.on('fail', (data, code) => reject({ message: `下载过程中失败, code: ${code}` }));
+                },
+                fail: (err, code) => reject({ message: `无法开始下载, code: ${code}` })
+            });
+        });
+    },
+    
+    getQueue() {
+        return [...this.queue];
+    },
+
+    getCurrentTask() {
+        return this.currentTask;
+    },
+
+    clearQueue() {
+        this.queue = [];
+        console.log('下载队列已清空');
     }
 };
+
+export default downloadManager;

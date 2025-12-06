@@ -67,151 +67,127 @@
 </style>
 
 <script>
-// --- script部分与上一版完全相同，功能和错误处理逻辑保持不变 ---
+// 【最终净化版，请用此版本完整替换 user.ux 的 <script> 部分】
+
 import router from '@system.router';
-import file from '@system.file';
 import prompt from '@system.prompt';
-import request from '@system.request';
-const API_USER_ACCOUNT = 'https://163api.qijieya.cn/user/account';
-const PROFILE_FILE_URI = 'internal://files/user_profile.json';
-const COOKIE_FILE_URI = 'internal://files/cookie.txt';
+
+// 辅助函数，方便地从全局获取所有需要的服务
+const getServices = () => ({
+    api: this.$app.$def.api,
+});
+
 const DEFAULT_AVATAR = '/common/icon.png';
-const AVATAR_CACHE_DIR = 'internal://files/avatars/';
-const LOCAL_AVATAR_URI = `${AVATAR_CACHE_DIR}user_avatar.png`;
+
 export default {
     private: {
+        // --- UI状态，完全由 apiService 驱动 ---
         nickname: '未登录',
         userId: '点击此处以登录',
-        avatarUrl: LOCAL_AVATAR_URI,
+        avatarUrl: DEFAULT_AVATAR,
+        
+        // --- 页面控制状态 ---
         currentTime: "00:00",
         isUpdating: false,
-        isPendingVerification: false,
     },
-    onInit( ) {
+
+    onInit() {
         this.updateTime();
         setInterval(() => this.updateTime(), 1000);
-        this.loadUserProfileFromLocal();
+        // onInit 时加载一次，确保首次进入页面有数据
+        this.loadUserProfile();
     },
-    onShow() { this.loadUserProfileFromLocal(); },
+
+    onShow() {
+        // 每次页面显示时都重新加载，以确保数据是最新
+        this.loadUserProfile();
+    },
+
     updateTime() {
         const now = new Date();
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
-    loadUserProfileFromLocal() {
-        file.readText({
-            uri: PROFILE_FILE_URI,
-            success: (data) => {
-                try {
-                    const profile = JSON.parse(data.text);
-                    if (profile && profile.status === 'pending_verification') {
-                        this.isPendingVerification = true;
-                    } else if (profile && profile.userId) {
-                        this.isPendingVerification = false;
-                        this.nickname = profile.nickname;
-                        this.userId = `ID: ${profile.userId}`;
-                        this.avatarUrl = profile.avatarUrl || DEFAULT_AVATAR;
-                    } else { this.resetToDefault(); }
-                } catch (e) { this.resetToDefault(); }
-            },
-            fail: () => { this.resetToDefault(); }
-        });
+
+    /**
+     * 【核心修正】加载用户信息，只负责调用服务和更新UI
+     */
+    async loadUserProfile() {
+        const { api } = getServices();
+        try {
+            // 【核心】调用 apiService 的一个高级方法来获取用户信息
+            // 这个方法内部会处理：是加载本地缓存，还是显示“待验证”
+            const profile = await api.getUserProfile();
+            
+            if (profile) {
+                this.nickname = profile.nickname;
+                this.userId = `ID: ${profile.userId}`;
+                // 优先使用本地缓存的头像，如果没有再用在线的，最后用默认的
+                this.avatarUrl = profile.localAvatarUri || profile.avatarUrl || DEFAULT_AVATAR;
+            } else {
+                // 如果 service 返回 null，说明未登录
+                this.resetToDefault();
+            }
+        } catch (error) {
+            // 即使加载失败，也应该显示默认状态，而不是让页面崩溃
+            console.error("加载用户信息失败:", error);
+            this.resetToDefault();
+        }
     },
+
     resetToDefault() {
-        this.isPendingVerification = false;
         this.nickname = '未登录';
         this.userId = '点击此处以登录';
         this.avatarUrl = DEFAULT_AVATAR;
     },
+
+    /**
+     * 【核心修正】处理下拉刷新或点击头像，只负责调用服务
+     */
     handleManualRefresh(e) {
+        // 如果是下拉刷新，但UI上还没渲染完，就忽略
         if (e && e.type === 'scrolltop' && !e.refreshing) return;
-        if (this.nickname === '未登录' && !this.isPendingVerification) {
+        
+        // 如果未登录，直接跳转到登录页
+        if (this.nickname === '未登录') {
             router.push({ uri: '/pages/login' });
             return;
         }
+        
         if (this.isUpdating) {
             prompt.showToast({ message: '正在刷新中...' });
             return;
         }
+        
         prompt.showToast({ message: '正在同步用户信息...' });
-        this.performNetworkRefresh(() => {
-            if (e && e.type === 'scrolltop') this.$element('userProfileScroll').finishPullToRefresh();
-        });
-    },
-    async performNetworkRefresh(onComplete) {
         this.isUpdating = true;
-        try {
-            const requestService = this.$app.$def.requestService;
-            if (!requestService) throw new Error("内部服务错误");
-            const cookie = await requestService.loadCookie();
-            if (!cookie) {
-                this.handleLogout();
-                router.push({ uri: '/pages/login' });
-                throw new Error("登录凭证丢失, 请重新登录");
-            }
-            const response = await requestService.fetch({ url: API_USER_ACCOUNT, cookie: cookie });
-            if (response.status !== 'success' || response.data?.code !== 200) {
-                if (response.data?.code === 301) {
-                    prompt.showToast({ message: "登录凭证已过期" });
-                    this.handleLogout();
-                    router.push({ uri: '/pages/login' });
+
+        const { api } = getServices();
+        
+        // 【核心】调用 apiService 的一个高级方法来强制刷新
+        api.refreshUserProfile()
+            .then(newProfile => {
+                // 刷新成功后，重新加载一次数据以更新UI
+                this.loadUserProfile();
+                prompt.showToast({ message: "用户信息已是最新" });
+            })
+            .catch(error => {
+                console.error("手动刷新失败:", error);
+                prompt.showToast({ message: error.message || "刷新失败，请检查网络" });
+                // 如果是因为凭证失效导致的刷新失败，apiService内部会处理登出
+                // 我们只需要再次加载本地信息，UI就会自动更新为“未登录”状态
+                this.loadUserProfile();
+            })
+            .finally(() => {
+                this.isUpdating = false;
+                if (e && e.type === 'scrolltop') {
+                    this.$element('userProfileScroll').finishPullToRefresh();
                 }
-                throw new Error(`刷新失败: ${response.data?.message || '请检查网络'}`);
-            }
-            const profile = response.data.profile;
-            if (!profile) throw new Error("获取信息为空");
-            const localAvatarPath = await this.downloadAndCacheAvatar(profile.avatarUrl);
-            const userProfileToSave = { userId: profile.userId, nickname: profile.nickname, avatarUrl: localAvatarPath || DEFAULT_AVATAR };
-            await this.saveProfileToFile(userProfileToSave);
-            this.loadUserProfileFromLocal();
-            prompt.showToast({ message: "用户信息已是最新" });
-        } catch (error) {
-            console.error("手动刷新失败:", error);
-            prompt.showToast({ message: error.message, duration: 3000 });
-        } finally {
-            this.isUpdating = false;
-            if (onComplete) onComplete();
-        }
-    },
-    handleLogout() {
-        file.delete({ uri: PROFILE_FILE_URI });
-        file.delete({ uri: COOKIE_FILE_URI });
-        if (this.$app.$def.cookieService) this.$app.$def.cookieService.cookie = null;
-        this.resetToDefault();
-    },
-    downloadAndCacheAvatar(remoteUrl) {
-        return new Promise((resolve) => {
-            if (!remoteUrl) { resolve(null); return; }
-            const thumbnailUrl = remoteUrl.includes('?') ? `${remoteUrl}&param=100y100` : `${remoteUrl}?param=100y100`;
-            request.download({
-                url: thumbnailUrl,
-                success: (task) => {
-                    request.onDownloadComplete({
-                        token: task.token,
-                        success: (data) => {
-                            file.delete({
-                                uri: LOCAL_AVATAR_URI,
-                                complete: () => file.move({ srcUri: data.uri, dstUri: LOCAL_AVATAR_URI, success: () => resolve(LOCAL_AVATAR_URI), fail: () => resolve(null) })
-                            });
-                        },
-                        fail: () => resolve(null)
-                    });
-                },
-                fail: () => resolve(null)
             });
-        });
     },
-    saveProfileToFile(profileData) {
-        return new Promise((resolve, reject) => {
-            file.writeText({
-                uri: PROFILE_FILE_URI, text: JSON.stringify(profileData, null, 2),
-                success: resolve,
-                fail: (data, code) => {
-                    if (code === 300) reject(new Error('更新信息失败, 请检查存储空间或重启设备'));
-                    else reject(new Error(`更新信息失败, 错误码: ${code}`));
-                },
-            });
-        });
-    },
+
+    // 【移除】performNetworkRefresh, handleLogout, downloadAndCacheAvatar, saveProfileToFile
+    // 所有这些复杂逻辑现在都由 api.js 内部处理
+
     goToSettings() { router.push({ uri: '/pages/settings' }); },
     goToStorage() { router.push({ uri: '/pages/storage' }); },
     goToAbout() { router.push({ uri: '/pages/about' }); },

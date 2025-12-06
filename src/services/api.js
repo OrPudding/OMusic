@@ -1,114 +1,193 @@
-// src/services/api.js
+// 【请用此版本完整替换您的 src/services/api.js 文件】
 
 import fetch from '@system.fetch';
 
+// 【核心修正】直接导入所有需要的服务模块
+import file from './file.js';
+
 const API_BASE = 'https://163api.qijieya.cn';
+const COOKIE_FILE_URI = 'internal://files/cookie.txt';
 
-// 内部辅助函数  ，用于构建带认证信息的URL
-function buildAuthenticatedUrl(baseUrl, cookie) {
-    if (cookie) {
-        const separator = baseUrl.includes('?') ? '&' : '?';
-        return `${baseUrl}${separator}cookie=${encodeURIComponent(cookie)}`;
-    }
-    return baseUrl;
-}
+const apiService = {
+    _globalCookie: null,
+    _isCookieLoaded: false,
 
-// 内部辅助函数，封装fetch调用
-function fetchPromise(url) {
-    return new Promise((resolve, reject) => {
-        fetch.fetch({
-            url,
-            responseType: 'text',
-            success: resolve,
-            fail: (data, code) => reject({ data, code })
-        });
-    });
-}
-
-export default {
     /**
-     * 获取在线播放的歌曲信息（URL和时长）
-     * @param {string} songId - 歌曲ID
-     * @param {number} bitrate - 音质码率 (kbps)
-     * @param {string} cookie - 用户认证Cookie
-     * @returns {Promise<object>} - 包含 url 和 duration 的对象
+     * 【内部核心】从文件加载Cookie到内存
      */
-    async getSongPlaybackInfo(songId, bitrate, cookie) {
-        const urlWithBitrate = `${API_BASE}/song/url?id=${songId}&br=${bitrate * 1000}`;
-        const finalUrl = buildAuthenticatedUrl(urlWithBitrate, cookie);
-        console.log("API: Fetching song URL:", finalUrl);
+    async _loadCookie( ) {
+        if (!file) {
+            console.error("ApiService: _loadCookie 失败，file 服务模块未导入！");
+            this._globalCookie = null;
+            this._isCookieLoaded = true;
+            return;
+        }
+        try {
+            const cookieText = await file.readText(COOKIE_FILE_URI);
+            if (cookieText && cookieText.trim().startsWith('MUSIC_U=')) {
+                this._globalCookie = cookieText.trim();
+                console.log("ApiService: 全局Cookie已从文件加载到内存。");
+            } else {
+                this._globalCookie = null;
+            }
+        } catch (error) {
+            this._globalCookie = null;
+            if (error.code !== 301) {
+                console.error("ApiService: 加载Cookie时发生异常:", error);
+            }
+        }
+        this._isCookieLoaded = true;
+    },
 
-        const response = await fetchPromise(finalUrl);
-        const songData = JSON.parse(response.data)?.data?.[0];
+    /**
+     * 【内部核心】发送网络请求
+     */
+    async _sendRequest(options) {
+        if (!this._isCookieLoaded) {
+            await this._loadCookie();
+        }
+        
+        const cookieForRequest = options.tempCookie || this._globalCookie;
+        let url = options.url;
+        if (cookieForRequest) {
+            const separator = url.includes('?') ? '&' : '?';
+            url = `${url}${separator}cookie=${encodeURIComponent(cookieForRequest)}`;
+        }
 
+        try {
+            const response = await new Promise((resolve, reject) => {
+                fetch.fetch({
+                    url,
+                    method: options.method || 'GET',
+                    responseType: 'text',
+                    success: resolve,
+                    fail: (data, code) => reject({ code, data }),
+                });
+            });
+
+            if (response.code === 200) {
+                return JSON.parse(response.data);
+            }
+            throw new Error(`网络错误, code: ${response.code}`);
+        } catch (error) {
+            console.error(`请求失败 ${options.url}:`, error);
+            throw error;
+        }
+    },
+
+    // ===================================================================
+    // =================== 对外暴露的公共方法 ============================
+    // ===================================================================
+
+    /**
+     * 【公共】初始化服务
+     */
+    async initialize() {
+        await this._loadCookie();
+        console.log("ApiService: 初始化完成。");
+    },
+
+    /**
+     * 【公共】写入Cookie到文件，并更新内存状态
+     */
+    async writeCookie(cookieString) {
+        if (!file) {
+            throw new Error("ApiService: writeCookie 失败，file 服务模块未导入！");
+        }
+        try {
+            await file.writeText(COOKIE_FILE_URI, cookieString);
+            this._globalCookie = cookieString;
+            console.log("ApiService: Cookie已成功写入文件并更新到内存。");
+        } catch (error) {
+            console.error("ApiService: 写入Cookie失败:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * 【公共】清除Cookie文件，并清空内存状态
+     */
+    async clearCookie() {
+        if (!file) {
+            throw new Error("ApiService: clearCookie 失败，file 服务模块未导入！");
+        }
+        try {
+            await file.delete(COOKIE_FILE_URI);
+            this._globalCookie = null;
+            console.log("ApiService: Cookie文件已删除，内存状态已清空。");
+        } catch (error) {
+            console.error("ApiService: 清除Cookie失败:", error);
+            throw error;
+        }
+    },
+
+    // --- API方法 (所有这些方法都保持不变，因为它们都依赖于 _sendRequest) ---
+
+    async getSongPlaybackInfo(songId, bitrate) {
+        const url = `${API_BASE}/song/url?id=${songId}&br=${bitrate * 1000}`;
+        const response = await this._sendRequest({ url });
+        const songData = response?.data?.[0];
         if (songData?.url) {
             return {
                 url: songData.url,
-                duration: Math.floor(songData.time / 1000)
+                duration: Math.floor(songData.time / 1000),
             };
-        } else {
-            throw new Error('获取播放链接失败');
         }
+        throw new Error('获取播放链接失败');
     },
 
-    /**
-     * 获取歌曲的歌词数据
-     * @param {string} songId - 歌曲ID
-     * @param {string} cookie - 用户认证Cookie
-     * @returns {Promise<object>} - 完整的歌词API返回对象
-     */
-    async getLyricData(songId, cookie) {
-        const finalUrl = buildAuthenticatedUrl(`${API_BASE}/lyric?id=${songId}`, cookie);
-        console.log("API: Fetching lyric:", finalUrl);
-
+    async getLyricData(songId) {
+        const url = `${API_BASE}/lyric?id=${songId}`;
         try {
-            const response = await fetchPromise(finalUrl);
-            return JSON.parse(response.data);
+            return await this._sendRequest({ url });
         } catch (error) {
-            console.error("API: 获取歌词失败", error);
-            return null; // 获取失败时返回null，不抛出错误
+            return null;
         }
     },
 
-    /**
-     * 获取私人FM歌曲列表
-     * @param {string} cookie - 用户认证Cookie
-     * @returns {Promise<Array>} - 格式化后的歌曲对象数组
-     */
-    async getPersonalFmSongs(cookie) {
-        const url = `${API_BASE}/personal_fm?timestamp=${new Date().getTime()}`;
-        const finalUrl = buildAuthenticatedUrl(url, cookie);
-        console.log("API: Fetching personal FM");
+    async getPlaylistDetail(playlistId) {
+        const url = `${API_BASE}/playlist/detail?id=${playlistId}`;
+        return await this._sendRequest({ url });
+    },
 
-        const response = await fetchPromise(finalUrl);
-        const fmData = JSON.parse(response.data)?.data;
+    async getPlaylistAllTracks(playlistId, limit, offset) {
+        const url = `${API_BASE}/playlist/track/all?id=${playlistId}&limit=${limit}&offset=${offset}`;
+        return await this._sendRequest({ url });
+    },
 
-        if (fmData && fmData.length > 0) {
+    async getDailyRecommendSongs() {
+        const url = `${API_BASE}/recommend/songs`;
+        const response = await this._sendRequest({ url });
+        return response?.data?.dailySongs || [];
+    },
+
+    async getPersonalFmSongs() {
+        const url = `${API_BASE}/personal_fm?timestamp=${Date.now()}`;
+        const response = await this._sendRequest({ url });
+        const fmData = response?.data;
+        if (fmData?.length > 0) {
             return fmData.map(s => ({
                 id: s.id,
                 name: s.name,
                 artists: s.artists.map(a => a.name).join(' / '),
-                // ... 其他必要字段
             }));
         }
         return [];
     },
 
-    /**
-     * 【【【新增】】】
-     * 获取歌曲的评论
-     * @param {string} songId - 歌曲ID
-     * @param {number} [limit=20] - 取出评论数量
-     * @param {number} [offset=0] - 偏移数量，用于分页
-     * @returns {Promise<object>} - 包含热门评论和最新评论的对象
-     */
+    async getUserDetail(uid) {
+        const url = `${API_BASE}/user/detail?uid=${uid}`;
+        const response = await this._sendRequest({ url });
+        if (response?.code !== 200) {
+            throw new Error(response?.msg || '获取用户信息失败');
+        }
+        return response.profile;
+    },
+    
     async getSongComments(songId, limit = 20, offset = 0) {
         const url = `${API_BASE}/comment/music?id=${songId}&limit=${limit}&offset=${offset}`;
-        console.log("API: Fetching song comments:", url);
         try {
-            const response = await fetchPromise(url);
-            const commentData = JSON.parse(response.data);
-            // 成功时，返回一个包含热门和最新评论的结构化对象
+            const commentData = await this._sendRequest({ url });
             if (commentData.code === 200) {
                 return {
                     hotComments: commentData.hotComments || [],
@@ -116,38 +195,24 @@ export default {
                     total: commentData.total || 0
                 };
             }
-            // 如果API返回错误码，则抛出错误
             throw new Error(`API返回错误码: ${commentData.code}`);
         } catch (error) {
-            console.error("API: 获取歌曲评论失败", error);
-            // 统一返回一个空的结构，防止页面因null或undefined而出错
             return { hotComments: [], comments: [], total: 0 };
         }
     },
 
-    /**
-     * 【【【新增】】】
-     * 获取楼层评论 (某条评论的回复)
-     * @param {string} parentCommentId - 楼层评论ID
-     * @param {string} resourceId - 资源ID (这里是歌曲ID)
-     * @param {number} [limit=20] - 取出评论数量
-     * @returns {Promise<object>} - 包含楼层评论数据的对象
-     */
     async getFloorComments(parentCommentId, resourceId, limit = 20) {
-        // 根据API文档，歌曲的 type 固定为 0
-        const resourceType = 0;
-        const url = `${API_BASE}/comment/floor?parentCommentId=${parentCommentId}&id=${resourceId}&type=${resourceType}&limit=${limit}`;
-        console.log("API: Fetching floor comments:", url);
+        const url = `${API_BASE}/comment/floor?parentCommentId=${parentCommentId}&id=${resourceId}&type=0&limit=${limit}`;
         try {
-            const response = await fetchPromise(url);
-            const floorData = JSON.parse(response.data);
+            const floorData = await this._sendRequest({ url });
             if (floorData.code === 200) {
-                return floorData.data; // API直接返回 data 对象
+                return floorData.data;
             }
             throw new Error(`API返回错误码: ${floorData.code}`);
         } catch (error) {
-            console.error("API: 获取楼层评论失败", error);
-            return null; // 获取失败时返回null
+            return null;
         }
     }
 };
+
+export default apiService;

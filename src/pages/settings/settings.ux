@@ -425,386 +425,222 @@
 
 
 <script>
-    import router from '@system.router';
-    import file from '@system.file';
-    import prompt from '@system.prompt';
+// 【最终净化版，请用此版本完整替换 settings.ux 的 <script> 部分】
 
-    const LICENSE_FILE_URI = 'internal://files/license.json';
-    const SETTINGS_FILE_URI = 'internal://files/settings.json';
-    const PROFILE_FILE_URI = 'internal://files/user_profile.json';
-    const AVATAR_CACHE_URI = 'internal://files/avatars/user_avatar.png';
-    const COOKIE_FILE_URI = 'internal://files/cookie.txt';
-    const PLAYLIST_CACHE_DIR = 'internal://files/playlists/';
-    const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
-    const PRESETS = {
-        lyrics: { japaneseMode: ['translation', 'romaji', 'original'], cantoneseMode: ['romaji', 'original'], englishMode: ['translation', 'original'], },
-        lyricAdvanceTime: [0, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2], // 单位：秒
-        audioQuality: { online: [64, 128, 192, 320, 990], download: [64, 128, 192, 320] },
-        performance: { windowSize: [10, 20, 40], pageSize: [10, 15, 20], },
-        network: { totalLimit: [50, 200, 500], apiPageSize: [10, 20, 50], },
-        search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25], }
-    };
-	// 在 PRESETS 同级位置定义手势常量
-	const GESTURE_ACTIONS = ['none', 'lyrics', 'playlist', 'search', 'user', 'settings', 'prev', 'next'];
-const GESTURE_ACTION_TEXTS = {
-    none: '无操作',
-    lyrics: '切换歌词页', // 新增
-    playlist: '播放列表',
-    search: '搜索',
-    user: '个人中心',
-    settings: '设置',
-    prev: '上一首',
-    next: '下一首'
-};
+import router from '@system.router';
+import prompt from '@system.prompt';
 
-    export default {
-        private: {
-            currentTime: '00:00',
-            currentView: 'main',
-            viewTitles: {
-                main: '‹设置',
-                lyrics: '‹歌词显示',
-                gestures: '‹快捷手势',
-                audioQuality: '‹音质设置',
-                performance: '‹列表性能',
-                network: '‹网络与加载',
-                search: '‹搜索设置',
-                data: '‹应用数据'
-            },
-            settings: {
-                lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
-                lyricAdvanceTime: 1.8,
-                audioQuality: { online: 64, download: 128 },
-                performance: { windowSize: 30, pageSize: 15 },
-                network: { totalLimit: 200, apiPageSize: 20 },
-                search: { totalLimit: 25, apiPageSize: 10 },
-				gestures: {
-                left: 'lyrics',       // 左滑默认切换到歌词页
-                right: 'playlist',    // 右滑默认打开播放列表
-                up: 'none',       // 上滑默认打开搜索
-                down: 'none'    // 下滑默认打开个人中心
-            }
-            },
+// 辅助函数，方便地从全局获取所有需要的服务
+const getServices = () => ({
+    settings: this.$app.$def.settings,
+    api: this.$app.$def.api,
+    auth: this.$app.$def.auth,
+    file: this.$app.$def.file, // 仅用于数据清理功能
+});
+
+export default {
+    private: {
+        currentTime: '00:00',
+        currentView: 'main',
+        viewTitles: {
+            main: '‹设置',
+            lyrics: '‹歌词显示',
+            gestures: '‹快捷手势',
+            audioQuality: '‹音质设置',
+            performance: '‹列表性能',
+            network: '‹网络与加载',
+            search: '‹搜索设置',
+            data: '‹应用数据'
         },
-
-        computed: {
-            titleText() { return this.viewTitles[this.currentView] || '‹设置'; },
-            japaneseLyricModeText() { const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' }; return map[this.settings.lyrics.japaneseMode] || '未知'; },
-            cantoneseLyricModeText() { const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' }; return map[this.settings.lyrics.cantoneseMode] || '未知'; },
-            englishLyricModeText() { const map = { 'translation': '显示翻译', 'original': '仅显示原文' }; return map[this.settings.lyrics.englishMode] || '未知'; },
-        // 新增计算属性，用于显示手势中文文本
-			gestureLeftText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.left] || '未知'; },
-        gestureRightText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.right] || '未知'; },
-        gestureUpText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.up] || '未知'; },
-        gestureDownText() { return GESTURE_ACTION_TEXTS[this.settings.gestures.down] || '未知'; }
+        // 【核心修正】settings 对象现在完全由 service 驱动
+        settings: {},
+        // 【核心修正】PRESETS 和 TEXTS 也从 service 获取
+        PRESETS: {},
+        TEXTS: {},
     },
 
-        onInit() {
-            this.updateTime();
-            setInterval(() => this.updateTime(), 1000);
-            this.loadSettings();
+    computed: {
+        titleText() { return this.viewTitles[this.currentView] || '‹设置'; },
+        
+        // 【核心修正】所有计算属性都从 this.settings 和 this.TEXTS 中读取
+        japaneseLyricModeText() {
+            const key = this.settings.lyrics?.japaneseMode;
+            return this.TEXTS.lyrics?.japaneseMode?.[key] || '未知';
         },
+        cantoneseLyricModeText() {
+            const key = this.settings.lyrics?.cantoneseMode;
+            return this.TEXTS.lyrics?.cantoneseMode?.[key] || '未知';
+        },
+        englishLyricModeText() {
+            const key = this.settings.lyrics?.englishMode;
+            return this.TEXTS.lyrics?.englishMode?.[key] || '未知';
+        },
+        gestureLeftText() {
+            const key = this.settings.gestures?.left;
+            return this.TEXTS.gestures?.[key] || '未知';
+        },
+        gestureRightText() {
+            const key = this.settings.gestures?.right;
+            return this.TEXTS.gestures?.[key] || '未知';
+        },
+        gestureUpText() {
+            const key = this.settings.gestures?.up;
+            return this.TEXTS.gestures?.[key] || '未知';
+        },
+        gestureDownText() {
+            const key = this.settings.gestures?.down;
+            return this.TEXTS.gestures?.[key] || '未知';
+        }
+    },
 
-        navigateTo(viewName) {
-            this.currentView = viewName;
+    onInit() {
+        this.updateTime();
+        setInterval(() => this.updateTime(), 1000);
+        
+        // 【核心修正】从 service 加载所有需要的数据
+        const { settings } = getServices();
+        this.settings = settings.getAll();
+        this.PRESETS = settings.PRESETS;
+        this.TEXTS = settings.TEXTS;
+    },
+
+    navigateTo(viewName) {
+        this.currentView = viewName;
+        this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
+    },
+
+    goBack() {
+        if (this.currentView !== 'main') {
+            this.currentView = 'main';
             this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
-        },
+        } else {
+            router.back();
+        }
+    },
 
-        goBack() {
-            if (this.currentView !== 'main') {
-                this.currentView = 'main';
-                this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
-            } else {
-                router.back();
-            }
-        },
+    updateTime() {
+        const now = new Date();
+        this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    },
 
-        updateTime() { const now = new Date(); this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`; },
-    // 【修正】统一加载逻辑，与 player.js 保持一致
-    loadSettings() {
-        file.readText({
-            uri: SETTINGS_FILE_URI,
-            success: (data) => {
+    // 【移除】loadSettings, saveSettings, _toggleSetting
+    // 所有这些逻辑现在都由 settingsService 内部处理
+
+    // 【核心修正】所有 toggle 函数都调用 service 的方法
+    toggleSetting(path) {
+        const { settings } = getServices();
+        settings.toggle(path);
+        // 更新本地状态以立即响应UI
+        this.settings = settings.getAll();
+    },
+    
+    // 【调用方式修正】
+    toggleLyricAdvanceTime() { this.toggleSetting('lyricAdvanceTime'); },
+    toggleJapaneseLyricMode() { this.toggleSetting('lyrics.japaneseMode'); },
+    toggleCantoneseLyricMode() { this.toggleSetting('lyrics.cantoneseMode'); },
+    toggleEnglishLyricMode() { this.toggleSetting('lyrics.englishMode'); },
+    toggleGesture(direction) { this.toggleSetting(`gestures.${direction}`); },
+    toggleOnlineQuality() { this.toggleSetting('audioQuality.online'); },
+    toggleDownloadQuality() { this.toggleSetting('audioQuality.download'); },
+    toggleWindowSize() { this.toggleSetting('performance.windowSize'); },
+    togglePageSize() { this.toggleSetting('performance.pageSize'); },
+    toggleTotalLimit() { this.toggleSetting('network.totalLimit'); },
+    toggleApiPageSize() { this.toggleSetting('network.apiPageSize'); },
+    toggleSearchTotalLimit() { this.toggleSetting('search.totalLimit'); },
+    toggleSearchApiPageSize() { this.toggleSetting('search.apiPageSize'); },
+
+    // ===================================================================
+    // =================== 数据清理逻辑 (调用服务) =======================
+    // ===================================================================
+
+    handleClearCache() {
+        prompt.showDialog({
+            title: "清除缓存",
+            message: "您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息。",
+            buttons: [{ text: "取消" }, { text: "确定", color: "#007AFF" }],
+            success: async () => {
+                prompt.showToast({ message: "正在清除缓存..." });
+                const { file } = getServices();
                 try {
-                    const loadedSettings = JSON.parse(data.text);
-                    // 使用与 player.js 相同的健壮合并逻辑
-                    this.settings = {
-                        ...this.settings,
-                        ...loadedSettings,
-                        lyrics: { ...this.settings.lyrics, ...(loadedSettings.lyrics || {}) },
-						gestures: { ...this.settings.gestures, ...(loadedSettings.gestures || {}) }, // 合并 gestures
-                        audioQuality: { ...this.settings.audioQuality, ...(loadedSettings.audioQuality || {}) },
-                        performance: { ...this.settings.performance, ...(loadedSettings.performance || {}) },
-                        network: { ...this.settings.network, ...(loadedSettings.network || {}) },
-                        search: { ...this.settings.search, ...(loadedSettings.search || {}) },
-                    };
-                } catch (e) {
-                    // 如果解析失败，用当前的默认设置保存一次，以修复文件
-                    this.saveSettings();
+                    // 【核心修正】调用 fileService 的方法
+                    await file.rmdir('internal://files/avatars/', true);
+                    await file.rmdir('internal://files/playlists/', true);
+                    await file.rmdir('internal://files/user_playlists/', true);
+                    prompt.showToast({ message: "缓存已清除" });
+                } catch (error) {
+                    console.error("清除缓存失败:", error);
+                    prompt.showToast({ message: "部分缓存清除失败，可能缓存不存在" });
                 }
             },
-            fail: () => {
-                // 如果文件不存在，用当前的默认设置创建它
-                this.saveSettings();
-            }
         });
     },
 
-    saveSettings() {
-        file.writeText({
-            uri: SETTINGS_FILE_URI,
-            text: JSON.stringify(this.settings, null, 2)
+    handleLogout() {
+        prompt.showDialog({
+            title: "退出登录",
+            message: "您确定要退出登录吗？这将清除您的本地用户数据。",
+            buttons: [{ text: "取消" }, { text: "确定", color: "#FF453A" }],
+            success: async () => {
+                prompt.showToast({ message: "正在退出..." });
+                const { api } = getServices();
+                try {
+                    // 【核心修正】调用 apiService 的 logout 方法
+                    await api.logout();
+                    prompt.showToast({ message: "已退出登录" });
+                    router.replace({ uri: "/pages/user" });
+                } catch (error) {
+                    console.error("退出登录失败:", error);
+                    prompt.showToast({ message: "退出登录失败，请重试" });
+                }
+            },
         });
     },
 
-    // 【【【核心重构】】】
-    // 一个通用的设置切换函数
-    _toggleSetting(category, key, presets) {
-        let targetObject;
-        let currentValue;
-
-        // 智能判断目标对象：
-        // 如果 key 为 null，说明是顶层属性 (如 lyricAdvanceTime)
-        // 否则是嵌套属性 (如 lyrics.japaneseMode)
-        if (key === null) {
-            targetObject = this.settings;
-            currentValue = targetObject[category];
-        } else {
-            targetObject = this.settings[category];
-            currentValue = targetObject[key];
-        }
-
-        const currentIndex = presets.indexOf(currentValue);
-        const nextIndex = (currentIndex + 1) % presets.length;
-        const nextValue = presets[nextIndex];
-
-        // 智能更新值
-        if (key === null) {
-            targetObject[category] = nextValue;
-        } else {
-            targetObject[key] = nextValue;
-        }
-
-        // 保存所有更改
-        this.saveSettings();
+    handleClearActivation() {
+        prompt.showDialog({
+            title: "清除授权",
+            message: "您确定要清除本地授权信息吗？清除后需要重新联网激活应用。",
+            buttons: [{ text: "取消" }, { text: "确定", color: "#FF9500" }],
+            success: async () => {
+                prompt.showToast({ message: "正在清除授权..." });
+                const { auth } = getServices();
+                try {
+                    // 【核心修正】调用 authService 的方法
+                    await auth.clearLicense();
+                    prompt.showToast({ message: "授权已清除，请重新启动应用" });
+                    router.replace({ uri: "/pages/splash" });
+                } catch (error) {
+                    console.error("清除授权失败:", error);
+                    prompt.showToast({ message: "清除授权失败，请重试" });
+                }
+            },
+        });
     },
 
-    // 【调用方式修正】
-    // 调用 _toggleSetting 时，顶层属性的 key 传入 null
-    toggleLyricAdvanceTime() {
-        this._toggleSetting('lyricAdvanceTime', null, PRESETS.lyricAdvanceTime);
+    handleClearAllData() {
+        prompt.showDialog({
+            title: "清空所有数据",
+            message: "【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？",
+            buttons: [{ text: "取消" }, { text: "确定清空", color: "#FF453A" }],
+            success: async () => {
+                prompt.showToast({ message: "正在清空所有数据..." });
+                const { file, auth } = getServices();
+                try {
+                    // 【核心修正】调用 fileService 的方法
+                    await file.rmdir('internal://files/', true);
+                    // 手动重置 auth 服务的状态
+                    auth.reset();
+                    prompt.showToast({ message: "所有数据已清空，请重启应用" });
+                    router.replace({ uri: "/pages/splash" });
+                } catch (error) {
+                    console.error("清空所有数据失败:", error);
+
+                    prompt.showToast({ message: `清空数据失败` });
+                }
+            },
+        });
     },
-        
-        // 其他调用方式保持不变
-        toggleJapaneseLyricMode() { this._toggleSetting('lyrics', 'japaneseMode', PRESETS.lyrics.japaneseMode); },
-        toggleCantoneseLyricMode() { this._toggleSetting('lyrics', 'cantoneseMode', PRESETS.lyrics.cantoneseMode); },
-        toggleEnglishLyricMode() { this._toggleSetting('lyrics', 'englishMode', PRESETS.lyrics.englishMode); },
-		    // 【【【新增方法】】】
-    // 切换手势设置
-    toggleGesture(direction) { // direction: 'left', 'up', 'down'
-        const currentAction = this.settings.gestures[direction];
-        const currentIndex = GESTURE_ACTIONS.indexOf(currentAction);
-        const nextIndex = (currentIndex + 1) % GESTURE_ACTIONS.length;
-        
-        this.settings.gestures[direction] = GESTURE_ACTIONS[nextIndex];
-        
-        this.saveSettings();
-    },
-        toggleOnlineQuality() { this._toggleSetting('audioQuality', 'online', PRESETS.audioQuality.online); },
-        toggleDownloadQuality() { this._toggleSetting('audioQuality', 'download', PRESETS.audioQuality.download); },
-        toggleWindowSize() { this._toggleSetting('performance', 'windowSize', PRESETS.performance.windowSize); },
-        togglePageSize() { this._toggleSetting('performance', 'pageSize', PRESETS.performance.pageSize); },
-        toggleTotalLimit() { this._toggleSetting('network', 'totalLimit', PRESETS.network.totalLimit); },
-        toggleApiPageSize() { this._toggleSetting('network', 'apiPageSize', PRESETS.network.apiPageSize); },
-        toggleSearchTotalLimit() { this._toggleSetting('search', 'totalLimit', PRESETS.search.totalLimit); },
-        toggleSearchApiPageSize() { this._toggleSetting('search', 'apiPageSize', PRESETS.search.apiPageSize); },
-	handleClearCache() {
-		prompt.showDialog({
-			title: "清除缓存",
-			message:
-				"您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像。",
-			buttons: [{ text: "取消" }, { text: "确定", color: "#007AFF" }],
-			success: () => {
-				prompt.showToast({ message: "正在清除缓存..." });
-				const itemsToClear = [
-					{ uri: AVATAR_CACHE_URI, type: "file" },
-					{ uri: PLAYLIST_CACHE_DIR, type: "dir" },
-					{ uri: USER_PLAYLISTS_DIR, type: "dir" },
-				];
-				let itemsCount = itemsToClear.length;
-				let hasFailed = false;
-				const onComplete = () => {
-					itemsCount--;
-					if (itemsCount === 0) {
-						prompt.showToast({
-							message: hasFailed
-								? "部分缓存清除失败，可能缓存不存在，这是正常的"
-								: "缓存已清除",
-						});
-					}
-				};
-				const onFail = (uri, code) => {
-					hasFailed = true;
-					console.error(`清除 ${uri} 失败, code=${code}`);
-				};
-				itemsToClear.forEach((item) => {
-					if (item.type === "file") {
-						file.delete({
-							uri: item.uri,
-							complete: onComplete,
-							fail: (data, code) => onFail(item.uri, code),
-						});
-					} else if (item.type === "dir") {
-						file.rmdir({
-							uri: item.uri,
-							recursive: true,
-							complete: onComplete,
-							fail: (data, code) => onFail(item.uri, code),
-						});
-					}
-				});
-			},
-			cancel: () => {
-				prompt.showToast({ message: "操作已取消" });
-			},
-		});
-	},
-	handleLogout() {
-		prompt.showDialog({
-			title: "退出登录",
-			message: "您确定要退出登录吗？这将清除您的本地用户数据。",
-			buttons: [{ text: "取消" }, { text: "确定", color: "#FF453A" }],
-			success: () => {
-				prompt.showToast({ message: "正在退出..." });
-				const filesToDelete = [
-					PROFILE_FILE_URI,
-					AVATAR_CACHE_URI,
-					COOKIE_FILE_URI,
-				];
-				let deleteCount = filesToDelete.length;
-				const onComplete = () => {
-					deleteCount--;
-					if (deleteCount === 0) {
-						prompt.showToast({ message: "已退出登录" });
-						router.replace({ uri: "/pages/user" });
-					}
-				};
-				filesToDelete.forEach((uri) => {
-					file.delete({ uri: uri, complete: onComplete });
-				});
-			},
-			cancel: () => {
-				prompt.showToast({ message: "操作已取消" });
-			},
-		});
-	},
-	handleClearActivation() {
-		prompt.showDialog({
-			title: "清除授权",
-			message: "您确定要清除本地授权信息吗？清除后需要重新联网激活应用。",
-			buttons: [{ text: "取消" }, { text: "确定", color: "#FF9500" }],
-			success: () => {
-				prompt.showToast({ message: "正在清除授权..." });
-				file.delete({
-					uri: LICENSE_FILE_URI,
-					complete: () => {
-						if (this.$app.$def) {
-							this.$app.$def.isActivated = false;
-						}
-						prompt.showToast({ message: "授权已清除，请重新启动应用" });
-						router.replace({ uri: "/pages/splash" });
-					},
-				});
-			},
-			cancel: () => {
-				prompt.showToast({ message: "操作已取消" });
-			},
-		});
-	},
-	handleClearAllData() {
-		prompt.showDialog({
-			title: "清空所有数据",
-			message:
-				"【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？",
-			buttons: [{ text: "取消" }, { text: "确定清空", color: "#FF453A" }],
-			success: () => {
-				prompt.showToast({ message: "正在清空所有数据..." });
-				this.ClearAllData({
-					success: () => {
-						if (this.$app.$def) {
-							this.$app.$def.isActivated = false;
-							if (this.$app.$def.cookieService) {
-								this.$app.$def.cookieService.cookie = null;
-							}
-						}
-						prompt.showToast({ message: "所有数据已清空，请重启应用" });
-						router.replace({ uri: "/pages/splash" });
-					},
-					fail: (data, code) => {
-						prompt.showToast({ message: `清空数据失败，错误码: ${code}` });
-					},
-				});
-			},
-			cancel: () => {
-				prompt.showToast({ message: "操作已取消" });
-			},
-		});
-	},
-	ClearAllData({ success, fail, complete }) {
-		const baseUri = "internal://files/";
-		file.list({
-			uri: baseUri,
-			success: (data) => {
-				const fileList = data.fileList;
-				if (fileList.length === 0) {
-					if (success) success();
-					if (complete) complete();
-					return;
-				}
-				let itemsToDelete = fileList.length;
-				let hasFailed = false;
-				const checkCompletion = () => {
-					itemsToDelete--;
-					if (itemsToDelete === 0 && !hasFailed) {
-						if (success) success();
-						if (complete) complete();
-					}
-				};
-				const failOnce = (errData, errCode, itemUri) => {
-					if (!hasFailed) {
-						hasFailed = true;
-						console.error(`删除 ${itemUri} 失败, code=${errCode}。`);
-						if (fail) fail(errData, errCode);
-						if (complete) complete();
-					}
-				};
-				fileList.forEach((item) => {
-					if (hasFailed) return;
-					if (item.uri.endsWith("/")) {
-						file.rmdir({
-							uri: item.uri,
-							recursive: true,
-							success: () => {
-								checkCompletion();
-							},
-							fail: (d, c) => failOnce(d, c, item.uri),
-						});
-					} else {
-						file.delete({
-							uri: item.uri,
-							success: () => {
-								checkCompletion();
-							},
-							fail: (d, c) => failOnce(d, c, item.uri),
-						});
-					}
-				});
-			},
-			fail: (data, code) => {
-				if (fail) fail(data, code);
-				if (complete) complete();
-			},
-		});
-	},
+    
+    // 【移除】ClearAllData 方法，逻辑已简化并内联到 handleClearAllData 中
 };
 </script>
