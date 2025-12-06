@@ -54,7 +54,7 @@
   ],
   "config": {
     "logLevel": "log",
-    "designWidth": "432",
+    "designWidth": "device-width",
     "background": {
       "features": [
         "system.audio",

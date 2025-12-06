@@ -152,10 +152,19 @@ import brightness from "@system.brightness";
 
 const fileService = {
     _promisify(fn, options) {
-        return new Promise((resolve, reject) => {
-            fn({ ...options, success: resolve, fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)) });
+    return new Promise((resolve, reject) => {
+        fn({
+            ...options,
+            success: resolve,
+            fail: (data, code) => {
+                const err = new Error(`Error code ${code}: ${data}`);
+                err.code = code;
+                reject(err);
+            }
         });
-    },
+    });
+},
+
     async readJson(uri, defaultValue = null) {
         try {
             const data = await this._promisify(file.readText, { uri });
@@ -356,66 +365,69 @@ export default {
 
     retryLoad: function() { this.loadData(); },
 
-    /**
-     * 【【【核心重构】】】
-     * 恢复 async/await 风格，但在循环内部 await，实现串行请求，避免 OOM
-     */
     async _getSourceData_songlist(forceAll = false) {
-        if (!this.songlistId) throw new Error("未提供歌单ID");
-        
-        const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
-        if (!forceAll) {
-            const cachedList = await fileService.readJson(cacheFileUri);
-            if (cachedList && Object.keys(cachedList).length > 0) {
-                this.didLoadFromCache = true;
-                return cachedList;
-            }
-        }
+    if (!this.songlistId) throw new Error("未提供歌单ID");
 
-        this.isFetchingFromNetwork = true;
-        const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误");
+    const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
 
-        const detailUrl = `https://163api.qijieya.cn/playlist/detail?id=${this.songlistId}`;
-        let detailResponse;
-        try {
-            detailResponse = await request.fetch({ url: detailUrl } );
-        } catch (e) {
-            throw new Error("无法获取歌单详情");
+    // 1. 读取缓存 (含cover，不重复请求)
+    if (!forceAll) {
+        const cachedList = await fileService.readJson(cacheFileUri, null);
+        if (Array.isArray(cachedList) && cachedList.length > 0) {
+            console.log('[songlist] 使用缓存歌单，长度 =', cachedList.length);
+            this.didLoadFromCache = true;
+            this.totalTrackCount = cachedList.length;
+            return cachedList;
         }
-        
-        this.totalTrackCount = detailResponse.data?.playlist?.trackCount || 0;
-        if (this.totalTrackCount === 0) return [];
+    }
 
-        let offset = 0;
-        let networkSongs = [];
-        this.networkSongsCount = 0;
-        this.networkLoadProgress = 0;
+    // 2. 请求 detail 但只用于 tracks → 映射轻量对象版本
+    const request = this.$app.$def.requestService;
+    if (!request) throw new Error("内部服务错误");
 
-        while (networkSongs.length < this.totalTrackCount && networkSongs.length < this.TOTAL_LIMIT) {
-            const url = `https://163api.qijieya.cn/playlist/track/all?id=${this.songlistId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
-            try {
-                // 【【【核心】】】在循环内部 await ，保证串行
-                const response = await request.fetch({ url });
-                const songs = response.data?.songs;
-                if (songs && songs.length > 0) {
-                    networkSongs.push(...songs.map(s => ({ id: s.id, name: s.name, artists: s.ar.map(a => a.name).join(' / ') })));
-                    offset += songs.length;
-                    this.networkSongsCount = networkSongs.length;
-                    this.networkLoadProgress = Math.round((this.networkSongsCount / this.totalTrackCount) * 100);
-                } else {
-                    break;
-                }
-            } catch (error) {
-                throw new Error("网络请求中断");
-            }
-        }
-        
-        if (networkSongs.length > 0) {
-            await fileService.writeJson(cacheFileUri, networkSongs);
-        }
-        return networkSongs;
-    },
+    console.log('[songlist] 请求歌单详情 /playlist/detail, id =', this.songlistId);
+
+    let detailResponse;
+    try {
+        detailResponse = await request.fetch({
+            url: `https://163api.qijieya.cn/playlist/detail?id=${this.songlistId}`
+        });
+    } catch (e) {
+        console.error('[songlist] 详情获取失败', e);
+        throw new Error("获取歌单失败");
+    }
+
+    const playlist = detailResponse.data?.playlist;
+    const tracks = playlist?.tracks;
+
+    if (!Array.isArray(tracks) || tracks.length === 0) {
+        console.warn('[songlist] 歌单无数据');
+        return [];
+    }
+
+    // ⚠ 内存关键优化：逐条映射到轻量对象并释放原 tracks 项
+    const songs = [];
+    for (let i = 0; i < tracks.length; i++) {
+        const s = tracks[i];
+        songs.push({
+            id: s.id,
+            name: s.name,
+            artists: (s.ar || s.artists)?.map(a => a.name).join(' / ') || '',
+            cover: s.al?.picUrl || ""       // ← 你要保留的
+        });
+        tracks[i] = null;                  // ← 立即丢掉大对象，降低峰值内存
+    }
+
+    playlist.tracks = null; // ← 彻底释放原始大数组引用
+
+    this.totalTrackCount = songs.length;
+    console.log('[songlist] 一次加载完成，歌曲数量 =', songs.length);
+
+    // 3. 写缓存（轻量对象，已无大字段，安全）
+    await fileService.writeJson(cacheFileUri, songs);
+
+    return songs;
+},
 
     async _getSourceData_dailyRecommend() {
         const request = this.$app.$def.requestService;
