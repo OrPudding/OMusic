@@ -113,7 +113,8 @@ export default {
           try {
               const songId = String(this.currentSong.id);
               const favorites = await file.readJson(this.FAVORITES_FILE_URI, {});
-              this.isFavorited = Boolean(favorites && favorites[songId]);
+              const favoritesMap = favorites && typeof favorites === 'object' ? favorites : {};
+              this.isFavorited = Boolean(favoritesMap[songId]);
           } catch (error) {
               prompt.showToast({ message: '获取收藏状态失败' });
           }
@@ -122,9 +123,13 @@ export default {
           try {
               const songId = String(this.currentSong.id);
               const downloadedMap = await file.readJson(this.DOWNLOADED_FILE_URI, {});
-              const isDownloaded = Boolean(downloadedMap && downloadedMap[songId]);
-              const isQueued = (typeof download.getQueue === 'function' && download.getQueue().some(task => task.id === this.currentSong.id))
-                  || (typeof download.getCurrentTask === 'function' && download.getCurrentTask().id === this.currentSong.id);
+              const downloadedMapSafe = downloadedMap && typeof downloadedMap === 'object' ? downloadedMap : {};
+              const isDownloaded = Boolean(downloadedMapSafe[songId]);
+
+              const queueTasks = typeof download.getQueue === 'function' ? download.getQueue() : [];
+              const currentTask = typeof download.getCurrentTask === 'function' ? download.getCurrentTask() : null;
+              const isQueued = Array.isArray(queueTasks) && queueTasks.some(task => task && task.id === this.currentSong.id)
+                  || (currentTask && currentTask.id === this.currentSong.id);
 
               if (isDownloaded) {
                   this.downloadState = 'downloaded';
@@ -160,20 +165,21 @@ export default {
           try {
               const songId = String(this.currentSong.id);
               const favorites = await file.readJson(this.FAVORITES_FILE_URI, {});
-              const exists = Boolean(favorites && favorites[songId]);
+              const favoritesMap = favorites && typeof favorites === 'object' ? favorites : {};
+              const exists = Boolean(favoritesMap[songId]);
 
               if (exists) {
                   await file.deleteFromJson(this.FAVORITES_FILE_URI, songId);
                   this.isFavorited = false;
                   prompt.showToast({ message: '已取消收藏' });
               } else {
-                  favorites[songId] = {
+                  favoritesMap[songId] = {
                       id: this.currentSong.id,
                       name: this.currentSong.name,
                       artists: this.currentSong.artists,
                       duration: this.currentSong.duration || 0,
                   };
-                  await file.writeJson(this.FAVORITES_FILE_URI, favorites);
+                  await file.writeJson(this.FAVORITES_FILE_URI, favoritesMap);
                   this.isFavorited = true;
                   prompt.showToast({ message: '已收藏' });
               }
@@ -201,14 +207,20 @@ export default {
             return;
         }
           // 【核心】调用 downloadService 的方法来添加任务，并同步状态
+          if (typeof download.addTask !== 'function') {
+              prompt.showToast({ message: '下载服务不可用' });
+              return;
+          }
+
           download.addTask(this.currentSong, {
               onStart: () => { this.downloadState = 'downloading'; },
               onSuccess: async (downloadedInfo) => {
                   const { file } = this.getServices();
                   if (file) {
                       const downloadedMap = await file.readJson(this.DOWNLOADED_FILE_URI, {});
-                      downloadedMap[downloadedInfo.id] = downloadedInfo;
-                      await file.writeJson(this.DOWNLOADED_FILE_URI, downloadedMap);
+                      const downloadedMapSafe = downloadedMap && typeof downloadedMap === 'object' ? downloadedMap : {};
+                      downloadedMapSafe[downloadedInfo.id] = downloadedInfo;
+                      await file.writeJson(this.DOWNLOADED_FILE_URI, downloadedMapSafe);
                   }
                   this.downloadState = 'downloaded';
               },
