@@ -37,16 +37,27 @@ const downloadManager = {
     /**
      * 【公共】添加下载任务。
      */
-    addTask(song, callbacks) {
+    addTask(song, options = {}, callbacks = {}) {
         if (this.currentTask?.id === song.id || this.queue.some(t => t.id === song.id)) {
             prompt.showToast({ message: `已在下载队列中` });
             return;
         }
 
+        const looksLikeCallbacks = (obj) => obj && (
+            typeof obj.onStart === 'function' ||
+            typeof obj.onSuccess === 'function' ||
+            typeof obj.onError === 'function' ||
+            typeof obj.onFinish === 'function'
+        );
+
+        const normalizedOptions = looksLikeCallbacks(options) ? {} : (options || {});
+        const normalizedCallbacks = looksLikeCallbacks(options) ? (options || {}) : (callbacks || {});
+
         const task = {
             id: song.id,
             song: song,
-            callbacks: callbacks || {},
+            options: normalizedOptions,
+            callbacks: normalizedCallbacks,
             status: 'pending'
         };
 
@@ -106,13 +117,16 @@ const downloadManager = {
      * 【内部】执行单首歌曲的下载流程。
      */
     async _downloadSong(task) {
-        const { song } = task;
-        
+        const { song, options = {} } = task;
+
         if (!api || !file || !settings) {
             throw new Error("下载任务缺少必要的服务模块依赖");
         }
 
-        const downloadBitrate = settings.get('audioQuality.download');
+        const resolvedBitrate = Number.isFinite(options.downloadBitrate)
+            ? options.downloadBitrate
+            : settings.get('audioQuality.download');
+        const downloadBitrate = Number.isFinite(resolvedBitrate) ? resolvedBitrate : undefined;
         const lyricFilePath = `${DIR_LYRICS}${song.id}.json`;
         const songFilePath = `${DIR_MUSIC}${song.id}.mp3`;
 
