@@ -32,22 +32,12 @@
   import audio from "@system.audio";
   import prompt from "@system.prompt";
   
-  // 辅助函数，方便地从全局获取所有需要的服务
-  const getServices = () => ({
-      player: this.$app.$def.player,
-      download: this.$app.$def.download,
-  });
-  
-  export default {
-      private: {
-          volume: 0,
-          currentSong: null,
+export default {
+    private: {
+        volume: 0,
           isFavorited: false,
           downloadState: 'not_downloaded', // 'not_downloaded', 'downloading', 'downloaded'
-          screenShape: 'circle',
-          playMode: 0,
-          isFmMode: false,
-      },
+    },
   
       computed: {
           downloadIcon() {
@@ -74,12 +64,12 @@
           isFmMode: false,
       },
   
-      onInit() {
-          this.volume = audio.volume * 100;
-          
-          // 确保从路由正确接收到布尔值
+    async onInit() {
+        this.volume = audio.volume * 100;
+
+        // 确保从路由正确接收到布尔值
           this.isFmMode = String(this.isFmMode) === 'true';
-  
+
           try {
               if (typeof this.currentSong === 'string') {
                   this.currentSong = JSON.parse(this.currentSong);
@@ -89,32 +79,44 @@
               router.back();
               return;
           }
-  
+
           if (!this.currentSong || !this.currentSong.id) {
               prompt.showToast({ message: '歌曲信息无效' });
               router.back();
               return;
           }
-  
-          this.loadInitialState();
+
+          await this.loadInitialState();
       },
-  
-      onShow() {
-          // 弹窗页面每次显示时都应该刷新状态
-          this.loadInitialState();
-      },
+
+    async onShow() {
+        // 弹窗页面每次显示时都应该刷新状态
+        await this.loadInitialState();
+    },
   
       /**
        * 【核心修正】加载初始状态，只负责调用服务和更新UI
        */
-      async loadInitialState() {
-          const { player, download } = getServices();
-          
+    async loadInitialState() {
+        const { player, download } = this.getServices();
+        if (!player || !download) {
+            prompt.showToast({ message: '服务未初始化，请重启应用' });
+            return;
+        }
+
           // 【核心】从 playerService 获取收藏状态
-          this.isFavorited = await player.isFavorited(this.currentSong.id);
-          
+          try {
+              this.isFavorited = await player.isFavorited(this.currentSong.id);
+          } catch (error) {
+              prompt.showToast({ message: '获取收藏状态失败' });
+          }
+
           // 【核心】从 downloadService 获取下载状态
-          this.downloadState = download.getSongDownloadState(this.currentSong.id);
+          try {
+              this.downloadState = download.getSongDownloadState(this.currentSong.id);
+          } catch (error) {
+              prompt.showToast({ message: '获取下载状态失败' });
+          }
       },
   
       // 【移除】updateFavoriteStatus, updateDownloadStatus, 因为逻辑已合并到 loadInitialState
@@ -128,9 +130,13 @@
       /**
        * 【核心修正】切换收藏，只负责调用服务
        */
-      async toggleFavorite() {
-          if (!this.currentSong) return;
-          const { player } = getServices();
+    async toggleFavorite() {
+        if (!this.currentSong) return;
+        const { player } = this.getServices();
+        if (!player) {
+            prompt.showToast({ message: '播放服务未就绪' });
+            return;
+        }
           
           try {
               // 【核心】调用 playerService 的方法来处理收藏/取消收藏
@@ -145,17 +151,21 @@
       /**
        * 【核心修正】处理下载点击，只负责调用服务
        */
-      handleDownloadClick() {
-          if (this.downloadState === 'downloaded') {
-              prompt.showToast({ message: '歌曲已下载' });
-              return;
-          }
+    handleDownloadClick() {
+        if (this.downloadState === 'downloaded') {
+            prompt.showToast({ message: '歌曲已下载' });
+            return;
+        }
           if (this.downloadState === 'downloading') {
               prompt.showToast({ message: '已在下载队列中' });
               return;
           }
           
-          const { download } = getServices();
+        const { download } = this.getServices();
+        if (!download) {
+            prompt.showToast({ message: '下载服务未就绪' });
+            return;
+        }
           // 【核心】调用 downloadService 的方法来添加任务
           download.addTask(this.currentSong);
           // 更新UI状态
@@ -165,15 +175,26 @@
       /**
        * 【核心修正】处理播放模式点击，只负责调用服务
        */
-      handlePlayModeClick() {
-          const { player } = getServices();
-          // 【核心】调用 playerService 的方法来切换模式
-          player.togglePlayMode();
-          // 无需做任何操作，playerService 内部会处理提示和状态变更
-          // 为了UI即时响应，可以手动更新一下
-          this.playMode = player.getPlayMode();
-          this.isFmMode = player.isFmMode();
-      },
+    handlePlayModeClick() {
+        const { player } = this.getServices();
+        if (!player) {
+            prompt.showToast({ message: '播放服务未就绪' });
+            return;
+        }
+        // 【核心】调用 playerService 的方法来切换模式
+        player.togglePlayMode();
+        // 无需做任何操作，playerService 内部会处理提示和状态变更
+        // 为了UI即时响应，可以手动更新一下
+        this.playMode = player.getPlayMode();
+        this.isFmMode = player.isFmMode();
+    },
+
+    getServices() {
+        return {
+            player: this.$app.$def.player,
+            download: this.$app.$def.download,
+        };
+    },
   
       goBack() {
           router.back();
