@@ -25,36 +25,58 @@
     <div elif="{{ verificationState === 'verifying' }}" class="verifying-content">
         <image class="logo" src="/common/icon.png"></image>
         <text class="app-name">OMusic</text>
-        <text class="status-text">v2.0</text>
+        <text class="status-text">{{ $app.$def.APP_VERSION }}</text>
+        <text class="status-text" if="{{ $app.$def.IS_DEBUG_BUILD }}">测试版本，不代表最终品质</text>
     </div>
 
-    <!-- 状态二：验证失败，显示最终优化后的引导页 -->
-    <div elif="{{ verificationState === 'failed' }}" class="activation-content">
-        <scroll class="splash-container" scroll-y="true" bounces="true">
-            <div class="header" onclick="back">
-                <text class="time-display">{{ currentTime }}</text>
-                <text class="title">‹软件激活</text>
-            </div>
-            <div class="info-capsule">
-                <text class="capsule-title">第一步：扫码购买</text>
-                <qrcode value="{{ afdianPurchaseUrl }}" class="qrcode-component-large"></qrcode>
-                <text class="capsule-tip">请用手机扫码，打开爱发电页面</text>
-            </div>
-            <div class="info-capsule">
-                <text class="capsule-title">第二步：扫码复制ID并备注</text>
-                    <qrcode value="{{ deviceId }}" class="qrcode-component-small"></qrcode>
-                        <text class="capsule-tip">购买时，扫码复制上方ID并填入订单备注</text>
-            </div>
-            <text class="post-purchase-button" onclick="retryActivation">我已完成购买，开始验证</text>
-            <text class="debug-button" onclick="handleClearAllCache">清除所有缓存并重置</text>
-        </scroll>
-    </div>
+<!-- 状态二：验证失败，显示最终优化后的引导页 -->
+<div elif="{{ verificationState === 'failed' }}" class="activation-content">
+    <scroll class="splash-container" scroll-y="true" bounces="true">
+        <div class="header" onclick="back">
+            <text class="time-display">{{ currentTime }}</text>
+            <text class="title">‹软件激活</text>
+        </div>
+        <div class="info-capsule">
+            <text class="capsule-title">扫码购买</text>
+            <qrcode value="{{ afdianPurchaseUrl }}" class="qrcode-component-large"></qrcode>
+            <text class="capsule-tip">请用手机扫码，打开爱发电页面，设备ID已自动填入备注</text>
+        </div>
+        <text class="post-purchase-button" onclick="retryActivation">我已完成购买，开始验证</text>
+        <text class="debug-button" onclick="handleClearAllCache">清除所有缓存并重置</text>
+    </scroll>
 </div>
+<!-- ===================================================================
+ 新增状态四：Debug 测试版白名单拦截（遵循现有激活页规范）
+ =================================================================== -->
+ <div elif="{{ verificationState === 'debugGate' }}" class="activation-content">
+    <scroll class="splash-container" scroll-y="true" bounces="true">
+      <div class="header" onclick="back">
+        <text class="time-display">{{ currentTime }}</text>
+        <text class="title">‹测试版验证</text>
+      </div>
+  
+      <div class="info-capsule">
+        <text class="capsule-title">当前为 Debug 测试版</text>
+        <text class="capsule-tip">
+          仅限白名单测试设备使用，请扫码复制设备ID并发送给开发者开通。
+        </text>
+      </div>
+  
+      <div class="info-capsule">
+        <text class="capsule-title">设备唯一ID</text>
+        <qrcode value="{{ deviceId }}" class="qrcode-component-large"></qrcode>
+        <text class="capsule-tip">扫码复制上方ID</text>
+      </div>
+  
+      <text class="post-purchase-button" onclick="exitApp">退出应用</text>
+    </scroll>
+  </div>
+  
 </template>
 <style>
     /* --- 基础容器样式 --- */
     .splash-container { width: 100%; height: 100%; flex-direction: column; align-items: center; background-color: black; padding: 20px 0 60px 0; }
-    .verifying-content { background-image:"/common/hello.png";background-size:466px 466px;width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center;}
+    .verifying-content { background-image:url("/common/hello.png");background-size:466px 466px;width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center;}
     .logo { width: 144px; height: 144px; }
     .app-name { font-size: 48px; font-weight: bold; color: #DEE0FF; margin-top: 20px; }
     .status-text { font-size: 24px; color: rgba(255, 255, 255, 0.6);}
@@ -68,7 +90,7 @@
     .capsule-tip { font-size: 20px; color: rgba(255, 255, 255, 0.7); text-align: center; }
     
     /* --- 二维码样式 --- */
-    .qrcode-component-large { width: 220px; height: 220px; background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+    .qrcode-component-large { width: 360px; height: 360px; background-color: #ffffff; padding: 5px; margin-bottom: 15px; }
     .qrcode-component-small { width: 220px; height: 220px; background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 15px;}
     
     .device-id-display { width: 100%; flex-direction: column; align-items: center; justify-content: center; margin-top: 10px; }
@@ -88,6 +110,7 @@
     .eula-button-agree { background-color: #555; color: #999; /* 未激活状态 */ }
     .eula-button-agree-active { background-color: #BAC3FF; color: #000; /* 激活状态 */ }
     .eula-tip { font-size: 18px; color: rgba(255, 255, 255, 0.5); }
+
   
     @media screen and (shape: rect) {
         .header { padding-top: 10px; flex-direction: row-reverse; justify-content:space-around; }
@@ -95,7 +118,7 @@
 		font-size: 32px;
 		padding-top: 0px;
 	}
-        .verifying-content { background-image:"/common/hello-rect.png";background-size:432px 514px;}
+        .verifying-content { background-image:url("/common/hello-rect.png");background-size:432px 514px;}
         .debug-button { margin-bottom: 20px; }
     }
     @media screen and (shape: circle) {
@@ -154,22 +177,27 @@
         },
 
         onInit() {
-            this.initializeDataFiles(() => {
-        console.log("Splash.onInit: 初始化 Splash 页面。");
-        this.updateTime();
-        setInterval(() => { this.updateTime(); }, 1000);
-        setTimeout(() => {
-            if (this.$app.$def.isActivated) {
-                                router.replace({ uri: '/pages/player' });
-                            }
-                            else {
-                                        
-        // 核心流程修改：先检查 EULA，再决定后续流程
+  this.initializeDataFiles(() => {
+    console.log("Splash.onInit: 初始化 Splash 页面。");
+    this.updateTime();
+    setInterval(() => { this.updateTime(); }, 1000);
+
+    setTimeout(() => {
+      // ===== Debug 测试版白名单拦截（新增）=====
+      if (this.checkDebugGateAndBlock()) {
+        return; // 阻断后续 EULA/激活流程
+      }
+
+      if (this.$app.$def.isActivated) {
+        prompt.showToast({ message: '测试人员设备' });
+        router.replace({ uri: '/pages/player' });
+      } else {
         this.checkEulaStatus();
-                            }
-        }, 800);
-        })
-    },
+      }
+    }, 800);
+  })
+},
+
 
         // ==================== 最终修正点 1: 回归到回调函数模式 ====================
         checkEulaStatus() {
@@ -219,7 +247,30 @@
             });
         },
 
+// 返回 true 表示已拦截并切换到 debugGate 页面
+checkDebugGateAndBlock() {
+  if (!this.$app.$def.IS_DEBUG_BUILD) return false;
 
+  // 用你项目现成的 deviceId（来自 this.$app.$def.deviceId）
+  const id = (this.$app && this.$app.$def && this.$app.$def.deviceId) ? String(this.$app.$def.deviceId) : '';
+  this.deviceId = id || 'ID获取失败,请重启应用';
+
+  // 硬编码测试人员设备唯一ID白名单（你填这里）
+  const ALLOW = [
+    'd4cd0dabcf4caa22ad92fab40844c786',
+    'TESTER_DEVICE_ID_2',
+    'TESTER_DEVICE_ID_3',
+  ];
+
+  if (ALLOW.includes(this.deviceId)) return false;
+
+  this.verificationState = 'debugGate';
+  return true;
+},
+
+exitApp() {
+  app.terminate
+},
 
 
         // ==================== 核心修正点 2: 改造 showEulaPage 方法 ====================
@@ -332,7 +383,22 @@
         showFailedState() {
             const appDef = this.$app.$def;
             this.deviceId = appDef.deviceId || 'ID获取失败,请重启应用';
-            this.afdianPurchaseUrl = appDef.AFDIAN_PURCHASE_URL || 'https://afdian.com';
+// 获取设备唯一 ID
+const deviceId = this.deviceId;
+
+// 手动拼接 URL 参数，确保格式与你提供的完全一致
+const baseUrl = 'https://ifdian.net/order/create';
+const params = [
+  'product_type=1',
+  'plan_id=64db28ce9f7d11f088fc52540025c377',
+  'sku=%5B%7B%22sku_id%22%3A%226584612e9fa911f083625254001e7c00%22%2C%22count%22%3A1%7D%5D',
+  'viokrz_ex=0',
+  'fr=afcom',
+  `remark=${encodeURIComponent(deviceId)}`
+].join('&');
+
+// 拼接完整的 URL
+this.afdianPurchaseUrl = `${baseUrl}?${params}`;
             this.verificationState = 'failed';
         },
 

@@ -1,6 +1,7 @@
 <script>
 import file from '@system.file';
 import fetch from '@system.fetch';
+import app from '@system.app';
 import interconnect from "@system.interconnect";
 import crypto from '@system.crypto'; // 验证需要
 import device from '@system.device';   // 验证需要
@@ -20,9 +21,19 @@ export default {
     // --- 授权相关的全局状态 ---
     isActivated: false, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
     deviceId: null,    // 全局设备ID
+    cookie: null, // 全局 cookie
+
+    // =================== App 版本与 Debug 标识 ===================
+
+// 从系统读取的版本号
+APP_VERSION: '',
+
+// 是否 Debug 构建
+IS_DEBUG_BUILD: false,
+
 
         // 1. 全局 interconnect 实例 (保持不变)
-    //connectInstance: interconnect.instance(),
+    connectInstance: interconnect.instance(),
 
     downloadService: downloadService,
 
@@ -58,10 +69,30 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
     // ===================================================================
 
     async onCreate() {
-        console.info('App onCreate: 应用启动');
+    console.info('App onCreate: 应用启动');
+
+    // ===== 读取应用版本号（只在这里做一次）=====
+    try {
+        const info = app.getInfo && app.getInfo();
+        if (info && info.versionName) {
+            this.APP_VERSION = String(info.versionName);
+            this.IS_DEBUG_BUILD = this.APP_VERSION.toLowerCase().includes('debug');
+        } else {
+            this.APP_VERSION = '';
+            this.IS_DEBUG_BUILD = false;
+        }
+        console.log('[App] version:', this.APP_VERSION, 'debug:', this.IS_DEBUG_BUILD);
+    } catch (e) {
+        console.error('[App] 获取版本号失败:', e);
+        this.APP_VERSION = '';
+        this.IS_DEBUG_BUILD = false;
+    }
         
         // 步骤 1: 在任何其他操作之前，首先执行激活验证
         await this.runActivationFlow();
+
+                // 步骤 2: 加载全局 Cookie
+                await this.loadGlobalCookie();
 
         // 步骤 2: 根据验证结果，条件性地执行后续初始化任务
         if (this.isActivated) {
@@ -142,6 +173,32 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
         }
     });
 },
+
+    /**
+     * @description 从文件加载全局 Cookie
+     */
+     async loadGlobalCookie() {
+        try {
+            const data = await new Promise((resolve, reject) => {
+                file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: (data, code) => {
+                    // 文件不存在是正常情况，不应视为 reject
+                    if (code === 301) resolve({ text: null });
+                    else reject({ data, code });
+                }});
+            });
+            const cookieText = data.text;
+            if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
+                console.log("有效的 Cookie 已从文件加载并设置为全局变量。");
+                this.cookie = cookieText.trim();
+            } else {
+                // 文件内容无效或为空，也视为未登录
+                this.cookie = null;
+            }
+        } catch (e) {
+            // 其他读取错误
+            this.cookie = null;
+        }
+    },
 
 // 确保 runActivationFlow 也使用回调
 runActivationFlow() {

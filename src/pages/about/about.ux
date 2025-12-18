@@ -14,7 +14,7 @@
             <image class="app-icon" src="/common/icon.png"></image>
             <div class="app-details">
               <text class="app-name">OMusic</text>
-              <text class="app-version">v2.0</text>
+              <text class="app-version">{{ $app.$def.APP_VERSION }}</text>
             </div>
           </div>
         </list-item>

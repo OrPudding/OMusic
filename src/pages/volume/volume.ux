@@ -80,7 +80,7 @@
           },
           playModeIcon() {
         if (this.isFmMode === "true") {
-                return '/common/icon/fm.png'; // 假设您有一个FM图标
+                return '/common/icon/infm.png'; // 假设您有一个FM图标
             }
         const icons = [
             '/common/icon/loop.png',

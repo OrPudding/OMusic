@@ -297,7 +297,8 @@ export default {
         let networkPlaylists = [];
 
         while (hasMore && networkPlaylists.length < this.TOTAL_LIMIT) {
-            const url = `${API_BASE}/user/playlist?uid=${userId}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
+            const timestamp = Date.now();
+            const url = `${API_BASE}/user/playlist?uid=${userId}&limit=${this.API_PAGE_SIZE}&offset=${offset}&timestamp=${timestamp}`;
             try {
                 const response = await request.fetch({ url });
                 if (response.status !== 'success') throw new Error(response.message);

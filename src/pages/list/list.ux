@@ -45,9 +45,8 @@
                 <div if="{{ isLoading }}" class="loading-wrapper">
                     <!-- a. 如果确定是从网络获取，则显示进度条 -->
                     <div if="{{ isFetchingFromNetwork }}" class="loading-progress-container">
-                        <text class="loading-progress-text">{{ loadingText }} {{ networkSongsCount }} / {{ totalTrackCount }}</text>
-                        <progress class="loading-progress-bar" type="horizontal" percent="{{ networkLoadProgress }}"></progress>
-                    </div>
+                        <text class="loading-progress-text">已加载{{networkSongsCount}}首</text>
+</div>
                     <!-- b. 否则 (缓存加载或本地列表加载)，只显示动态文本 -->
                     <text else class="loading-tip">{{ loadingText }}</text>
                 </div>
@@ -152,19 +151,10 @@ import brightness from "@system.brightness";
 
 const fileService = {
     _promisify(fn, options) {
-    return new Promise((resolve, reject) => {
-        fn({
-            ...options,
-            success: resolve,
-            fail: (data, code) => {
-                const err = new Error(`Error code ${code}: ${data}`);
-                err.code = code;
-                reject(err);
-            }
+        return new Promise((resolve, reject) => {
+            fn({ ...options, success: resolve, fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)) });
         });
-    });
-},
-
+    },
     async readJson(uri, defaultValue = null) {
         try {
             const data = await this._promisify(file.readText, { uri });
@@ -366,68 +356,114 @@ export default {
     retryLoad: function() { this.loadData(); },
 
     async _getSourceData_songlist(forceAll = false) {
-    if (!this.songlistId) throw new Error("未提供歌单ID");
+  if (!this.songlistId) throw new Error("未提供歌单ID");
 
-    const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
+  const request = this.$app.$def.requestService;
+  if (!request) throw new Error("内部服务错误");
 
-    // 1. 读取缓存 (含cover，不重复请求)
-    if (!forceAll) {
-        const cachedList = await fileService.readJson(cacheFileUri, null);
-        if (Array.isArray(cachedList) && cachedList.length > 0) {
-            console.log('[songlist] 使用缓存歌单，长度 =', cachedList.length);
-            this.didLoadFromCache = true;
-            this.totalTrackCount = cachedList.length;
-            return cachedList;
-        }
+  const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
+
+  // 1) 缓存优先
+  if (!forceAll) {
+    const cached = await fileService.readJson(cacheFileUri, null);
+    if (Array.isArray(cached) && cached.length > 0) {
+      console.log('[songlist] 使用缓存，长度 =', cached.length);
+      // 只显示已拉取数量即可（总数未知）
+      this.isFetchingFromNetwork = false;
+      this.networkSongsCount = cached.length;
+      this.totalTrackCount = ' ';        // UI：不显示总数
+      this.networkLoadProgress = 0;      // UI：可不显示进度条或固定 0
+      return cached;
     }
+  }
 
-    // 2. 请求 detail 但只用于 tracks → 映射轻量对象版本
-    const request = this.$app.$def.requestService;
-    if (!request) throw new Error("内部服务错误");
+  // 2) 初始化 UI 状态（未知总数的“拉取计数”模式）
+  this.isFetchingFromNetwork = true;
+  this.loadingText = '正在加载歌曲...';
+  this.networkSongsCount = 0;
+  this.totalTrackCount = ' ';       // 未知总数：保持空
+  this.networkLoadProgress = 0;     // 未知总数：不用百分比
 
-    console.log('[songlist] 请求歌单详情 /playlist/detail, id =', this.songlistId);
+  // 3) 分页参数（穿戴设备建议 20~50）
+  //    你可以让 API_PAGE_SIZE 在设置里改；这里做一个安全兜底
+  let limit = this.API_PAGE_SIZE || 20;
+  if (limit > 80) limit = 80;       // 上限别太大，避免 parse 峰值 OOM
+  if (limit < 5) limit = 5;
 
-    let detailResponse;
+  let offset = 0;
+  let hasMore = true;
+
+  // 4) 累积轻量对象（注意：只存轻字段）
+  const result = [];
+
+  // 你原来有 TOTAL_LIMIT（例如 200），保留：避免拉 1245 首坐牢 + 写缓存炸
+  const targetTotal = this.TOTAL_LIMIT || 200;
+
+  while (hasMore && result.length < targetTotal) {
+    const ts = Date.now();
+    let resp;
+
     try {
-        detailResponse = await request.fetch({
-            url: `https://163api.qijieya.cn/playlist/detail?id=${this.songlistId}`
-        });
+      resp = await request.fetch({
+        url: `https://163api.qijieya.cn/playlist/track/all`
+          + `?id=${this.songlistId}`
+          + `&limit=${limit}`
+          + `&offset=${offset}`
+          + `&timestamp=${ts}`
+      });
     } catch (e) {
-        console.error('[songlist] 详情获取失败', e);
-        throw new Error("获取歌单失败");
+      console.error('[songlist] 请求失败 offset=', offset, e);
+      break;
     }
 
-    const playlist = detailResponse.data?.playlist;
-    const tracks = playlist?.tracks;
-
-    if (!Array.isArray(tracks) || tracks.length === 0) {
-        console.warn('[songlist] 歌单无数据');
-        return [];
+    const songs = resp.data?.songs;
+    if (!Array.isArray(songs) || songs.length === 0) {
+      // 无数据 => 结束
+      hasMore = false;
+      break;
     }
 
-    // ⚠ 内存关键优化：逐条映射到轻量对象并释放原 tracks 项
-    const songs = [];
-    for (let i = 0; i < tracks.length; i++) {
-        const s = tracks[i];
-        songs.push({
-            id: s.id,
-            name: s.name,
-            artists: (s.ar || s.artists)?.map(a => a.name).join(' / ') || '',
-            cover: s.al?.picUrl || ""       // ← 你要保留的
-        });
-        tracks[i] = null;                  // ← 立即丢掉大对象，降低峰值内存
+    // 逐条瘦身 + 立即释放
+    for (let i = 0; i < songs.length && result.length < targetTotal; i++) {
+      const s = songs[i];
+      result.push({
+        id: s.id,
+        name: s.name,
+        artists: (s.ar || s.artists || []).map(a => a.name).join(' / ')
+        // cover 如果不是必须建议先别存，带宽/内存都会下降
+      });
+      songs[i] = null; // ✅ 释放大对象
     }
 
-    playlist.tracks = null; // ← 彻底释放原始大数组引用
+    // 断开引用，帮助 GC
+    if (resp.data) resp.data.songs = null;
 
-    this.totalTrackCount = songs.length;
-    console.log('[songlist] 一次加载完成，歌曲数量 =', songs.length);
+    offset += songs.length;
 
-    // 3. 写缓存（轻量对象，已无大字段，安全）
-    await fileService.writeJson(cacheFileUri, songs);
+    // UI：未知总数，只更新已拉取数量
+    this.networkSongsCount = result.length;
 
-    return songs;
+    // 结束条件：返回数量 < limit => 已到尾页
+    if (songs.length < limit) {
+      hasMore = false;
+      break;
+    }
+
+    // 让出事件循环，避免峰值堆积导致 OOM（VelaOS 很关键）
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  this.isFetchingFromNetwork = false;
+
+  // 5) 缓存（非常重要：writeJson 必须不带缩进，避免 OOM）
+  // 你若仍是 JSON.stringify(data, null, 2)，请先改掉
+  if (result.length > 0) {
+    await fileService.writeJson(cacheFileUri, result);
+  }
+
+  return result;
 },
+
 
     async _getSourceData_dailyRecommend() {
         const request = this.$app.$def.requestService;
@@ -659,6 +695,7 @@ export default {
 
         const settings = that.$app.$def.settings || { audioQuality: { download: 128 } };
         const cookie = that.$app.$def.cookie || null;
+        console.log('cookie:', cookie);
 
         downloadService.start(
             songToDownload,
