@@ -43,10 +43,8 @@
             <div class="status-container">
                 <!-- 1. 加载中状态：只在 isLoading 为 true 时显示 -->
                 <div if="{{ isLoading }}" class="loading-wrapper">
-                    <!-- a. 如果确定是从网络获取，则显示进度条 -->
-                    <div if="{{ isFetchingFromNetwork }}" class="loading-progress-container">
-                        <text class="loading-progress-text">已加载{{networkSongsCount}}首</text>
-</div>
+
+                        <text if="{{ isFetchingFromNetwork }}" class="loading-tip">拉取中...已加载{{networkSongsCount}}首</text>
                     <!-- b. 否则 (缓存加载或本地列表加载)，只显示动态文本 -->
                     <text else class="loading-tip">{{ loadingText }}</text>
                 </div>
@@ -205,7 +203,7 @@ export default {
         PAGE_SIZE: 10,
         currentPage: 1,
         totalPages: 1,
-        TOTAL_LIMIT: 200,
+        TOTAL_LIMIT: 1000,
         API_PAGE_SIZE: 20,
         ITEM_HEIGHT: 130, 
         isLoading: false,
@@ -284,6 +282,10 @@ export default {
         this.loadError = null;
         this.isFetchingFromNetwork = false;
         this.didLoadFromCache = false;
+
+        if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+                    brightness.setKeepScreenOn({ keepScreenOn: true });
+                }
         
         switch (this.listType) {
             case 'songlist': this.loadingText = '正在加载歌单...'; break;
@@ -350,6 +352,9 @@ export default {
             if (this.didLoadFromCache) {
                 setTimeout(() => { this.didLoadFromCache = false; }, 500);
             }
+                if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+                    brightness.setKeepScreenOn({ keepScreenOn: false });
+                }
         }
     },
 
@@ -397,7 +402,7 @@ export default {
   const result = [];
 
   // 你原来有 TOTAL_LIMIT（例如 200），保留：避免拉 1245 首坐牢 + 写缓存炸
-  const targetTotal = this.TOTAL_LIMIT || 200;
+  const targetTotal = this.TOTAL_LIMIT || 1000;
 
   while (hasMore && result.length < targetTotal) {
     const ts = Date.now();

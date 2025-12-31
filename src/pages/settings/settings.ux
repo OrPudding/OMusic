@@ -475,8 +475,8 @@ const GESTURE_ACTION_TEXTS = {
                 lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
                 lyricAdvanceTime: 1.8,
                 audioQuality: { online: 64, download: 128 },
-                performance: { windowSize: 30, pageSize: 15 },
-                network: { totalLimit: 200, apiPageSize: 20 },
+                performance: { windowSize: 10, pageSize: 10 },
+                network: { totalLimit: 1000, apiPageSize: 20 },
                 search: { totalLimit: 25, apiPageSize: 10 },
 				gestures: {
                 left: 'lyrics',       // 左滑默认切换到歌词页
