@@ -41,7 +41,7 @@
             </div>
         </div>
 
-        
+
         <image class="little-icon" src="{{ downloadIcon }}" if="{{ downloadIcon && swiperCurrentIndex === 0 }}"></image>
 
 <!-- 视图 1: 歌词页 -->
@@ -673,7 +673,7 @@ export default {
 
     settings: {
       lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
-      lyricAdvanceTime: 1.8,
+      lyricAdvanceTime: 1.5,
       gestures: { left: 'lyrics', right: 'playlist', up: 'none', down: 'none' },
       audioQuality: { online: 64, download: 128 }
     },
@@ -827,36 +827,39 @@ export default {
     if (this.songId) return false;
 
     const savedState = await fileService.readJson(CONSTANTS.FILE_PLAYER_STATE);
-    const isStateExpired = savedState?.timestamp ? (new Date().getTime() - savedState.timestamp > 12 * 3600 * 1000) : true;
+    const isStateExpired = savedState?.timestamp
+        ? (new Date().getTime() - savedState.timestamp > 12 * 3600 * 1000)
+        : true;
 
     if (savedState && savedState.lastSongId && savedState.duration && !isStateExpired) {
-      await this.loadListFromFile();
-      const lastIndex = this.playList.findIndex(song => song && song.id === savedState.lastSongId);
+        await this.loadListFromFile();
+        const lastIndex = this.playList.findIndex(song => song && song.id === savedState.lastSongId);
 
-      if (lastIndex > -1) {
-        console.log(`onRestoreState: 成功恢复状态，歌曲: ${this.playList[lastIndex].name}`);
+        if (lastIndex > -1) {
+            console.log(`onRestoreState: 恢复歌曲: ${this.playList[lastIndex].name}`);
 
-        this.songId = savedState.lastSongId;
-        this.currentIndex = lastIndex;
-        this.playMode = savedState.playMode || 0;
+            this.songId = savedState.lastSongId;
+            this.currentIndex = lastIndex;
+            this.playMode = savedState.playMode || 0;
 
-        this.currSong = { ...this.playList[this.currentIndex], duration: savedState.duration };
+            this.currSong = { ...this.playList[this.currentIndex], duration: savedState.duration };
 
-        // UI 展示进度（恢复用）
-        this.playerState.playDuration = savedState.lastPlayDuration || 0;
+            // 先把 UI 进度设置为保存值，避免初始显示 00:00
+            this.playerState.playDuration = savedState.lastPlayDuration || 0;
 
-        // 【关键新增】记录待恢复 seek（用户点击播放时生效）
-        this.resumeTime = this.playerState.playDuration;
+            // 记录：等真正 onplay 后再做恢复 seek
+            this._pendingRestoreTime = this.playerState.playDuration;
 
-        // 只获取歌词数据，但不自动播放
-        this.fetchLyric(this.songId);
+            // 只获取歌词数据（不强制渲染也行，你原逻辑保持）
+            this.fetchLyric(this.songId);
 
-        prompt.showToast({ message: "播放状态已恢复" });
-        return true;
-      }
+            prompt.showToast({ message: "播放状态已恢复" });
+            return true;
+        }
     }
     return false;
-  },
+},
+
 
     // --- 交互与UI方法 ---
     handleHeaderSwipe(e) {
@@ -902,24 +905,9 @@ export default {
             }
         }
     },
+    onSliderTouchStart() { this.isSliderDragging = true; },
+onSliderTouchEnd() { this.isSliderDragging = false; },
 
-    /**
-     * 滑块触摸开始事件
-     * 设置拖动锁定标志
-     */
-    onSliderTouchStart() {
-        console.log("滑块触摸开始，设置拖动锁定");
-        this.isSliderDragging = true;
-    },
-
-    /**
-     * 滑块触摸结束事件
-     * 清除拖动锁定标志
-     */
-    onSliderTouchEnd() {
-        console.log("滑块触摸结束，清除拖动锁定");
-        this.isSliderDragging = false;
-    },
 
     // 辅助方法：执行通用手势操作 (不包括视图切换)
     executeGestureAction(action) {
@@ -1073,7 +1061,7 @@ updateLyric() {
   if (!this.lyrics || this.lyrics.length === 0) return;
   if (!this.lyricLines || this.lyricLines.length !== this.lyrics.length) return;
 
-    const lookaheadTime = this.playerState.playDuration + (this.settings.lyricAdvanceTime || 1.8);
+    const lookaheadTime = this.playerState.playDuration + (this.settings.lyricAdvanceTime || 1.5);
     const oldIndex = this.playerState.currentLyricIndex;
 
     // a. 二分查找：最后一个 time <= lookaheadTime 的行
@@ -1269,21 +1257,47 @@ updateLyricSelection(index, isSelected) {
   }
 },
 
-        // 真正执行 seek 的方法
-        applySliderChange(progress) {
-        console.log(`[Throttled] Applying seek to: ${progress}`);
-        if (this.playerState.isPlaying || audio.duration > 0) {
-            audio.currentTime = progress;
-            this.updateLyric(); // 手动更新歌词以保证UI响应
-        }
-    },
+// 真正执行 seek 的方法（仅用户拖动触发）
+applySliderChange(progress) {
+    // 恢复期间禁止 slider seek
+    if (this._restoreSeeking) return;
 
-    // 进度条的 onchange 事件处理函数
-    onSliderChange(e) {
-        // 3. 调用节流后的函数，而不是直接操作 audio
-        //    注意：这里需要通过 this 来调用
-        this.throttledSliderChange(e.progress);
-    },
+    const now = Date.now();
+    if (this._ignoreSliderUntilTs && now < this._ignoreSliderUntilTs) return;
+
+    // 只有用户拖动才允许 seek（防 UI 回写触发 onchange）
+    if (!this.isSliderDragging) return;
+
+    const p = Number(progress);
+    if (!isFinite(p) || p < 0) return;
+
+    const dur = (this.currSong && typeof this.currSong.duration === 'number') ? this.currSong.duration : 0;
+    if (!(dur > 0)) return;
+
+    const target = Math.max(0, Math.min(p, dur - 0.2));
+    const cur = Number(audio.currentTime) || 0;
+    if (Math.abs(cur - target) < 0.25) return;
+
+    // console.log(`[Throttled] Applying seek to: ${target}`);
+    audio.currentTime = target;
+
+    this.playerState.playDuration = target;
+    this.updateLyric();
+},
+
+// 进度条 onchange 事件处理函数（仅用户拖动触发）
+onSliderChange(e) {
+    if (this._restoreSeeking) return;
+
+    const now = Date.now();
+    if (this._ignoreSliderUntilTs && now < this._ignoreSliderUntilTs) return;
+
+    if (!this.isSliderDragging) return;
+
+    this.throttledSliderChange(e.progress);
+},
+
+
     goToSongActions() {
         if (!this.currSong) { prompt.showToast({ message: '当前无播放歌曲' }); return; }
         router.push({ uri: "/pages/volume", params: { currentSong: JSON.stringify(this.currSong), screenShape: this.screenShape, playMode: this.playMode, isFmMode: this.isFmMode } });
@@ -1530,56 +1544,98 @@ updateUiForNewSong(song) {
     }
 },
 startPlayback(songWithDuration, src) {
-    if (!src || typeof src !== 'string') { this.handlePlaybackError("无效的播放源"); return; }
+    if (!src || typeof src !== 'string') {
+        this.handlePlaybackError("无效的播放源");
+        return;
+    }
 
     if (this.currSong && songWithDuration && songWithDuration.duration) {
-      this.currSong.duration = songWithDuration.duration;
+        this.currSong.duration = songWithDuration.duration;
     }
 
     this.retryCount = 0;
+
+    // 启动前 stop 没问题
     audio.stop();
     audio.src = src;
 
-    // 如果你有抑制标记（防止 onplay 递归），这里保留
-    this._suppressHandlePlayRequest = true;
+    // 如果存在待恢复时间：进入恢复期（屏蔽 timeupdate/slider 的抢写）
+    if (typeof this._pendingRestoreTime === 'number' && this._pendingRestoreTime > 0) {
+        this._restoreSeeking = true;
+        const now = Date.now();
+        this._ignoreTimeupdateUntilTs = now + 2500; // 覆盖启动阶段的 timeupdate=0
+        this._ignoreSliderUntilTs = now + 2500;     // 覆盖启动阶段 slider 回写
+    }
 
     audio.play();
+},
 
-    // 【关键新增】仅一次：从恢复进度继续
-    if (this.resumeTime >= 0) {
-      this.seekOnce(this.resumeTime);
-      this.resumeTime = -1; // 用完即清，避免影响下一首
+seekOnce(t) {
+    const target0 = Number(t) || 0;
+    if (target0 <= 0) {
+        this._restoreSeeking = false;
+        return;
     }
-  },
-  seekOnce(t) {
+
+    // 恢复期：先锁住
+    this._restoreSeeking = true;
+
+    const armIgnoreWindows = (ms) => {
+        const now = Date.now();
+        this._ignoreTimeupdateUntilTs = Math.max(this._ignoreTimeupdateUntilTs || 0, now + ms);
+        this._ignoreSliderUntilTs = Math.max(this._ignoreSliderUntilTs || 0, now + ms);
+    };
+
+    armIgnoreWindows(1800);
+
     let tries = 0;
-    const maxTries = 8;
+    const maxTries = 10;
+
+    const finish = () => {
+        // 延迟释放：避免 seek 后立刻 timeupdate=0 或 slider 回写造成闪动
+        setTimeout(() => {
+            this._restoreSeeking = false;
+            armIgnoreWindows(400);
+        }, 600);
+    };
 
     const attempt = () => {
-      tries++;
-      audio.getPlayState({
-        success: (st) => {
-          const dur = st && typeof st.duration === 'number' ? st.duration : 0;
-          const ok = st && (st.state === 'play' || st.state === 'pause');
+        tries++;
+        audio.getPlayState({
+            success: (st) => {
+                const dur = st && typeof st.duration === 'number' ? st.duration : 0;
+                const ok = st && (st.state === 'play' || st.state === 'pause');
 
-          if (ok && dur > 0) {
-            const target = Math.max(0, Math.min(t, dur - 0.2));
-            audio.currentTime = target;
-            this.playerState.playDuration = target; // UI 同步
-            this.updateLyric();
-            return;
-          }
+                if (ok && dur > 0) {
+                    const target = Math.max(0, Math.min(target0, dur - 0.2));
 
-          if (tries < maxTries) setTimeout(attempt, 120);
-        },
-        fail: () => {
-          if (tries < maxTries) setTimeout(attempt, 120);
-        }
-      });
+                    // 如果已经非常接近，就不重复 seek
+                    const cur = Number(audio.currentTime) || 0;
+                    if (Math.abs(cur - target) > 0.25) {
+                        audio.currentTime = target;
+                    }
+
+                    // UI 固定到目标值（不等 timeupdate）
+                    this.playerState.playDuration = target;
+                    this.updateLyric();
+
+                    finish();
+                    return;
+                }
+
+                if (tries < maxTries) setTimeout(attempt, 120);
+                else finish();
+            },
+            fail: () => {
+                if (tries < maxTries) setTimeout(attempt, 120);
+                else finish();
+            }
+        });
     };
 
     attempt();
-  },
+},
+
     change(dir) {
         if (this.pendingSongId) { prompt.showToast({ message: '正在切歌...' }); return; }
         if (this.isFmMode) { if (dir < 0) { prompt.showToast({ message: '私人FM不支持上一首哦' }); return; } this.playCurrent(); return; }
@@ -1808,23 +1864,43 @@ async fetchLyricOnline(songId) {
     },
     
     bindAudioEvents() {
-  // 播放事件：只做状态同步，不要再 audio.play()
-  audio.onplay = () => {
-    // 如果是我们自己主动触发的 play（例如切歌 startPlayback），
-    // 这里不做额外干预，避免二次逻辑。
-    if (this._suppressHandlePlayRequest) {
-      this._suppressHandlePlayRequest = false;
-    }
+    // onplay：同步状态 + 如有 pending restore time，则在此处触发一次 seekOnce
+    audio.onplay = () => {
+        // 同步播放态
+        if (!this.playerState.isPlaying) {
+            this.playerState.isPlaying = true;
+        }
 
-    this.playerState.isPlaying = true;
+        // 清超时等待
+        if (this.playTimeoutId) {
+            clearTimeout(this.playTimeoutId);
+            this.playTimeoutId = null;
+        }
+        this.pendingSongId = null;
 
-    if (this.playTimeoutId) {
-      clearTimeout(this.playTimeoutId);
-      this.playTimeoutId = null;
-    }
-    this.pendingSongId = null;
-    console.log("Event: onplay (synced).");
-  };
+        // 如果需要恢复进度：只在这里做一次
+        if (typeof this._pendingRestoreTime === 'number' && this._pendingRestoreTime > 0) {
+            const t = this._pendingRestoreTime;
+            this._pendingRestoreTime = null; // 确保只做一次
+            this.seekOnce(t);
+        }
+
+        console.log("Event: onplay (synced).");
+    };
+
+    // ontimeupdate：恢复期禁止写入 0，避免 UI 00:00 闪一下
+    audio.ontimeupdate = () => {
+        // 等待切歌阶段不更新（你原逻辑保留）
+        if (this.pendingSongId) return;
+
+        // 恢复期 / 屏蔽窗口：不更新 UI，不跑歌词（关键）
+        const now = Date.now();
+        if (this._restoreSeeking) return;
+        if (this._ignoreTimeupdateUntilTs && now < this._ignoreTimeupdateUntilTs) return;
+
+        this.playerState.playDuration = audio.currentTime;
+        this.updateLyric();
+    };
 
   // 暂停事件：只做状态同步，不要再 audio.pause()
   audio.onpause = () => {
@@ -1841,13 +1917,6 @@ async fetchLyricOnline(songId) {
     }
     this.pendingSongId = null;
     console.log("Event: onstop.");
-  };
-
-  audio.ontimeupdate = () => {
-    if (!this.pendingSongId) {
-      this.playerState.playDuration = audio.currentTime;
-      this.updateLyric();
-    }
   };
 
   audio.onended = () => {

@@ -33,7 +33,7 @@ IS_DEBUG_BUILD: false,
 
 
         // 1. 全局 interconnect 实例 (保持不变)
-    connectInstance: interconnect.instance(),
+    //connectInstance: interconnect.instance(),
 
     downloadService: downloadService,
 

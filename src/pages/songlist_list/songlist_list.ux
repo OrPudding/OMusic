@@ -81,6 +81,7 @@
         align-items: center;
     }
 
+    
     /* --- 列表样式 (网格布局) --- */
     .list-content {
         display: flex; /* 使用标准 display:flex 替代 */
@@ -97,7 +98,7 @@
         padding: 10px;
         margin: 5px 5%; /* 使用百分比外边距实现间隙 */
         background-color: #191821;
-        border-radius: 20px;
+        border-radius: 36px;
     }
     .item-info {
         flex-direction: column;

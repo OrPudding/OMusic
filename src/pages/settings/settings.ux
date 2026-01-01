@@ -473,7 +473,7 @@ const GESTURE_ACTION_TEXTS = {
             },
             settings: {
                 lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
-                lyricAdvanceTime: 1.8,
+                lyricAdvanceTime: 1.5,
                 audioQuality: { online: 64, download: 128 },
                 performance: { windowSize: 10, pageSize: 10 },
                 network: { totalLimit: 1000, apiPageSize: 20 },

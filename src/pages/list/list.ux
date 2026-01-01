@@ -108,7 +108,7 @@
     .scroll-wrapper { position: absolute; top: 90px; bottom: 0; left: 0; right: 0; width: 100%; flex-direction: column; align-items: center; }
     .button-container { width: 392px; margin: 10px 0; }
     .button-group { width: 100%; flex-direction: row; justify-content: space-around; }
-    .group-button { height: 100px; border-radius: 24px; justify-content: center; align-items: center; flex-direction: column; background-color: #BAC3FF; }
+    .group-button { height: 100px; border-radius: 36px; justify-content: center; align-items: center; flex-direction: column; background-color: #BAC3FF; }
     .normal-buttons { width: 160px; }
     .little-buttons { width: 124px; }
     .button-icon { width: 36px; height: 36px; }
@@ -228,6 +228,7 @@ export default {
         loadError: null,
         loadingText: '正在加载...',
         didLoadFromCache: false,
+        isUpdateCheckInFlight: false,
     },
 
     onInit: function() {
@@ -244,6 +245,7 @@ export default {
             await fileService.ensureDirExists(that.songlistsDir);
             that.loadData(!!that.targetSongId);
         })();
+        this.silentCheckForUpdates();
     },
 
     onDestroy: function() {
@@ -274,6 +276,125 @@ export default {
         const now = new Date();
         this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     },
+
+    async silentCheckForUpdates() {
+  // 仅对“可刷新的在线列表”做检查；personal_fm 太动态，建议不检查避免频繁弹窗
+  const refreshable = ['songlist', 'daily_recommend'].includes(this.listType);
+  if (!refreshable) return;
+
+  if (this.isLoading || this.isRefreshing || this.isUpdateCheckInFlight) return;
+
+  // songlist 必须有 id
+  if (this.listType === 'songlist' && !this.songlistId) return;
+
+  this.isUpdateCheckInFlight = true;
+
+  try {
+    // 1) 读取本地当前列表的“头部签名”
+    const localHeadSig = await this._getLocalHeadSignature(10);
+    if (!localHeadSig) return; // 没有本地数据就不提示
+
+    // 2) 静默从网络取“开头一小段”
+    const remoteHeadSig = await this._getRemoteHeadSignature(10);
+    if (!remoteHeadSig) return; // 网络失败静默忽略
+
+// 3) 有差异 -> 弹窗询问是否刷新（Vela: 用 success/cancel 判断勾/叉）
+if (localHeadSig !== remoteHeadSig) {
+  prompt.showDialog({
+    title: '发现列表更新',
+    message: '检测到列表内容可能已更新，是否刷新？',
+    // Vela 不依赖 buttons/index；用勾(确认)/叉(取消)
+    success: async () => {
+      // 用户点“勾”：执行刷新
+      try {
+        await this.loadData(false, true);
+        prompt.showToast({ message: '已刷新' });
+      } catch (e) {
+        prompt.showToast({ message: '刷新失败' });
+      }
+    },
+    cancel: () => {
+        prompt.showToast({ message: '操作已取消' });
+      // 用户点“叉”：什么都不做，静默返回
+    },
+    fail: (data, code) => {
+      console.error(`showDialog fail code=${code}`, data);
+    }
+  });
+}
+  } finally {
+    this.isUpdateCheckInFlight = false;
+  }
+},
+
+async _getLocalHeadSignature(n = 10) {
+  try {
+    // 优先用当前已显示/已加载的数据（最快）
+    const list = Array.isArray(this.fullSongList) && this.fullSongList.length > 0
+      ? this.fullSongList
+      : null;
+
+    if (list) {
+      return list.slice(0, n).map(s => String(s.id)).join(',');
+    }
+
+    // 如果当前内存里没有，就根据不同 listType 读对应缓存
+    if (this.listType === 'songlist') {
+      const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
+      const cached = await fileService.readJson(cacheFileUri, null);
+      if (!Array.isArray(cached) || cached.length === 0) return '';
+      return cached.slice(0, n).map(s => String(s.id)).join(',');
+    }
+
+    if (this.listType === 'daily_recommend') {
+      // daily recommend 若你有缓存文件可读，放这里；没有缓存就直接用内存（上面已处理）
+      return '';
+    }
+
+    return '';
+  } catch (e) {
+    return '';
+  }
+},
+
+async _getRemoteHeadSignature(n = 10) {
+  try {
+    const request = this.$app.$def.requestService;
+    if (!request) return '';
+
+    if (this.listType === 'songlist') {
+      // 只拉 offset=0 的一页，轻量映射成 id 列表
+      const ts = Date.now();
+      const limit = Math.max(20, n); // 至少 20，避免太小不稳定
+      const resp = await request.fetch({
+        url: `https://163api.qijieya.cn/playlist/track/all`
+          + `?id=${this.songlistId}`
+          + `&limit=${limit}`
+          + `&offset=0`
+          + `&timestamp=${ts}`
+      });
+
+      const songs = resp.data?.songs;
+      if (!Array.isArray(songs) || songs.length === 0) return '';
+
+      // 只取 id，不留大对象
+      return songs.slice(0, n).map(s => String(s.id)).join(',');
+    }
+
+    if (this.listType === 'daily_recommend') {
+      // 这里调用你现有的 daily recommend 接口（你文件里 _getSourceData_dailyRecommend 已有）
+      // 但我们只取“开头 n 首”的 id，避免全量加载
+      const data = await this._getSourceData_dailyRecommend();
+      if (!Array.isArray(data) || data.length === 0) return '';
+      return data.slice(0, n).map(s => String(s.id)).join(',');
+    }
+
+    return '';
+  } catch (e) {
+    return '';
+  }
+},
+
 
     async loadData(shouldLocate = false, force = false) {
         if (this.isLoading) return;
@@ -529,30 +650,66 @@ export default {
     loadPrevPage: function() { if (this.currentPage > 1) this.loadPage(this.currentPage - 1); },
     loadNextPage: function() { if (this.currentPage < this.totalPages) this.loadPage(this.currentPage + 1); },
 
-    async handleScrollTop() {
-        if (this.isLoading || this.isRefreshing) return;
-        const isRefreshable = ['songlist', 'personal_fm', 'daily_recommend'].includes(this.listType);
-        if (!isRefreshable) return;
+/**
+ * 下拉刷新（保留）：
+ * - 需要连续触发 4 次 onscrolltop
+ * - 任意两次间隔不超过 2 秒，否则重置计数
+ * - 仅第 3 次提示 toast
+ */
+ handleScrollTop() {
+  const now = Date.now();
 
-        if (this.justReachedTop) {
-            this.isRefreshing = true; 
-            prompt.showToast({ message: '正在刷新...' });
-            if (this.justReachedTopTimeoutId) clearTimeout(this.justReachedTopTimeoutId);
-            this.justReachedTopTimeoutId = null;
-            this.justReachedTop = false;
+  // 初始化状态（不需要在 private/protected 里声明）
+  if (!this._pullRefreshMeta) {
+    this._pullRefreshMeta = { count: 0, lastTs: 0, timerId: null };
+  }
 
-            try {
-                await this.loadData(false, true);
-            } finally {
-                this.isRefreshing = false;
-            }
-        } else {
-            prompt.showToast({ message: '再次下拉刷新' });
-            this.justReachedTop = true;
-            if (this.justReachedTopTimeoutId) clearTimeout(this.justReachedTopTimeoutId);
-            this.justReachedTopTimeoutId = setTimeout(() => { this.justReachedTop = false; }, 3000);
-        }
-    },
+  const meta = this._pullRefreshMeta;
+
+  // 如果页面正在加载/刷新，忽略下拉触发，避免并发
+  // 这里尽量兼容你已有字段：isLoading / isRefreshing / needsRefresh
+  if (this.isLoading || this.isRefreshing) return;
+
+  // 2 秒窗口：超过则重置为 1 次
+  if (meta.lastTs && (now - meta.lastTs) <= 2000) {
+    meta.count += 1;
+  } else {
+    meta.count = 1;
+  }
+  meta.lastTs = now;
+
+  // 每次触发都重置一个“超时清零计数”的定时器
+  if (meta.timerId) clearTimeout(meta.timerId);
+  meta.timerId = setTimeout(() => {
+    // 超过 2 秒没有下一次下拉，清零
+    if (this._pullRefreshMeta) {
+      this._pullRefreshMeta.count = 0;
+      this._pullRefreshMeta.lastTs = 0;
+      this._pullRefreshMeta.timerId = null;
+    }
+  }, 2100);
+
+  // 只有第 3 次提示（第 1、2 次不提示）
+  if (meta.count === 3) {
+    // 提示文案你可自行改
+    prompt.showToast({ message: '再下拉 1 次刷新', duration: 800 });
+    return;
+  }
+
+  // 第 4 次：触发真正刷新，并立即清零计数
+  if (meta.count >= 4) {
+    // 清零 + 清 timer
+    if (meta.timerId) clearTimeout(meta.timerId);
+    meta.count = 0;
+    meta.lastTs = 0;
+    meta.timerId = null;
+
+    // 执行刷新：force=true（按你原 loadData 签名：loadData(shouldLocate=false, force=false)）
+    // 如你的签名不同，替换这一行即可
+    this.loadData(false, true);
+  }
+},
+
 
     async deleteSong(songToDelete) {
         const fullIndex = this.fullSongList.findIndex(item => item.id === songToDelete.id);
