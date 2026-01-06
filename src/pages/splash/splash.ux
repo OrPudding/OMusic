@@ -38,13 +38,14 @@
         </div>
         <div class="info-capsule">
             <text class="capsule-title">扫码购买</text>
-            <qrcode value="{{ afdianPurchaseUrl }}" class="qrcode-component-large"></qrcode>
+            <qrcode value="{{ afdianPurchaseUrl }}" class="qrcode-component-small"></qrcode>
             <text class="capsule-tip">请用手机扫码，打开爱发电页面，设备ID已自动填入备注</text>
         </div>
         <text class="post-purchase-button" onclick="retryActivation">我已完成购买，开始验证</text>
         <text class="debug-button" onclick="handleClearAllCache">清除所有缓存并重置</text>
     </scroll>
 </div>
+
 <!-- ===================================================================
  新增状态四：Debug 测试版白名单拦截（遵循现有激活页规范）
  =================================================================== -->
@@ -56,11 +57,11 @@
       </div>
   
       <div class="info-capsule">
-        <text class="capsule-title">当前为 Debug 测试版</text>
+        <text class="capsule-title">当前为测试版</text>
         <text class="capsule-tip">
           仅限白名单测试设备使用，请扫码复制设备ID并发送给开发者开通。
         </text>
-      </div>
+    </div>
   
       <div class="info-capsule">
         <text class="capsule-title">设备唯一ID</text>
@@ -71,6 +72,7 @@
       <text class="post-purchase-button" onclick="exitApp">退出应用</text>
     </scroll>
   </div>
+</div>
   
 </template>
 <style>
@@ -90,8 +92,7 @@
     .capsule-tip { font-size: 20px; color: rgba(255, 255, 255, 0.7); text-align: center; }
     
     /* --- 二维码样式 --- */
-    .qrcode-component-large { width: 360px; height: 360px; background-color: #ffffff; padding: 5px; margin-bottom: 15px; }
-    .qrcode-component-small { width: 220px; height: 220px; background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 15px;}
+    .qrcode-component-small { width: 260px; height: 260px; background-color: #ffffff; padding: 5px; border-radius: 8px; margin-bottom: 15px;}
     
     .device-id-display { width: 100%; flex-direction: column; align-items: center; justify-content: center; margin-top: 10px; }
     .device-id-text-wrapper { flex: 1; flex-direction: column; }
@@ -386,20 +387,10 @@ exitApp() {
 // 获取设备唯一 ID
 const deviceId = this.deviceId;
 
-// 手动拼接 URL 参数，确保格式与你提供的完全一致
-const baseUrl = 'https://ifdian.net/order/create';
-const params = [
-  'product_type=1',
-  'plan_id=64db28ce9f7d11f088fc52540025c377',
-  'sku=%5B%7B%22sku_id%22%3A%226584612e9fa911f083625254001e7c00%22%2C%22count%22%3A1%7D%5D',
-  'viokrz_ex=0',
-  'fr=afcom',
-  `remark=${encodeURIComponent(deviceId)}`
-].join('&');
-
-// 拼接完整的 URL
-this.afdianPurchaseUrl = `${baseUrl}?${params}`;
-            this.verificationState = 'failed';
+// ✅ 只生成中转 URL，参数交给 Cloudflare Worker
+this.afdianPurchaseUrl = `https://pay.orpu.moe/${encodeURIComponent(deviceId)}`;
+// 本地校验失败，进入购买流程
+this.verificationState = 'failed';
         },
 
     /**

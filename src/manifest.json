@@ -1,8 +1,8 @@
 {
   "package": "moe.orpu.omusic",
   "name": "OMusic",
-  "versionName": "26.1.1",
-  "versionCode": 260101,
+  "versionName": "26.1.7",
+  "versionCode": 260107,
   "minPlatformVersion": 1000,
   "icon": "/common/icon.png",
   "deviceTypeList": [

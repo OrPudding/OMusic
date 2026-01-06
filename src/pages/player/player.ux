@@ -11,32 +11,67 @@
         <div if="{{ swiperCurrentIndex === 0 }}" class="swiper-item player-view" onswipe="handleSwipe">
             <!-- a. 播放控制按钮 -->
             <div class="controls">
-                <image class="icon" src="/common/icon/prev.png" onclick="change(-1)" />
-                <image class="icon-play-pause" src="{{ playButtonIcon }}" onclick="playOrPause" />
-                <image class="icon" src="/common/icon/next.png" onclick="change(1)" />
-            </div>
+                <!-- Prev -->
+                <image class="icon pressable {{ prevBtnClass }} {{ prevBtnAnim }}"
+                       src="/common/icon/prev.png"
+                       ontouchstart="pressDown('prevBtn')"
+                       ontouchend="pressRelease('prevBtn')"
+                       ontouchcancel="pressCancel('prevBtn')"
+                       onclick="change(-1)" />
+              
+                <!-- Play/Pause -->
+                <image class="pressable {{ playBtnClass }} {{ playBtnAnim }}"
+                       src="{{ playButtonIcon }}"
+                       ontouchstart="pressDown('playBtn')"
+                       ontouchend="pressRelease('playBtn')"
+                       ontouchcancel="pressCancel('playBtn')"
+                       onclick="onPlayBtnClick" />
+              
+                <!-- Next -->
+                <image class="icon pressable {{ nextBtnClass }} {{ nextBtnAnim }}"
+                       src="/common/icon/next.png"
+                       ontouchstart="pressDown('nextBtn')"
+                       ontouchend="pressRelease('nextBtn')"
+                       ontouchcancel="pressCancel('nextBtn')"
+                       onclick="change(1)" />
+              </div>
+              
+              
             <!-- b. 播放进度条 -->
             <div class="progress">
                 <div class="progress-text">
                 <text class="play-time">{{ progressCurrentTime }}</text>
                 <text class="play-time">{{ progressTotalTime }}</text>
                 </div>
-                <slider class="play-progress" 
+                <slider class="play-progress {{ sliderAnim }}"  
                         min="0" 
                         max="{{ (currSong && currSong.duration) ? currSong.duration : 100 }}" 
                         step="1" 
                         value="{{ playerState.playDuration }}" 
                         onchange="onSliderChange"
                         ontouchstart="onSliderTouchStart"
-                        ontouchend="onSliderTouchEnd">
+                        ontouchend="onSliderTouchEnd"
+                        ontouchcancel="onSliderTouchCancel">
                 </slider>
             </div>
             <!-- c. 底部操作栏 -->
             <div class="footer">
                 <div class="footer-content">
-                    <image class="footer-icon" src="/common/icon/volume.png" onclick="goToSongActions"></image>
-                    <image class="footer-icon footer-icon-down" src="/common/icon/download.png" onclick="initiateDownload"></image>
-                    <image class="footer-icon" src="/common/icon/play-list.png" onclick="goToMenu"></image>
+                    <image class="footer-icon pressable {{volumeBtnClass}} {{volumeBtnAnim}}" src="/common/icon/volume.png" 
+                    ontouchstart="pressDown('volumeBtn')"
+                    ontouchend="pressRelease('volumeBtn')"
+                    ontouchcancel="pressCancel('volumeBtn')"
+                    onclick="goToSongActions"></image>
+                    <image class="footer-icon footer-icon-down pressable {{downloadBtnClass}} {{downloadBtnAnim}}" src="/common/icon/download.png" 
+                    ontouchstart="pressDown('downloadBtn')"
+                    ontouchend="pressRelease('downloadBtn')"
+                    ontouchcancel="pressCancel('downloadBtn')"
+                    onclick="initiateDownload"></image>
+                    <image class="footer-icon pressable {{menuBtnClass}} {{menuBtnAnim}}" src="/common/icon/play-list.png" 
+                    ontouchstart="pressDown('menuBtn')"
+                    ontouchend="pressRelease('menuBtn')"
+                    ontouchcancel="pressCancel('menuBtn')"
+                    onclick="goToMenu"></image>
                 </div>
             </div>
         </div>
@@ -317,12 +352,12 @@
     <div class="lyrics-list-padding-bottom"></div>
 </scroll>
 
-                <!-- 3. 手动添加的页面指示器 (放置在最外层，不影响 if/else 结构) -->
-                <div class="manual-indicator">
+                <!-- 3. 手动添加的页面指示器 (放置在最外层，不影响 if/else 结构) 
+                <div if="swiperCurrentIndex === 1" class="manual-indicator">
                     <div class="indicator-dot {{ swiperCurrentIndex === 0 ? 'indicator-dot-active' : '' }}"></div>
                     <div class="indicator-dot {{ swiperCurrentIndex === 1 ? 'indicator-dot-active' : '' }}"></div>
                 </div>
-
+-->
 	</div>
 </template>
 
@@ -451,7 +486,39 @@
     padding-left: 0px; 
     padding-right: 0px; 
     margin: 0 20px; 
+    transform-origin: 50% 50%;
 }
+
+
+/* 按下：轻微收紧（更克制） */
+.slider-press-down {
+  animation-name: SliderPressDown;
+  animation-duration: 80ms;
+  animation-timing-function: cubic-bezier(0.25, 0.55, 0.25, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+/* 松开：平稳回到位，极小过冲（可选） */
+.slider-press-up {
+  animation-name: SliderPressUp;
+  animation-duration: 140ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes SliderPressDown {
+  0%   { transform: scale(1, 1); opacity: 1; }
+  100% { transform: scale(1.00, 0.96); opacity: 0.8; }
+}
+
+/* 这里过冲非常小；如果你想完全无过冲，我下面给你“无过冲版” */
+@keyframes SliderPressUp {
+  0%   { transform: scale(1.00, 0.96); opacity: 0.8; }
+  70%  { transform: scale(1.00, 1.01); opacity: 1; }
+  100% { transform: scale(1, 1); opacity: 1; }
+}
+
 .footer { 
     width: 100%; 
     justify-content: center; 
@@ -468,13 +535,13 @@
 }
 .little-icon {
     position: absolute;
-    top: 333px;
+    top: 353px;
     left: 244px;
     width: 41px;
     height: 41px;
 }
 .footer-icon-down {
-    margin-top: 20px;
+    margin-top: 40px;
 }
 /* --- 歌词视图样式 (已优化 - 无透明度版) --- */
 .lyrics-scroll-view {
@@ -544,6 +611,56 @@
     font-size: 24px;
     margin-top: 8px;
 }
+.pressable {
+  /* 尺寸由具体按钮决定 */
+  padding: 6px;                /* 动画安全区 */
+  margin-bottom: 6px;
+
+  align-items: center;
+  justify-content: center;
+
+  /* 关键：原点下移，避免向上被裁 */
+  transform-origin: 50% 62%;
+
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 静态暗压态（按住时） */
+.is-down {
+  transform: scale(0.92);
+  opacity: 0.75;
+}
+
+/* 按下瞬间动画：保留你最初的 ease-out */
+.press-down {
+  animation-name: PressDown;
+  animation-duration: 80ms;
+  animation-timing-function: ease-out;
+  animation-iteration-count: 1;
+  animation-fill-mode: none;   /* 关键：不留最终态 */
+}
+
+/* 抬起回弹：保留你最初觉得“最好”的曲线 */
+.press-up {
+  animation-name: PressUp;
+  animation-duration: 140ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes PressDown {
+  0%   { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(0.92); opacity: 0.75; }
+}
+
+/* 132px 资源：峰值控制在 1.04，避免遮挡 */
+@keyframes PressUp {
+  0%   { transform: scale(0.92); opacity: 0.75; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
 /* --- 媒体查询 --- */
 @media screen and (shape: rect) {
     .controls {
@@ -699,6 +816,22 @@ export default {
     _gestureToLyrics: null,
     isSliderDragging: false,
 
+    prevBtnClass: '',
+  prevBtnAnim: '',
+  playBtnClass: '',
+  playBtnAnim: '',
+  nextBtnClass: '',
+  nextBtnAnim: '',
+  sliderClass: '',
+  sliderAnim: '',
+  volumeBtnClass: '',
+    volumeBtnAnim: '',
+    downloadBtnClass: '',
+    downloadBtnAnim: '',
+    menuBtnClass: '',
+    menuBtnAnim: '',
+    _playBtnDown: false,
+
     // =========================
     // 【新增】最小增量：恢复进度用
     // -1 表示不需要恢复；>=0 表示下次播放需要seek到这里
@@ -749,7 +882,7 @@ export default {
     async onInit() {
         if (this.$app.$def.isActivated !== true) { router.replace({ uri: '/pages/splash' }); return; }
         console.log("Player onInit: 准备基础环境。");
-        this.throttledSliderChange = throttle(this.applySliderChange, 200);
+        this.throttledSliderChange = throttle(this.applySliderChange, 50);
         
         this.bindAudioEvents();
         await this.loadSettings();
@@ -822,6 +955,54 @@ export default {
         prompt.showToast({ message: '顶栏右滑退出应用' });
         return true; // 返回 true 表示消费该事件，应用不会退出
     },
+
+    pressDown(key) {
+  // 清动画，保证可重复触发
+  this[key + 'Anim'] = '';
+  // 进入静态暗压态
+  this[key + 'Class'] = 'is-down';
+  // 按下瞬间动画（可选，但手感更好）
+  setTimeout(() => {
+    this[key + 'Anim'] = 'press-down';
+  }, 0);
+},
+
+pressRelease(key) {
+  // 移除暗压态
+  this[key + 'Class'] = '';
+  // 回弹动画一发
+  this[key + 'Anim'] = '';
+  setTimeout(() => {
+    this[key + 'Anim'] = 'press-up';
+  }, 0);
+},
+
+pressCancel(key) {
+  // 兜底复位（滑出 / touchcancel / 业务 return）
+  this[key + 'Class'] = '';
+  this[key + 'Anim'] = '';
+},
+onPlayBtnUp() {
+  // 抬起：移除暗压态 + 跑回弹
+  this._releasePlayBtnWithPop();
+},
+
+onPlayBtnClick() {
+  // 点击：无论业务是否 return，都保证按钮恢复
+  this._releasePlayBtnWithPop();
+
+  // 再执行业务逻辑
+  this.playOrPause();
+},
+
+_releasePlayBtnWithPop() {
+  // 1) 先去掉暗压
+  this.playBtnClass = '';
+
+  // 2) 让回弹动画每次都能重播：先清空再 set
+  this.playBtnAnim = '';
+  setTimeout(() => { this.playBtnAnim = 'press-up'; }, 0);
+},
 
     async onRestoreState() {
     if (this.songId) return false;
@@ -905,8 +1086,54 @@ export default {
             }
         }
     },
-    onSliderTouchStart() { this.isSliderDragging = true; },
-onSliderTouchEnd() { this.isSliderDragging = false; },
+    onSliderTouchStart() {
+  this.isSliderDragging = true;
+  this._sliderPressDown();
+},
+
+onSliderTouchEnd() {
+  this.isSliderDragging = false;
+  this._sliderPressUp();
+},
+
+onSliderTouchCancel() {
+  this.isSliderDragging = false;
+  this._sliderPressReset();
+},
+
+_sliderPressDown() {
+  // 重触发：先清空再上
+  this.sliderAnim = '';
+
+    this.sliderAnim = 'slider-press-down';
+
+  // 防御：有些设备不会触发 touchend/cancel（极少见），给个兜底复位
+  clearTimeout(this._sliderAnimFailsafe);
+  this._sliderAnimFailsafe = setTimeout(() => {
+    this._sliderPressReset();
+  }, 800);
+},
+
+_sliderPressUp() {
+  // 无论有没有歌曲，都必须恢复（避免你提到的“无歌曲卡住”）
+  this.sliderAnim = '';
+  this.$nextTick(() => {
+    this.sliderAnim = 'slider-press-up';
+  });
+
+  clearTimeout(this._sliderAnimTimer);
+  this._sliderAnimTimer = setTimeout(() => {
+    this.sliderAnim = '';
+  }, 190);
+
+  clearTimeout(this._sliderAnimFailsafe);
+},
+
+_sliderPressReset() {
+  clearTimeout(this._sliderAnimTimer);
+  clearTimeout(this._sliderAnimFailsafe);
+  this.sliderAnim = '';
+},
 
 
     // 辅助方法：执行通用手势操作 (不包括视图切换)
@@ -1171,37 +1398,88 @@ updateLyricSelection(index, isSelected) {
 
 
 
-    // 视图切换函数保持不变，但调用时机已由 handleSwipe 控制
-    switchToLyricsView() {
-        if (this.swiperCurrentIndex === 1) return;
-        console.log("显示歌词视图");
-        this.swiperCurrentIndex = 1;
-        brightness.setKeepScreenOn({ keepScreenOn: true });
-        this.$nextTick(() => {
-            if (!this._lyricsScrollView) {
-                this._lyricsScrollView = this.$element('lyricsScrollView');
-            }
-            this.scrollToCurrentLyric(true);
-        });
-    },
-    /**
-     * 【【【逻辑修正】】】
-     * 滑回播放器页面时的处理
-     */
-     switchToPlayerView() {
-        if (this.swiperCurrentIndex === 0) return;
-        console.log("显示播放器视图");
-        this.swiperCurrentIndex = 0;
-        brightness.setKeepScreenOn({ keepScreenOn: false });
+// 视图切换函数保持不变，但调用时机已由 handleSwipe 控制
+switchToLyricsView() {
+  if (this.swiperCurrentIndex === 1) return;
+  console.log("显示歌词视图");
 
-        // 如果存在一个待处理的选中操作
-        if (this.selectedLyricIndex !== -1) {
-            this.clearSelectionTimeout();
-            // 【关键】无条件继续播放
-            audio.play();
-            this.resetLyricSelection();
-        }
-    },
+  // 1) 强制复位所有按钮暗压 / 动画
+  this.resetAllPressStates();
+
+  // 2) 退出沉浸（理论上在播放器页不该有，但兜底）
+  this.exitImmersiveIfNeeded();
+
+  // 3) 切换视图
+  this.swiperCurrentIndex = 1;
+
+  // 4) 开启常亮（防御式）
+  try {
+    if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+      brightness.setKeepScreenOn({ keepScreenOn: true });
+    }
+  } catch (e) {
+    console.log('setKeepScreenOn(true) fail:', e);
+  }
+
+  // 5) 歌词滚动对齐
+  this.$nextTick(() => {
+    if (!this._lyricsScrollView) {
+      this._lyricsScrollView = this.$element('lyricsScrollView');
+    }
+    this.scrollToCurrentLyric(true);
+  });
+},
+/**
+ * 【【【逻辑修正】】】
+ * 滑回播放器页面时的处理
+ */
+ switchToPlayerView() {
+  if (this.swiperCurrentIndex === 0) return;
+  console.log("显示播放器视图");
+
+  // 1) 复位所有按钮暗压 / 动画
+  this.resetAllPressStates();
+
+  // 2) 退出沉浸模式（如果在歌词页点了当前行）
+  this.exitImmersiveIfNeeded();
+
+  // 3) 切换视图
+  this.swiperCurrentIndex = 0;
+
+  // 4) 关闭常亮（防御式）
+  try {
+    if (brightness && typeof brightness.setKeepScreenOn === 'function') {
+      brightness.setKeepScreenOn({ keepScreenOn: false });
+    }
+  } catch (e) {
+    console.log('setKeepScreenOn(false) fail:', e);
+  }
+
+  // 5) 如果存在一个待处理的选中操作：无条件恢复播放 + 清选中
+  if (this.selectedLyricIndex !== -1) {
+    this.clearSelectionTimeout();
+    audio.play();                // 【关键】无条件继续播放
+    this.resetLyricSelection();
+  }
+},
+
+
+    resetAllPressStates() {
+  const keys = ['prevBtn', 'playBtn', 'nextBtn'];
+  for (const key of keys) {
+    const cls = key + 'Class';
+    const anim = key + 'Anim';
+    if (this.hasOwnProperty(cls)) this[cls] = '';
+    if (this.hasOwnProperty(anim)) this[anim] = '';
+  }
+},
+
+exitImmersiveIfNeeded() {
+  if (!this.isImmersive) return;
+  this.isImmersive = false;
+  if (this._stopImmersiveTick) this._stopImmersiveTick();
+},
+
 
     /**
      * 启动2秒后自动取消选中的定时器
@@ -1298,10 +1576,27 @@ onSliderChange(e) {
 },
 
 
-    goToSongActions() {
-        if (!this.currSong) { prompt.showToast({ message: '当前无播放歌曲' }); return; }
-        router.push({ uri: "/pages/volume", params: { currentSong: JSON.stringify(this.currSong), screenShape: this.screenShape, playMode: this.playMode, isFmMode: this.isFmMode } });
-    },
+goToSongActions() {
+    if (!this.currSong) {
+        prompt.showToast({ message: '当前无播放歌曲' });
+        return;
+    }
+
+    // 等待按钮 press-up 动画完成再跳转（克制延迟）
+    clearTimeout(this._navDelayTimer);
+    this._navDelayTimer = setTimeout(() => {
+        router.push({
+            uri: "/pages/volume",
+            params: {
+                currentSong: JSON.stringify(this.currSong),
+                screenShape: this.screenShape,
+                playMode: this.playMode,
+                isFmMode: this.isFmMode
+            }
+        });
+    }, 140); // 和 press-up 动画时长对齐
+},
+
     togglePlayMode() {
         if (this.isFmMode) {
             prompt.showDialog({
@@ -1321,10 +1616,27 @@ onSliderChange(e) {
         if (this.playMode === 2 && this.playList.length > 0) this.generateShuffledList(true);
     },
     goToMenu() {
-        if (this.isDownloadingLocked) { prompt.showToast({ message: '正在下载，请稍后' }); return; }
-        if (this.isFmMode) { prompt.showToast({ message: '当前处于FM模式！打开过多页面将导致中断！' }); }
+    if (this._navLock) return;
+
+    if (this.isDownloadingLocked) {
+        prompt.showToast({ message: '正在下载，请稍后' });
+        return;
+    }
+
+    if (this.isFmMode) {
+        prompt.showToast({ message: '当前处于FM模式！打开过多页面将导致中断！' });
+        // 不 return，和你原逻辑一致
+    }
+
+    this._navLock = true;
+
+    clearTimeout(this._navDelayTimer);
+    this._navDelayTimer = setTimeout(() => {
+        this._navLock = false;
         router.push({ uri: "/pages/menu" });
-    },
+    }, 140); // 与按钮 press-up 动画对齐
+},
+
     exit() { app.terminate(); },
     // --- 下载逻辑 (已重构并使用闭包管理周期性提示) ---
     initiateDownload() {
