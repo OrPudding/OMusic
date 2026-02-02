@@ -1,145 +1,631 @@
 <template>
-    <div class="page-container">
-        <!-- 1. 固定的顶部栏 -->
-        <div class="header" onclick="goBack">
-            <text class="time-display">{{currentTime}}</text>
-            <text class="title">‹{{ pageTitle }}</text>
-        </div>
+	<div class="page-container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header" onclick="goBack">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹{{ pageTitle }}</text>
+		</div>
 
-        <!-- 2. 独立滚动的内容区 -->
-        <scroll id="songListScroll" class="scroll-wrapper" scroll-y="true" bounces="true" onscrolltop="handleScrollTop">
+		<!-- 2. 独立滚动的内容区 -->
+		<scroll
+			id="songListScroll"
+			class="scroll-wrapper"
+			scroll-y="true"
+			bounces="true"
+			onscrolltop="handleScrollTop"
+		>
+			<!-- 按钮容器 -->
+			<div class="button-container" if="{{ fullSongList.length > 0 }}">
+				<div class="button-group">
+					<!-- 播放全部（通用） -->
+					<div
+						class="group-button {{ (listType === 'songlist' || listType === 'playlist') ? 'little-buttons' :
+'normal-buttons' }}"
+						onclick="playAll"
+						if="{{ listType === 'songlist' || listType === 'daily_recommend' || listType ===
+'playlist' || listType === 'personal_fm' || listType === 'downloadlist' }}"
+					>
+						<image
+							class="button-icon"
+							src="/common/icon/play-arrow.png"
+						></image>
+						<text class="button-text dark">
+							{{ listType === "personal_fm" ? "开启FM" : "播放全部" }}
+						</text>
+					</div>
 
-            <!-- 按钮容器 -->
-            <div class="button-container" if="{{ fullSongList.length > 0 }}">
-                <!-- 歌单页 (songlist) -->
-                <div if="{{ listType === 'songlist' }}" class="button-group">
-                    <div class="group-button little-buttons" onclick="playAll"><image class="button-icon" src="/common/icon/play-arrow.png"></image><text class="button-text dark">播放全部</text></div>
-                    <div class="group-button little-buttons" onclick="addAllToFavorites"><image class="button-icon" src="/common/icon/list-liked.png"></image><text class="button-text dark">添加收藏</text></div>
-                    <div class="group-button little-buttons" onclick="toggleDownloadMode">
-                        <image class="button-icon" src="{{ isDownloadMode ? '/common/icon/check.png' : '/common/icon/download_dark.png' }}"></image>
-                        <text class="button-text dark">{{ isDownloadMode ? '完成' : '下载' }}</text>
-                    </div>
-                </div>
-                <!-- 每日推荐/播放列表 (daily_recommend, playlist) -->
-                <div if="{{ listType === 'daily_recommend' || listType === 'playlist' }}" class="button-group">
-                    <div class="group-button normal-buttons" onclick="playAll"><image class="button-icon" src="/common/icon/play-arrow.png"></image><text class="button-text dark">播放全部</text></div>
-                    <div class="group-button normal-buttons" onclick="toggleDownloadMode">
-                        <image class="button-icon" src="{{ isDownloadMode ? '/common/icon/check.png' : '/common/icon/download_dark.png' }}"></image>
-                        <text class="button-text dark">{{ isDownloadMode ? '完成' : '下载' }}</text>
-                    </div>
-                </div>
-                <!-- 私人FM (personal_fm) -->
-                <div if="{{ listType === 'personal_fm' }}" class="button-group">
-                     <div class="group-button normal-buttons" onclick="playAll"><image class="button-icon" src="/common/icon/play-arrow.png"></image><text class="button-text dark">开启FM</text></div>
-                     <div class="group-button normal-buttons" onclick="refreshFm"><image class="button-icon" src="/common/icon/refresh.png"></image><text class="button-text dark">换一批</text></div>
-                </div>
-                <!-- 已下载 (downloadlist) -->
-                <div if="{{ listType === 'downloadlist' }}" class="button-group">
-                     <div class="group-button normal-buttons" onclick="playAll"><image class="button-icon" src="/common/icon/play-arrow.png"></image><text class="button-text dark">播放全部</text></div>
-                     <div class="group-button normal-buttons" onclick="goToStorage"><image class="button-icon" src="/common/icon/storage.png"></image><text class="button-text dark">存储空间</text></div>
-                </div>
-            </div>
+					<!-- 添加收藏（仅 songlist） -->
+					<div
+						class="group-button little-buttons"
+						onclick="addAllToFavorites"
+						if="{{ listType === 'songlist' }}"
+					>
+						<image
+							class="button-icon"
+							src="/common/icon/list-liked.png"
+						></image>
+						<text class="button-text dark">添加收藏</text>
+					</div>
 
-            <div class="status-container">
-                <!-- 1. 加载中状态：只在 isLoading 为 true 时显示 -->
-                <div if="{{ isLoading }}" class="loading-wrapper">
+					<!-- 下载/完成（songlist / daily_recommend / playlist） -->
+					<div
+						class="group-button {{ (listType === 'songlist' || listType === 'playlist') ? 'little-buttons' :
+'normal-buttons' }}"
+						onclick="toggleDownloadMode"
+						if="{{ listType === 'songlist' || listType === 'daily_recommend' || listType ===
+'playlist' }}"
+					>
+						<image
+							class="button-icon"
+							src="{{ isDownloadMode ? '/common/icon/check.png' : '/common/icon/download_dark.png' }}"
+						></image>
+						<text class="button-text dark">
+							{{ isDownloadMode ? "完成" : "下载" }}
+						</text>
+					</div>
 
-                        <text if="{{ isFetchingFromNetwork }}" class="loading-tip">拉取中...已加载{{networkSongsCount}}首</text>
-                    <!-- b. 否则 (缓存加载或本地列表加载)，只显示动态文本 -->
-                    <text else class="loading-tip">{{ loadingText }}</text>
-                </div>
+					<!-- 清空播放列表（仅 playlist） -->
+					<div
+						class="group-button little-buttons"
+						onclick="clearPlayList"
+						if="{{ listType === 'playlist' }}"
+					>
+						<image class="button-icon" src="/common/icon/delete.png"></image>
+						<text class="button-text dark">清空列表</text>
+					</div>
 
-                <!-- 2. 加载失败状态：只在加载结束且有错误时显示 -->
-                <div if="{{ !isLoading && loadError }}" class="error-wrapper">
-                    <text class="error-tip">加载失败: {{ loadError }}</text>
-                    <text class="retry-button" onclick="retryLoad">点击重试</text>
-                </div>
+					<!-- 私人FM：换一批（仅 personal_fm） -->
+					<div
+						class="group-button normal-buttons"
+						onclick="refreshFm"
+						if="{{ listType === 'personal_fm' }}"
+					>
+						<image class="button-icon" src="/common/icon/refresh.png"></image>
+						<text class="button-text dark">换一批</text>
+					</div>
 
-                <!-- 3. 列表为空状态：只在加载结束、无错误且列表为空时显示 -->
-                <text if="{{ !isLoading && !loadError && fullSongList.length === 0 }}" class="loading-tip">列表为空</text>
-            </div>
+					<!-- 已下载：存储空间（仅 downloadlist） -->
+					<div
+						class="group-button normal-buttons"
+						onclick="goToStorage"
+						if="{{ listType === 'downloadlist' }}"
+					>
+						<image class="button-icon" src="/common/icon/storage.png"></image>
+						<text class="button-text dark">存储空间</text>
+					</div>
+				</div>
+			</div>
 
-            <!-- 列表内容 -->
-            <div class="list-content" if="{{ !isLoading && !loadError && fullSongList.length > 0 }}">
-                <div for="{{(index, item) in displaySongList}}" class="song-item" onclick="handleItemClick(item)">
-                    <div class="item-prefix">
-                        <text class="item-index">{{ item.displayIndex }}</text>
-                    </div>
-                    <div class="song-info">
-                        <text class="song-title">{{ item.name }}</text>
-                        <text class="song-artist">{{ item.artists }}</text>
-                        <div class="song-meta" if="{{item.isDownloaded && !isDownloadMode}}">
-                            <text class="download-tag">已下载</text>
-                        </div>
-                    </div>
-                    <div class="action-btn-wrapper">
-                        <div if="{{ isDownloadMode && (listType === 'songlist' || listType === 'daily_recommend' || listType === 'playlist') }}" class="download-status-wrapper">
-                            <image if="{{ item.isDownloaded }}" class="action-btn" src="/common/icon/check_light.png"></image>
-                            <image elif="{{ downloadingIds.includes(item.id) }}" class="action-btn" src="/common/icon/more_light.png"></image>
-                            <image else class="action-btn" src="/common/icon/downloaded.png"></image>
-                        </div>
-                        <div else>
-                            <div if="{{ listType === 'playlist' || listType === 'favorites' || listType === 'downloadlist' }}" onclick="deleteSong(item)">
-                                <image class="action-btn" src="/common/icon/cancel.png"></image>
-                            </div>
-                            <div if="{{ listType === 'songlist' }}" onclick="addSongToNext(item)">
-                                <image class="action-btn" src="/common/icon/plus.png"></image>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </scroll>
+			<div class="status-container">
+				<!-- 1. 加载中状态：只在 isLoading 为 true 时显示 -->
+				<div if="{{ isLoading }}" class="loading-wrapper">
+					<text if="{{ isFetchingFromNetwork }}" class="loading-tip">
+						拉取中...已加载{{ networkSongsCount }}首
+					</text>
+					<!-- b. 否则 (缓存加载或本地列表加载)，只显示动态文本 -->
+					<text else class="loading-tip">{{ loadingText }}</text>
+				</div>
 
-        <!-- 翻页栏 -->
-        <div class="pagination-footer" if="{{ !isLoading && !loadError && fullSongList.length > PAGE_SIZE }}">
-            <text class="item-value-btn {{ currentPage === 1 ? 'item-value-btn-disabled' : '' }}" onclick="loadPrevPage">上一页</text>
-            <text class="pagination-text">{{ currentPage }} / {{ totalPages }}</text>
-            <text class="item-value-btn {{ currentPage >= totalPages ? 'item-value-btn-disabled' : '' }}" onclick="loadNextPage">下一页</text>
-        </div>
-    </div>
+				<!-- 2. 加载失败状态：只在加载结束且有错误时显示 -->
+				<div if="{{ !isLoading && loadError }}" class="error-wrapper">
+					<text class="error-tip">加载失败: {{ loadError }}</text>
+					<text class="retry-button" onclick="retryLoad">点击重试</text>
+				</div>
+
+				<!-- 3. 列表为空状态：只在加载结束、无错误且列表为空时显示 -->
+				<text
+					if="{{ !isLoading && !loadError && fullSongList.length === 0 }}"
+					class="loading-tip"
+				>
+					列表为空
+				</text>
+			</div>
+
+			<!-- 列表内容 -->
+			<div
+				class="list-content"
+				if="{{ !isLoading && !loadError && fullSongList.length > 0 }}"
+			>
+				<div
+					for="{{ (index, item) in displaySongList }}"
+					class="song-item {{ item.id === targetSongId ? 'song-item-playing' : '' }}"
+					onclick="handleItemClick(item)"
+				>
+					<div class="item-prefix">
+						<text class="item-index">{{ item.displayIndex }}</text>
+					</div>
+					<div class="song-info">
+						<text class="song-title">{{ item.name }}</text>
+						<text class="song-artist">{{ item.artists }}</text>
+						<div
+							class="song-meta"
+							if="{{ item.isDownloaded && !isDownloadMode }}"
+						>
+							<text class="download-tag">已下载</text>
+						</div>
+					</div>
+					<div class="action-btn-wrapper">
+						<div
+							if="{{ isDownloadMode && (listType === 'songlist' || listType === 'daily_recommend' ||
+listType === 'playlist') }}"
+							class="download-status-wrapper"
+						>
+							<image
+								if="{{ item.isDownloaded }}"
+								class="action-btn"
+								src="/common/icon/check_light.png"
+							></image>
+							<image
+								elif="{{ downloadingIds.includes(item.id) }}"
+								class="action-btn"
+								src="/common/icon/more_light.png"
+							></image>
+							<image
+								else
+								class="action-btn"
+								src="/common/icon/downloaded.png"
+							></image>
+						</div>
+						<div else>
+							<div
+								if="{{ listType === 'playlist' || listType === 'favorites' || listType ===
+'downloadlist' }}"
+								onclick="deleteSong(item, $event)"
+							>
+								<image class="action-btn" src="/common/icon/cancel.png"></image>
+							</div>
+							<div
+								if="{{ listType === 'songlist' }}"
+								onclick="addSongToNext(item, $event)"
+							>
+								<image class="action-btn" src="/common/icon/plus.png"></image>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</scroll>
+
+		<!-- 翻页栏 -->
+		<div
+			class="pagination-footer"
+			if="{{ !isLoading && !loadError && fullSongList.length > PAGE_SIZE }}"
+		>
+			<text class="item-value-btn" onclick="loadPrevPage">上一页</text>
+			<text class="pagination-text" onclick="openPageKeypad">
+				{{ currentPage }} / {{ totalPages }}
+			</text>
+			<text class="item-value-btn" onclick="loadNextPage">下一页</text>
+		</div>
+
+		<!-- 小键盘浮层 -->
+		<div
+			class="pagekey-overlay"
+			if="{{ showPageKeypad }}"
+			onclick="closePageKeypad"
+		>
+			<div class="pagekey-panel" onclick="stopBubble">
+				<div class="pagekey-display-wrapper">
+					<text class="pagekey-display">{{ pageInput || "" }}</text>
+				</div>
+
+				<div class="pagekey-keyboard">
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('1')">1</text>
+						<text class="pagekey-key" onclick="handlePageKey('2')">2</text>
+						<text class="pagekey-key" onclick="handlePageKey('3')">3</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('4')">4</text>
+						<text class="pagekey-key" onclick="handlePageKey('5')">5</text>
+						<text class="pagekey-key" onclick="handlePageKey('6')">6</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('7')">7</text>
+						<text class="pagekey-key" onclick="handlePageKey('8')">8</text>
+						<text class="pagekey-key" onclick="handlePageKey('9')">9</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('退格')">
+							退格
+						</text>
+						<text class="pagekey-key" onclick="handlePageKey('0')">0</text>
+						<text class="pagekey-key" onclick="confirmPageInput">跳转</text>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </template>
 
 <style>
-    .page-container { width: 100%; height: 100%; background-color: black; position: relative; }
-    .header { width: 100%; height: 90px; flex-direction: column; justify-content: center; align-items: center; background-color: black; }
-    .time-display { font-size: 28px; font-weight: bold; color: #ffffff; padding-top: 5px; text-align: center; }
-    .title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
-    .scroll-wrapper { position: absolute; top: 90px; bottom: 0; left: 0; right: 0; width: 100%; flex-direction: column; align-items: center; }
-    .button-container { width: 392px; margin: 10px 0; }
-    .button-group { width: 100%; flex-direction: row; justify-content: space-around; }
-    .group-button { height: 100px; border-radius: 36px; justify-content: center; align-items: center; flex-direction: column; background-color: #BAC3FF; }
-    .normal-buttons { width: 160px; }
-    .little-buttons { width: 124px; }
-    .button-icon { width: 36px; height: 36px; }
-    .button-text { font-size: 26px; font-weight: bold; margin-top: 4px; }
-    .button-text.dark { color: #000000; }
-    .list-content { flex-direction: column; padding-bottom: 90px; width: 100%; align-items: center; }
-    .song-item { padding: 0 10px 0 0; width: 400px; height: 120px; margin: 5px; background-color: #191821; border-radius: 60px; justify-content: flex-start; align-items: center; }
-    .item-prefix { width: 80px; height: 100%; justify-content: center; align-items: center; flex-shrink: 0; }
-    .item-index { text-align: center; font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.6); }
-    .song-info { flex-grow: 1; width: 0; flex-direction: column; justify-content: center; }
-    .song-title { font-size: 26px; font-weight: bold; color: #fff; lines: 1; text-overflow: ellipsis; }
-    .song-artist { font-size: 22px; font-weight: bold; color: #888; lines: 1; text-overflow: ellipsis; }
-    .song-meta { flex-direction: row; align-items: center; margin-top: 4px; }
-    .download-tag { background-color: #2E323C; color: #BAC3FF; font-size: 18px; font-weight: bold; padding: 2px 8px; border-radius: 6px; }
-    .action-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
-    .download-status-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; }
-    .action-btn { width: 64px; height: 64px; }
-    .pagination-footer { position: absolute; bottom: 0; left: 0; right: 0; width: 100%; height: 100px; flex-direction: row; padding: 0 20px; justify-content: space-around; align-items: center; }
-    .pagination-text { font-size: 28px; font-weight: bold; color: #ffffff; }
-    .item-value-btn { height: 50px; padding: 0 20px; background-color: #2E323C; border-radius: 25px; color: #BAC3FF; font-size: 26px; font-weight: bold; text-align: center; line-height: 50px; }
-    .item-value-btn-disabled { background-color: #2E323C; color: #888; }
-    .status-container { width: 100%; flex-direction: column; align-items: center; justify-content: center; }
-    .loading-wrapper, .error-wrapper { flex-direction: column; align-items: center; }
-    .loading-progress-container { width: 360px; flex-direction: column; }
-    .loading-progress-text { font-size: 26px; font-weight: bold;text-align: center; color: #888; margin-bottom: 8px; }
-    .loading-progress-bar { width: 100%; color: #BAC3FF; stroke-width: 16px; }
-    .loading-tip { width: 100%; padding:50px 0;text-align: center; color: #888; font-weight: bold; font-size: 26px; }
-    .error-tip { color: #FF453A; font-size: 24px; margin-bottom: 20px; text-align: center; }
-    .retry-button { padding: 10px 30px; font-size: 26px; color: #BAC3FF; border: 1px solid #BAC3FF; border-radius: 30px; }
-    @media (shape: rect) { .header { height: 65px; flex-direction: row-reverse; padding-top: 10px; justify-content: space-around; } .scroll-wrapper { top: 65px; } .time-display { font-size: 32px; padding-top: 0px; } }
-    @media (shape: circle) { .list-content { padding-bottom: 114px; } .pagination-footer { width: 100%; justify-content: center; } .item-value-btn { margin: 0 22px 50px 22px; } .pagination-text { position: absolute; bottom: 10px; } .loading-tip { padding-bottom: 120px; } }
+.page-container {
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	position: relative;
+}
+.header {
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background-color: black;
+}
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
+.title {
+	font-size: 32px;
+	padding: 5px;
+	text-align: center;
+	font-weight: bold;
+	color: #fff;
+}
+.scroll-wrapper {
+	position: absolute;
+	top: 90px;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+}
+.button-container {
+	width: 392px;
+	margin: 10px 0;
+}
+.button-group {
+	width: 100%;
+	flex-direction: row;
+	justify-content: space-around;
+}
+.group-button {
+	height: 100px;
+	border-radius: 36px;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+	background-color: #bac3ff;
+}
+.normal-buttons {
+	width: 160px;
+}
+.little-buttons {
+	width: 124px;
+}
+.button-icon {
+	width: 36px;
+	height: 36px;
+}
+.button-text {
+	font-size: 26px;
+	font-weight: bold;
+	margin-top: 4px;
+}
+.button-text.dark {
+	color: #000000;
+}
+.list-content {
+	flex-direction: column;
+	padding-bottom: 90px;
+	width: 100%;
+	align-items: center;
+}
+.song-item {
+	padding: 0 10px 0 0;
+	width: 400px;
+	height: 120px;
+	margin: 5px;
+	background-color: #2e323c;
+	border-radius: 60px;
+	justify-content: flex-start;
+	align-items: center;
+}
+/* 当前播放歌曲高亮 */
+.song-item-playing {
+	background-color: #2a2d3a; /* 比 #2e323c 稍亮一点 */
+	border: 2px solid #bac3ff; /* 你全局的主题色 */
+}
+
+.item-prefix {
+	width: 80px;
+	height: 100%;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.item-index {
+	text-align: center;
+	font-size: 28px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.6);
+}
+.song-info {
+	flex-grow: 1;
+	width: 0;
+	flex-direction: column;
+	justify-content: center;
+}
+.song-title {
+	font-size: 26px;
+	font-weight: bold;
+	color: #fff;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.song-artist {
+	font-size: 22px;
+	font-weight: bold;
+	color: #888;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.song-meta {
+	flex-direction: row;
+	align-items: center;
+	margin-top: 4px;
+}
+.download-tag {
+	background-color: #2e323c;
+	color: #bac3ff;
+	font-size: 18px;
+	font-weight: bold;
+	padding: 2px 8px;
+	border-radius: 6px;
+}
+.action-btn-wrapper {
+	width: 80px;
+	height: 120px;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.download-status-wrapper {
+	width: 80px;
+	height: 120px;
+	justify-content: center;
+	align-items: center;
+}
+.action-btn {
+	width: 64px;
+	height: 64px;
+}
+.pagination-footer {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	height: 100px;
+	flex-direction: row;
+	padding: 0 20px;
+	justify-content: space-around;
+	align-items: center;
+}
+.pagination-text {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+}
+.item-value-btn {
+	height: 50px;
+	padding: 0 20px;
+	background-color: #191821;
+	border-radius: 25px;
+	color: #bac3ff;
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 50px;
+}
+.item-value-btn-disabled {
+	background-color: #191821;
+	color: #888;
+}
+.status-container {
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+.loading-wrapper,
+.error-wrapper {
+	flex-direction: column;
+	align-items: center;
+}
+.loading-progress-container {
+	width: 360px;
+	flex-direction: column;
+}
+.loading-progress-text {
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+	color: #888;
+	margin-bottom: 8px;
+}
+.loading-progress-bar {
+	width: 100%;
+	color: #bac3ff;
+	stroke-width: 16px;
+}
+.loading-tip {
+	width: 100%;
+	padding: 50px 0;
+	text-align: center;
+	color: #888;
+	font-weight: bold;
+	font-size: 26px;
+}
+.error-tip {
+	color: #ff453a;
+	font-size: 24px;
+	margin-bottom: 20px;
+	text-align: center;
+}
+.retry-button {
+	padding: 10px 30px;
+	font-size: 26px;
+	color: #bac3ff;
+	border: 1px solid #bac3ff;
+	border-radius: 30px;
+}
+/* 覆盖层：全屏透明，仅用于把面板居中 */
+.pagekey-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+
+	background-color: rgba(0, 0, 0, 0.2); /* 完全透明 */
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+/* 面板：中间小小一坨 */
+.pagekey-panel {
+	width: 280px;
+	height: 260px;
+
+	background-color: #2e323c;
+	border-radius: 28px;
+
+	flex-direction: column;
+	align-items: center;
+
+	padding-bottom: 12px;
+
+	margin-bottom: 20px;
+}
+
+/* 显示框 */
+.pagekey-display-wrapper {
+	width: 160px;
+	height: 44px;
+
+	justify-content: center;
+	align-items: center;
+}
+
+.pagekey-display {
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+
+/* 键盘区域 */
+.pagekey-keyboard {
+	width: 240px;
+	height: 200px;
+
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+/* 每行 */
+.pagekey-row {
+	width: 240px;
+	height: 44px;
+
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+
+/* 按键 */
+.pagekey-key {
+	width: 72px;
+	height: 44px;
+
+	background-color: rgba(255, 255, 255, 0.12);
+	border-radius: 22px;
+
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 44px;
+}
+
+@media (shape: rect) {
+	.header {
+		height: 65px;
+		flex-direction: row-reverse;
+		padding-top: 10px;
+		justify-content: space-around;
+	}
+	.scroll-wrapper {
+		top: 65px;
+	}
+	.time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
+}
+.pagekey-panel {
+	width: 320px;
+	height: 300px;
+	border-radius: 32px;
+	padding-bottom: 14px;
+	margin-bottom: 10px;
+}
+
+.pagekey-display-wrapper {
+	width: 190px;
+	height: 52px;
+	border-radius: 20px;
+}
+
+.pagekey-display {
+	font-size: 28px;
+}
+
+.pagekey-keyboard {
+	width: 276px;
+	height: 226px;
+}
+
+.pagekey-row {
+	width: 276px;
+	height: 50px;
+}
+
+.pagekey-key {
+	width: 84px;
+	height: 50px;
+	border-radius: 25px;
+	font-size: 28px;
+	line-height: 50px;
+}
+@media (shape: circle) {
+	.list-content {
+		padding-bottom: 114px;
+	}
+	.pagination-footer {
+		width: 100%;
+		justify-content: center;
+	}
+	.item-value-btn {
+		margin: 0 22px 50px 22px;
+	}
+	.pagination-text {
+		position: absolute;
+		bottom: 10px;
+	}
+	.loading-tip {
+		padding-bottom: 120px;
+	}
+}
 </style>
 <script>
 import router from "@system.router";
@@ -148,764 +634,980 @@ import prompt from "@system.prompt";
 import brightness from "@system.brightness";
 
 const fileService = {
-    _promisify(fn, options) {
-        return new Promise((resolve, reject) => {
-            fn({ ...options, success: resolve, fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)) });
-        });
-    },
-    async readJson(uri, defaultValue = null) {
-        try {
-            const data = await this._promisify(file.readText, { uri });
-            return JSON.parse(data.text || '{}');
-        } catch (error) {
-            if (error.code !== 301) console.error(`[FileService] readJson 失败: ${uri}`, error);
-            return defaultValue;
-        }
-    },
-    async writeJson(uri, data) {
-        try {
-            await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
-            return true;
-        } catch (error) {
-            console.error(`[FileService] writeJson 失败: ${uri}`, error);
-            return false;
-        }
-    },
-    async delete(uri) {
-        try {
-            await this._promisify(file.delete, { uri });
-            return true;
-        } catch (error) {
-            if (error.code !== 301) console.error(`[FileService] delete 失败: ${uri}`, error);
-            return false;
-        }
-    },
-    async ensureDirExists(uri) {
-        try {
-            await this._promisify(file.mkdir, { uri });
-        } catch (error) { /* 忽略目录已存在的错误 */ }
-    }
+	_promisify(fn, options) {
+		return new Promise((resolve, reject) => {
+			fn({
+				...options,
+				success: resolve,
+				fail: (data, code) => reject(new Error(`Error code ${code}: ${data}`)),
+			});
+		});
+	},
+	async readJson(uri, defaultValue = null) {
+		try {
+			const data = await this._promisify(file.readText, { uri });
+			return JSON.parse(data.text || "{}");
+		} catch (error) {
+			if (error.code !== 301)
+				console.error(`[FileService] readJson 失败: ${uri}`, error);
+			return defaultValue;
+		}
+	},
+	async writeJson(uri, data) {
+		try {
+			await this._promisify(file.writeText, {
+				uri,
+				text: JSON.stringify(data),
+			});
+			return true;
+		} catch (error) {
+			console.error(`[FileService] writeJson 失败: ${uri}`, error);
+			return false;
+		}
+	},
+	async delete(uri) {
+		try {
+			await this._promisify(file.delete, { uri });
+			return true;
+		} catch (error) {
+			if (error.code !== 301)
+				console.error(`[FileService] delete 失败: ${uri}`, error);
+			return false;
+		}
+	},
+	async ensureDirExists(uri) {
+		try {
+			await this._promisify(file.mkdir, { uri });
+		} catch (error) {
+			/* 忽略目录已存在的错误 */
+		}
+	},
 };
 
-const SETTINGS_FILE_URI = 'internal://files/settings.json';
-const DIR_MUSIC = 'internal://files/music/';
-const DIR_LYRICS = 'internal://files/lyrics/';
+const SETTINGS_FILE_URI = "internal://files/settings.json";
+const DIR_MUSIC = "internal://files/music/";
+const DIR_LYRICS = "internal://files/lyrics/";
 
 export default {
-    protected: {
-        listType: 'playlist',
-        songlistId: null,
-        targetSongId: null, 
-    },
-    private: {
-        fullSongList: [],
-        displaySongList: [],
-        PAGE_SIZE: 10,
-        currentPage: 1,
-        totalPages: 1,
-        TOTAL_LIMIT: 1000,
-        API_PAGE_SIZE: 20,
-        ITEM_HEIGHT: 130, 
-        isLoading: false,
-        isRefreshing: false,
-        justReachedTop: false,
-        isDownloadMode: false,
-        isDownloadingLocked: false,
-        downloadingIds: [],
-        downloadQueue: [],
-        pageTitle: "播放列表",
-        currentTime: "00:00",
-        updateTimeInterval: null,
-        justReachedTopTimeoutId: null,
-        songlistsDir: 'internal://files/songlists/',
-        listFileUri: 'internal://files/play_list.json',
-        downloadedFileUri: 'internal://files/downloaded_songs.json',
-        favoritesFileUri: 'internal://files/favorites.json',
-        isFetchingFromNetwork: false,
-        networkSongsCount: 0,
-        totalTrackCount: ' ',
-        networkLoadProgress: 0,
-        loadError: null,
-        loadingText: '正在加载...',
-        didLoadFromCache: false,
-        isUpdateCheckInFlight: false,
-    },
-
-    onInit: function() {
-        var that = this;
-        if (that.targetSongId) {
-            console.log(`接收到定位请求，目标歌曲ID: ${that.targetSongId}`);
-        }
-        that.updateTime();
-        that.updateTimeInterval = setInterval(function() { that.updateTime(); }, 1000 * 60);
-        that.updatePageTitle();
-
-        (async () => {
-            await that.applySettings();
-            await fileService.ensureDirExists(that.songlistsDir);
-            that.loadData(!!that.targetSongId);
-        })();
-        this.silentCheckForUpdates();
-    },
-
-    onDestroy: function() {
-        if (this.updateTimeInterval) clearInterval(this.updateTimeInterval);
-        if (this.justReachedTopTimeoutId) clearTimeout(this.justReachedTopTimeoutId);
-    },
-
-    async applySettings() {
-        const data = await fileService.readJson(SETTINGS_FILE_URI, {});
-        if (data) {
-            if (data.performance) this.PAGE_SIZE = data.performance.windowSize || this.PAGE_SIZE;
-            if (data.network) {
-                this.TOTAL_LIMIT = data.network.totalLimit || this.TOTAL_LIMIT;
-                this.API_PAGE_SIZE = data.network.apiPageSize || this.API_PAGE_SIZE;
-            }
-        }
-    },
-
-    updatePageTitle: function() {
-        const titles = {
-            'downloadlist': "已下载", 'songlist': "歌单详情", 'favorites': "我的收藏",
-            'playlist': "播放列表", 'daily_recommend': "每日推荐", 'personal_fm': "私人FM",
-        };
-        this.pageTitle = titles[this.listType] || "播放列表";
-    },
-
-    updateTime: function() {
-        const now = new Date();
-        this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    },
-
-    async silentCheckForUpdates() {
-  // 仅对“可刷新的在线列表”做检查；personal_fm 太动态，建议不检查避免频繁弹窗
-  const refreshable = ['songlist', 'daily_recommend'].includes(this.listType);
-  if (!refreshable) return;
-
-  if (this.isLoading || this.isRefreshing || this.isUpdateCheckInFlight) return;
-
-  // songlist 必须有 id
-  if (this.listType === 'songlist' && !this.songlistId) return;
-
-  this.isUpdateCheckInFlight = true;
-
-  try {
-    // 1) 读取本地当前列表的“头部签名”
-    const localHeadSig = await this._getLocalHeadSignature(10);
-    if (!localHeadSig) return; // 没有本地数据就不提示
-
-    // 2) 静默从网络取“开头一小段”
-    const remoteHeadSig = await this._getRemoteHeadSignature(10);
-    if (!remoteHeadSig) return; // 网络失败静默忽略
-
-// 3) 有差异 -> 弹窗询问是否刷新（Vela: 用 success/cancel 判断勾/叉）
-if (localHeadSig !== remoteHeadSig) {
-  prompt.showDialog({
-    title: '发现列表更新',
-    message: '检测到列表内容可能已更新，是否刷新？',
-    // Vela 不依赖 buttons/index；用勾(确认)/叉(取消)
-    success: async () => {
-      // 用户点“勾”：执行刷新
-      try {
-        await this.loadData(false, true);
-        prompt.showToast({ message: '已刷新' });
-      } catch (e) {
-        prompt.showToast({ message: '刷新失败' });
-      }
-    },
-    cancel: () => {
-        prompt.showToast({ message: '操作已取消' });
-      // 用户点“叉”：什么都不做，静默返回
-    },
-    fail: (data, code) => {
-      console.error(`showDialog fail code=${code}`, data);
-    }
-  });
-}
-  } finally {
-    this.isUpdateCheckInFlight = false;
-  }
-},
-
-async _getLocalHeadSignature(n = 10) {
-  try {
-    // 优先用当前已显示/已加载的数据（最快）
-    const list = Array.isArray(this.fullSongList) && this.fullSongList.length > 0
-      ? this.fullSongList
-      : null;
-
-    if (list) {
-      return list.slice(0, n).map(s => String(s.id)).join(',');
-    }
-
-    // 如果当前内存里没有，就根据不同 listType 读对应缓存
-    if (this.listType === 'songlist') {
-      const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
-      const cached = await fileService.readJson(cacheFileUri, null);
-      if (!Array.isArray(cached) || cached.length === 0) return '';
-      return cached.slice(0, n).map(s => String(s.id)).join(',');
-    }
-
-    if (this.listType === 'daily_recommend') {
-      // daily recommend 若你有缓存文件可读，放这里；没有缓存就直接用内存（上面已处理）
-      return '';
-    }
-
-    return '';
-  } catch (e) {
-    return '';
-  }
-},
-
-async _getRemoteHeadSignature(n = 10) {
-  try {
-    const request = this.$app.$def.requestService;
-    if (!request) return '';
-
-    if (this.listType === 'songlist') {
-      // 只拉 offset=0 的一页，轻量映射成 id 列表
-      const ts = Date.now();
-      const limit = Math.max(20, n); // 至少 20，避免太小不稳定
-      const resp = await request.fetch({
-        url: `https://163api.qijieya.cn/playlist/track/all`
-          + `?id=${this.songlistId}`
-          + `&limit=${limit}`
-          + `&offset=0`
-          + `&timestamp=${ts}`
-      });
-
-      const songs = resp.data?.songs;
-      if (!Array.isArray(songs) || songs.length === 0) return '';
-
-      // 只取 id，不留大对象
-      return songs.slice(0, n).map(s => String(s.id)).join(',');
-    }
-
-    if (this.listType === 'daily_recommend') {
-      // 这里调用你现有的 daily recommend 接口（你文件里 _getSourceData_dailyRecommend 已有）
-      // 但我们只取“开头 n 首”的 id，避免全量加载
-      const data = await this._getSourceData_dailyRecommend();
-      if (!Array.isArray(data) || data.length === 0) return '';
-      return data.slice(0, n).map(s => String(s.id)).join(',');
-    }
-
-    return '';
-  } catch (e) {
-    return '';
-  }
-},
-
-
-    async loadData(shouldLocate = false, force = false) {
-        if (this.isLoading) return;
-
-        this.isLoading = true;
-        this.loadError = null;
-        this.isFetchingFromNetwork = false;
-        this.didLoadFromCache = false;
-
-        if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                    brightness.setKeepScreenOn({ keepScreenOn: true });
-                }
-        
-        switch (this.listType) {
-            case 'songlist': this.loadingText = '正在加载歌单...'; break;
-            case 'daily_recommend': this.loadingText = '正在获取今日推荐...'; break;
-            case 'personal_fm': this.loadingText = '正在开启私人FM...'; break;
-            default: this.loadingText = '正在读取列表...';
-        }
-        
-        if (force) {
-            this.fullSongList = [];
-            this.displaySongList = [];
-        }
-        this.currentPage = 1;
-
-        try {
-            let sourceData;
-            switch (this.listType) {
-                case 'songlist':
-                    sourceData = await this._getSourceData_songlist(force);
-                    break;
-                case 'daily_recommend':
-                    sourceData = await this._getSourceData_dailyRecommend();
-                    break;
-                case 'personal_fm':
-                    sourceData = await this._getSourceData_personalFm();
-                    break;
-                case 'downloadlist':
-                    sourceData = Object.values(await fileService.readJson(this.downloadedFileUri, {}));
-                    break;
-                case 'favorites':
-                    sourceData = Object.values(await fileService.readJson(this.favoritesFileUri, {}));
-                    break;
-                case 'playlist':
-                default:
-                    sourceData = await fileService.readJson(this.listFileUri, []);
-                    break;
-            }
-
-            if (sourceData && sourceData.length > 0) {
-                const downloadedData = await fileService.readJson(this.downloadedFileUri, {});
-                const downloadedIds = new Set(Object.keys(downloadedData));
-                
-                this.fullSongList = sourceData;
-                this.fullSongList.forEach(song => {
-                    song.isDownloaded = downloadedIds.has(String(song.id));
-                });
-
-                this.totalPages = Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
-
-                if (shouldLocate) this.locateSongAndLoadPage();
-                else this.loadPage(1);
-            } else {
-                this.fullSongList = [];
-                this.displaySongList = [];
-                this.totalPages = 1;
-            }
-        } catch (error) {
-            this.loadError = error.message || '未知错误';
-            this.fullSongList = [];
-            this.displaySongList = [];
-        } finally {
-            this.isLoading = false;
-            this.isFetchingFromNetwork = false;
-            if (this.didLoadFromCache) {
-                setTimeout(() => { this.didLoadFromCache = false; }, 500);
-            }
-                if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                    brightness.setKeepScreenOn({ keepScreenOn: false });
-                }
-        }
-    },
-
-    retryLoad: function() { this.loadData(); },
-
-    async _getSourceData_songlist(forceAll = false) {
-  if (!this.songlistId) throw new Error("未提供歌单ID");
-
-  const request = this.$app.$def.requestService;
-  if (!request) throw new Error("内部服务错误");
-
-  const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
-
-  // 1) 缓存优先
-  if (!forceAll) {
-    const cached = await fileService.readJson(cacheFileUri, null);
-    if (Array.isArray(cached) && cached.length > 0) {
-      console.log('[songlist] 使用缓存，长度 =', cached.length);
-      // 只显示已拉取数量即可（总数未知）
-      this.isFetchingFromNetwork = false;
-      this.networkSongsCount = cached.length;
-      this.totalTrackCount = ' ';        // UI：不显示总数
-      this.networkLoadProgress = 0;      // UI：可不显示进度条或固定 0
-      return cached;
-    }
-  }
-
-  // 2) 初始化 UI 状态（未知总数的“拉取计数”模式）
-  this.isFetchingFromNetwork = true;
-  this.loadingText = '正在加载歌曲...';
-  this.networkSongsCount = 0;
-  this.totalTrackCount = ' ';       // 未知总数：保持空
-  this.networkLoadProgress = 0;     // 未知总数：不用百分比
-
-  // 3) 分页参数（穿戴设备建议 20~50）
-  //    你可以让 API_PAGE_SIZE 在设置里改；这里做一个安全兜底
-  let limit = this.API_PAGE_SIZE || 20;
-  if (limit > 80) limit = 80;       // 上限别太大，避免 parse 峰值 OOM
-  if (limit < 5) limit = 5;
-
-  let offset = 0;
-  let hasMore = true;
-
-  // 4) 累积轻量对象（注意：只存轻字段）
-  const result = [];
-
-  // 你原来有 TOTAL_LIMIT（例如 200），保留：避免拉 1245 首坐牢 + 写缓存炸
-  const targetTotal = this.TOTAL_LIMIT || 1000;
-
-  while (hasMore && result.length < targetTotal) {
-    const ts = Date.now();
-    let resp;
-
-    try {
-      resp = await request.fetch({
-        url: `https://163api.qijieya.cn/playlist/track/all`
-          + `?id=${this.songlistId}`
-          + `&limit=${limit}`
-          + `&offset=${offset}`
-          + `&timestamp=${ts}`
-      });
-    } catch (e) {
-      console.error('[songlist] 请求失败 offset=', offset, e);
-      break;
-    }
-
-    const songs = resp.data?.songs;
-    if (!Array.isArray(songs) || songs.length === 0) {
-      // 无数据 => 结束
-      hasMore = false;
-      break;
-    }
-
-    // 逐条瘦身 + 立即释放
-    for (let i = 0; i < songs.length && result.length < targetTotal; i++) {
-      const s = songs[i];
-      result.push({
-        id: s.id,
-        name: s.name,
-        artists: (s.ar || s.artists || []).map(a => a.name).join(' / ')
-        // cover 如果不是必须建议先别存，带宽/内存都会下降
-      });
-      songs[i] = null; // ✅ 释放大对象
-    }
-
-    // 断开引用，帮助 GC
-    if (resp.data) resp.data.songs = null;
-
-    offset += songs.length;
-
-    // UI：未知总数，只更新已拉取数量
-    this.networkSongsCount = result.length;
-
-    // 结束条件：返回数量 < limit => 已到尾页
-    if (songs.length < limit) {
-      hasMore = false;
-      break;
-    }
-
-    // 让出事件循环，避免峰值堆积导致 OOM（VelaOS 很关键）
-    await new Promise(r => setTimeout(r, 0));
-  }
-
-  this.isFetchingFromNetwork = false;
-
-  // 5) 缓存（非常重要：writeJson 必须不带缩进，避免 OOM）
-  // 你若仍是 JSON.stringify(data, null, 2)，请先改掉
-  if (result.length > 0) {
-    await fileService.writeJson(cacheFileUri, result);
-  }
-
-  return result;
-},
-
-
-    async _getSourceData_dailyRecommend() {
-        const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误");
-        const response = await request.fetch({ url: `https://163api.qijieya.cn/recommend/songs` } );
-        const songs = response.data?.data?.dailySongs;
-        if (songs) {
-            return songs.map(s => ({ id: s.id, name: s.name, artists: s.ar.map(a => a.name).join(' / ') }));
-        }
-        throw new Error("获取每日推荐失败");
-    },
-
-    async _getSourceData_personalFm() {
-        const request = this.$app.$def.requestService;
-        if (!request) throw new Error("内部服务错误");
-        // 添加时间戳参数避免缓存，确保每次请求都能获取最新数据
-        const timestamp = Date.now();
-        const response = await request.fetch({ url: `https://163api.qijieya.cn/personal_fm?timestamp=${timestamp}` } );
-        const songs = response.data?.data;
-        if (songs) {
-            return songs.map(s => ({ id: s.id, name: s.name, artists: s.artists.map(a => a.name).join(' / ') }));
-        }
-        throw new Error("获取私人FM失败");
-    },
-
-
-    locateSongAndLoadPage: function() {
-        const targetId = this.targetSongId;
-        if (!targetId || !this.fullSongList || this.fullSongList.length === 0) {
-            this.loadPage(1);
-            return;
-        }
-        const songIndex = this.fullSongList.findIndex(song => String(song.id) === String(targetId));
-        if (songIndex !== -1) {
-            const targetPage = Math.floor(songIndex / this.PAGE_SIZE) + 1;
-            this.loadPage(targetPage);
-            this.$nextTick(() => {
-                const indexInPage = songIndex % this.PAGE_SIZE;
-                const scrollOffset = indexInPage * this.ITEM_HEIGHT;
-                this.$element('songListScroll').scrollTo({ top: scrollOffset, behavior: 'smooth' });
-            });
-        } else {
-            prompt.showToast({ message: '未在列表中找到指定歌曲' });
-            this.loadPage(1);
-        }
-        this.targetSongId = null;
-    },
-
-    loadPage: function(pageNumber) {
-        if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0)) return;
-        const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
-        const endIndex = startIndex + this.PAGE_SIZE;
-        this.displaySongList = this.fullSongList.slice(startIndex, endIndex).map((song, index) => ({ ...song, displayIndex: startIndex + index + 1 }));
-        this.currentPage = pageNumber;
-        this.$nextTick(() => { this.$element('songListScroll').scrollTo({ top: 1 }); });
-    },
-
-    loadPrevPage: function() { if (this.currentPage > 1) this.loadPage(this.currentPage - 1); },
-    loadNextPage: function() { if (this.currentPage < this.totalPages) this.loadPage(this.currentPage + 1); },
-
-/**
- * 下拉刷新（保留）：
- * - 需要连续触发 4 次 onscrolltop
- * - 任意两次间隔不超过 2 秒，否则重置计数
- * - 仅第 3 次提示 toast
- */
- handleScrollTop() {
-  const now = Date.now();
-
-  // 初始化状态（不需要在 private/protected 里声明）
-  if (!this._pullRefreshMeta) {
-    this._pullRefreshMeta = { count: 0, lastTs: 0, timerId: null };
-  }
-
-  const meta = this._pullRefreshMeta;
-
-  // 如果页面正在加载/刷新，忽略下拉触发，避免并发
-  // 这里尽量兼容你已有字段：isLoading / isRefreshing / needsRefresh
-  if (this.isLoading || this.isRefreshing) return;
-
-  // 2 秒窗口：超过则重置为 1 次
-  if (meta.lastTs && (now - meta.lastTs) <= 2000) {
-    meta.count += 1;
-  } else {
-    meta.count = 1;
-  }
-  meta.lastTs = now;
-
-  // 每次触发都重置一个“超时清零计数”的定时器
-  if (meta.timerId) clearTimeout(meta.timerId);
-  meta.timerId = setTimeout(() => {
-    // 超过 2 秒没有下一次下拉，清零
-    if (this._pullRefreshMeta) {
-      this._pullRefreshMeta.count = 0;
-      this._pullRefreshMeta.lastTs = 0;
-      this._pullRefreshMeta.timerId = null;
-    }
-  }, 2100);
-
-  // 只有第 3 次提示（第 1、2 次不提示）
-  if (meta.count === 3) {
-    // 提示文案你可自行改
-    prompt.showToast({ message: '再下拉 1 次刷新', duration: 800 });
-    return;
-  }
-
-  // 第 4 次：触发真正刷新，并立即清零计数
-  if (meta.count >= 4) {
-    // 清零 + 清 timer
-    if (meta.timerId) clearTimeout(meta.timerId);
-    meta.count = 0;
-    meta.lastTs = 0;
-    meta.timerId = null;
-
-    // 执行刷新：force=true（按你原 loadData 签名：loadData(shouldLocate=false, force=false)）
-    // 如你的签名不同，替换这一行即可
-    this.loadData(false, true);
-  }
-},
-
-
-    async deleteSong(songToDelete) {
-        const fullIndex = this.fullSongList.findIndex(item => item.id === songToDelete.id);
-        if (fullIndex > -1) {
-            this.fullSongList.splice(fullIndex, 1);
-            this.totalPages = Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
-            const targetPage = this.currentPage > this.totalPages ? Math.max(1, this.totalPages) : this.currentPage;
-            this.loadPage(targetPage);
-            prompt.showToast({ message: '已移除' });
-            await this.persistDeletion(songToDelete);
-        }
-    },
-
-    async persistDeletion(songToDelete) {
-        const songId = songToDelete.id;
-        if (this.listType === 'playlist') {
-            await fileService.writeJson(this.listFileUri, this.fullSongList);
-        } else if (this.listType === 'favorites') {
-            const favorites = await fileService.readJson(this.favoritesFileUri, {});
-            if (favorites[songId]) {
-                delete favorites[songId];
-                await fileService.writeJson(this.favoritesFileUri, favorites);
-            }
-        } else if (this.listType === 'downloadlist') {
-            await fileService.delete(`${DIR_MUSIC}${songId}.mp3`);
-            await fileService.delete(`${DIR_LYRICS}${songId}.json`);
-            const downloaded = await fileService.readJson(this.downloadedFileUri, {});
-            if (downloaded[songId]) {
-                delete downloaded[songId];
-                await fileService.writeJson(this.downloadedFileUri, downloaded);
-            }
-        }
-    },
-
-    async playAll() {
-        if (!this.fullSongList || this.fullSongList.length === 0) {
-            prompt.showToast({ message: '列表为空' });
-            return;
-        }
-        if (this.listType === 'personal_fm') {
-            this.play(this.fullSongList[0].id);
-            return;
-        }
-        await fileService.writeJson(this.listFileUri, this.fullSongList);
-        this.play(this.fullSongList[0].id);
-    },
-
-    play: function(songId) {
-        const songToPlay = this.fullSongList.find(song => song.id === songId);
-        if (!songToPlay) {
-            prompt.showToast({ message: '找不到歌曲信息' });
-            return;
-        }
-        const params = { songId: songId, songInfo: JSON.stringify({ id: songToPlay.id, name: songToPlay.name, artists: songToPlay.artists }) };
-        if (this.listType === 'personal_fm') params.startFmMode = true;
-        router.push({ uri: "/pages/player", params });
-    },
-
-    clearPlaylist: function() {
-        prompt.showDialog({
-            title: '清空播放列表',
-            message: '您确定要清空当前播放列表中的所有歌曲吗？',
-            buttons: [{ text: '取消' }, { text: '确定清空', color: '#FF453A' }],
-            success: async () => {
-                this.fullSongList = [];
-                this.displaySongList = [];
-                this.totalPages = 1;
-                await fileService.writeJson(this.listFileUri, []);
-                prompt.showToast({ message: '播放列表已清空' });
-            }
-        });
-    },
-
-    goBack: function() { router.back(); },
-    goToStorage: function() { router.push({ uri: '/pages/storage' }); },
-    refreshFm: function() { this.loadData(false, true); },
-
-    async addAllToFavorites() {
-        if (!this.fullSongList || this.fullSongList.length === 0) {
-            prompt.showToast({ message: '列表为空，无法添加' });
-            return;
-        }
-        prompt.showToast({ message: '正在添加到收藏...' });
-        const favorites = await fileService.readJson(this.favoritesFileUri, {});
-        let addedCount = 0;
-        this.fullSongList.forEach(song => {
-            if (!favorites[String(song.id)]) {
-                favorites[String(song.id)] = { id: song.id, name: song.name, artists: song.artists, duration: song.duration || 0 };
-                addedCount++;
-            }
-        });
-        if (addedCount > 0) {
-            const success = await fileService.writeJson(this.favoritesFileUri, favorites);
-            prompt.showToast({ message: success ? `成功添加 ${addedCount} 首歌曲到收藏` : '保存收藏失败' });
-        } else {
-            prompt.showToast({ message: '所有歌曲均已在收藏中' });
-        }
-    },
-
-    addSongToNext: function() { prompt.showToast({ message: '此功能正在开发中' }); },
-
-    handleItemClick: function(item) {
-        if (this.isDownloadMode && (this.listType === 'songlist' || this.listType === 'daily_recommend' || this.listType === 'playlist')) {
-            if (item.isDownloaded || this.downloadingIds.includes(item.id) || this.downloadQueue.some(q => q.id === item.id)) {
-                prompt.showToast({ message: item.isDownloaded ? '已下载' : '已在下载队列中' });
-                return;
-            }
-            this.downloadQueue.push(item);
-            prompt.showToast({ message: `已将 ${item.name} 加入下载队列` });
-            this._processDownloadQueue();
-        } else {
-            this.play(item.id);
-        }
-    },
-
-    _processDownloadQueue: function() {
-        var that = this;
-        if (that.isDownloadingLocked || that.downloadQueue.length === 0) {
-            if (!that.isDownloadingLocked && that.downloadQueue.length === 0) {
-                if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                    brightness.setKeepScreenOn({ keepScreenOn: false });
-                }
-            }
-            return;
-        }
-
-        if (!that.isDownloadingLocked) {
-            if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                brightness.setKeepScreenOn({ keepScreenOn: true });
-            }
-        }
-
-        that.isDownloadingLocked = true;
-        const songToDownload = that.downloadQueue.shift();
-
-        const downloadService = that.$app.$def.downloadService;
-        if (!downloadService) {
-            prompt.showToast({ message: '下载服务不可用' });
-            that.isDownloadingLocked = false;
-            if (brightness && typeof brightness.setKeepScreenOn === 'function') {
-                brightness.setKeepScreenOn({ keepScreenOn: false });
-            }
-            return;
-        }
-
-        const settings = that.$app.$def.settings || { audioQuality: { download: 128 } };
-        const cookie = that.$app.$def.cookie || null;
-        console.log('cookie:', cookie);
-
-        downloadService.start(
-            songToDownload,
-            { cookie: cookie, downloadBitrate: settings.audioQuality.download },
-            {
-                onStart: function(song) {
-                    that.downloadingIds.push(song.id);
-                },
-                onSuccess: async function(downloadedInfo) {
-                    try {
-                        const currentDownloadedSongs = await fileService.readJson(that.downloadedFileUri, {});
-                        const completeSongInfo = {
-                            id: songToDownload.id, name: songToDownload.name, artists: songToDownload.artists,
-                            duration: downloadedInfo.duration, localUri: downloadedInfo.localUri, localLyricUri: downloadedInfo.localLyricUri
-                        };
-                        const updatedSongs = { ...currentDownloadedSongs, [songToDownload.id]: completeSongInfo };
-                        
-                        await fileService.writeJson(that.downloadedFileUri, updatedSongs);
-
-                        const songIndex = that.fullSongList.findIndex(s => s.id === songToDownload.id);
-                        if (songIndex > -1) {
-                            that.fullSongList[songIndex].isDownloaded = true;
-                            const startIndex = (that.currentPage - 1) * that.PAGE_SIZE;
-                            const endIndex = startIndex + that.PAGE_SIZE;
-                            that.displaySongList = that.fullSongList.slice(startIndex, endIndex).map((song, index) => ({
-                                ...song, displayIndex: startIndex + index + 1,
-                            }));
-                        }
-                        prompt.showToast({ message: `${songToDownload.name} 下载成功` });
-                    } catch (e) {
-                        console.error("下载成功后处理失败:", e);
-                    } finally {
-                        const index = that.downloadingIds.indexOf(songToDownload.id);
-                        if (index > -1) that.downloadingIds.splice(index, 1);
-                        that.isDownloadingLocked = false;
-                        that._processDownloadQueue();
-                    }
-                },
-                onError: function(errorMessage) {
-                    prompt.showToast({ message: `下载失败: ${errorMessage}` });
-                    const index = that.downloadingIds.indexOf(songToDownload.id);
-                    if (index > -1) that.downloadingIds.splice(index, 1);
-                    that.isDownloadingLocked = false;
-                    that._processDownloadQueue();
-                }
-            }
-        );
-    },
-    toggleDownloadMode: function() { this.isDownloadMode = !this.isDownloadMode; }
+	protected: {
+		listType: "playlist",
+		songlistId: null,
+		targetSongId: null,
+	},
+	private: {
+		fullSongList: [],
+		displaySongList: [],
+		PAGE_SIZE: 10,
+		currentPage: 1,
+		totalPages: 1,
+		TOTAL_LIMIT: 1000,
+		API_PAGE_SIZE: 20,
+		ITEM_HEIGHT: 130,
+		isLoading: false,
+		isRefreshing: false,
+		justReachedTop: false,
+		isDownloadMode: false,
+		isDownloadingLocked: false,
+		downloadingIds: [],
+		downloadQueue: [],
+		pageTitle: "播放列表",
+		currentTime: "00:00",
+		updateTimeInterval: null,
+		justReachedTopTimeoutId: null,
+		songlistsDir: "internal://files/songlists/",
+		listFileUri: "internal://files/play_list.json",
+		downloadedFileUri: "internal://files/downloaded_songs.json",
+		favoritesFileUri: "internal://files/favorites.json",
+		isFetchingFromNetwork: false,
+		networkSongsCount: 0,
+		totalTrackCount: " ",
+		networkLoadProgress: 0,
+		loadError: null,
+		loadingText: "正在加载...",
+		didLoadFromCache: false,
+		isUpdateCheckInFlight: false,
+		showPageKeypad: false,
+		pageInput: "",
+	},
+
+	onInit: function () {
+		var that = this;
+		if (that.targetSongId) {
+			console.log(`接收到定位请求，目标歌曲ID: ${that.targetSongId}`);
+		}
+		that.updateTime();
+		that.updateTimeInterval = setInterval(function () {
+			that.updateTime();
+		}, 1000 * 60);
+		that.updatePageTitle();
+
+		(async () => {
+			await that.applySettings();
+			await fileService.ensureDirExists(that.songlistsDir);
+			that.loadData(!!that.targetSongId);
+		})();
+		this.silentCheckForUpdates();
+	},
+
+	onDestroy: function () {
+		if (this.updateTimeInterval) clearInterval(this.updateTimeInterval);
+		if (this.justReachedTopTimeoutId)
+			clearTimeout(this.justReachedTopTimeoutId);
+	},
+
+	async applySettings() {
+		const data = await fileService.readJson(SETTINGS_FILE_URI, {});
+		if (data) {
+			if (data.performance)
+				this.PAGE_SIZE = data.performance.windowSize || this.PAGE_SIZE;
+			if (data.network) {
+				this.TOTAL_LIMIT = data.network.totalLimit || this.TOTAL_LIMIT;
+				this.API_PAGE_SIZE = data.network.apiPageSize || this.API_PAGE_SIZE;
+			}
+		}
+	},
+
+	updatePageTitle: function () {
+		const titles = {
+			downloadlist: "已下载",
+			songlist: "歌单详情",
+			favorites: "我的收藏",
+			playlist: "播放列表",
+			daily_recommend: "每日推荐",
+			personal_fm: "私人FM",
+		};
+		this.pageTitle = titles[this.listType] || "播放列表";
+	},
+
+	updateTime: function () {
+		const now = new Date();
+		this.currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
+			.getMinutes()
+			.toString()
+			.padStart(2, "0")}`;
+	},
+
+	async silentCheckForUpdates() {
+		// 仅对“可刷新的在线列表”做检查；personal_fm 太动态，建议不检查避免频繁弹窗
+		const refreshable = ["songlist", "daily_recommend"].includes(this.listType);
+		if (!refreshable) return;
+
+		if (this.isLoading || this.isRefreshing || this.isUpdateCheckInFlight)
+			return;
+
+		// songlist 必须有 id
+		if (this.listType === "songlist" && !this.songlistId) return;
+
+		this.isUpdateCheckInFlight = true;
+
+		try {
+			// 1) 读取本地当前列表的“头部签名”
+			const localHeadSig = await this._getLocalHeadSignature(10);
+			if (!localHeadSig) return; // 没有本地数据就不提示
+
+			// 2) 静默从网络取“开头一小段”
+			const remoteHeadSig = await this._getRemoteHeadSignature(10);
+			if (!remoteHeadSig) return; // 网络失败静默忽略
+
+			// 3) 有差异 -> 弹窗询问是否刷新（Vela: 用 success/cancel 判断勾/叉）
+			if (localHeadSig !== remoteHeadSig) {
+				prompt.showDialog({
+					title: "发现列表更新",
+					message: "检测到列表内容可能已更新，是否刷新？",
+					// Vela 不依赖 buttons/index；用勾(确认)/叉(取消)
+					success: async () => {
+						// 用户点“勾”：执行刷新
+						try {
+							await this.loadData(false, true);
+							prompt.showToast({ message: "已刷新" });
+						} catch (e) {
+							prompt.showToast({ message: "刷新失败" });
+						}
+					},
+					cancel: () => {
+						prompt.showToast({ message: "操作已取消" });
+						// 用户点“叉”：什么都不做，静默返回
+					},
+					fail: (data, code) => {
+						console.error(`showDialog fail code=${code}`, data);
+					},
+				});
+			}
+		} finally {
+			this.isUpdateCheckInFlight = false;
+		}
+	},
+
+	async _getLocalHeadSignature(n = 10) {
+		try {
+			// 优先用当前已显示/已加载的数据（最快）
+			const list =
+				Array.isArray(this.fullSongList) && this.fullSongList.length > 0
+					? this.fullSongList
+					: null;
+
+			if (list) {
+				return list
+					.slice(0, n)
+					.map((s) => String(s.id))
+					.join(",");
+			}
+
+			// 如果当前内存里没有，就根据不同 listType 读对应缓存
+			if (this.listType === "songlist") {
+				const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
+				const cached = await fileService.readJson(cacheFileUri, null);
+				if (!Array.isArray(cached) || cached.length === 0) return "";
+				return cached
+					.slice(0, n)
+					.map((s) => String(s.id))
+					.join(",");
+			}
+
+			if (this.listType === "daily_recommend") {
+				// daily recommend 若你有缓存文件可读，放这里；没有缓存就直接用内存（上面已处理）
+				return "";
+			}
+
+			return "";
+		} catch (e) {
+			return "";
+		}
+	},
+
+	async _getRemoteHeadSignature(n = 10) {
+		try {
+			const request = this.$app.$def.requestService;
+			if (!request) return "";
+
+			if (this.listType === "songlist") {
+				// 只拉 offset=0 的一页，轻量映射成 id 列表
+				const ts = Date.now();
+				const limit = Math.max(20, n); // 至少 20，避免太小不稳定
+				const resp = await request.fetch({
+					url:
+						`https://163api.qijieya.cn/playlist/track/all` +
+						`?id=${this.songlistId}` +
+						`&limit=${limit}` +
+						`&offset=0` +
+						`&timestamp=${ts}`,
+				});
+
+				const songs = resp.data?.songs;
+				if (!Array.isArray(songs) || songs.length === 0) return "";
+
+				// 只取 id，不留大对象
+				return songs
+					.slice(0, n)
+					.map((s) => String(s.id))
+					.join(",");
+			}
+
+			if (this.listType === "daily_recommend") {
+				// 这里调用你现有的 daily recommend 接口（你文件里 _getSourceData_dailyRecommend 已有）
+				// 但我们只取“开头 n 首”的 id，避免全量加载
+				const data = await this._getSourceData_dailyRecommend();
+				if (!Array.isArray(data) || data.length === 0) return "";
+				return data
+					.slice(0, n)
+					.map((s) => String(s.id))
+					.join(",");
+			}
+
+			return "";
+		} catch (e) {
+			return "";
+		}
+	},
+
+	async loadData(shouldLocate = false, force = false) {
+		if (this.isLoading) return;
+
+		this.isLoading = true;
+		this.loadError = null;
+		this.isFetchingFromNetwork = false;
+		this.didLoadFromCache = false;
+
+		if (brightness && typeof brightness.setKeepScreenOn === "function") {
+			brightness.setKeepScreenOn({ keepScreenOn: true });
+		}
+
+		switch (this.listType) {
+			case "songlist":
+				this.loadingText = "正在加载歌单...";
+				break;
+			case "daily_recommend":
+				this.loadingText = "正在获取今日推荐...";
+				break;
+			case "personal_fm":
+				this.loadingText = "正在开启私人FM...";
+				break;
+			default:
+				this.loadingText = "正在读取列表...";
+		}
+
+		if (force) {
+			this.fullSongList = [];
+			this.displaySongList = [];
+		}
+		this.currentPage = 1;
+
+		try {
+			let sourceData;
+			switch (this.listType) {
+				case "songlist":
+					sourceData = await this._getSourceData_songlist(force);
+					break;
+				case "daily_recommend":
+					sourceData = await this._getSourceData_dailyRecommend();
+					break;
+				case "personal_fm":
+					sourceData = await this._getSourceData_personalFm();
+					break;
+				case "downloadlist":
+					sourceData = Object.values(
+						await fileService.readJson(this.downloadedFileUri, {})
+					);
+					break;
+				case "favorites":
+					sourceData = Object.values(
+						await fileService.readJson(this.favoritesFileUri, {})
+					);
+					break;
+				case "playlist":
+				default:
+					sourceData = await fileService.readJson(this.listFileUri, []);
+					break;
+			}
+
+			if (sourceData && sourceData.length > 0) {
+				const downloadedData = await fileService.readJson(
+					this.downloadedFileUri,
+					{}
+				);
+				const downloadedIds = new Set(Object.keys(downloadedData));
+
+				this.fullSongList = sourceData;
+				this.fullSongList.forEach((song) => {
+					song.isDownloaded = downloadedIds.has(String(song.id));
+				});
+
+				this.totalPages =
+					Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
+
+				if (shouldLocate) this.locateSongAndLoadPage();
+				else this.loadPage(1);
+			} else {
+				this.fullSongList = [];
+				this.displaySongList = [];
+				this.totalPages = 1;
+			}
+		} catch (error) {
+			this.loadError = error.message || "未知错误";
+			this.fullSongList = [];
+			this.displaySongList = [];
+		} finally {
+			this.isLoading = false;
+			this.isFetchingFromNetwork = false;
+			if (this.didLoadFromCache) {
+				setTimeout(() => {
+					this.didLoadFromCache = false;
+				}, 500);
+			}
+			if (brightness && typeof brightness.setKeepScreenOn === "function") {
+				brightness.setKeepScreenOn({ keepScreenOn: false });
+			}
+		}
+	},
+
+	retryLoad: function () {
+		this.loadData();
+	},
+
+	async _getSourceData_songlist(forceAll = false) {
+		if (!this.songlistId) throw new Error("未提供歌单ID");
+
+		const request = this.$app.$def.requestService;
+		if (!request) throw new Error("内部服务错误");
+
+		const cacheFileUri = `${this.songlistsDir}${this.songlistId}.json`;
+
+		// 1) 缓存优先
+		if (!forceAll) {
+			const cached = await fileService.readJson(cacheFileUri, null);
+			if (Array.isArray(cached) && cached.length > 0) {
+				console.log("[songlist] 使用缓存，长度 =", cached.length);
+				// 只显示已拉取数量即可（总数未知）
+				this.isFetchingFromNetwork = false;
+				this.networkSongsCount = cached.length;
+				this.totalTrackCount = " "; // UI：不显示总数
+				this.networkLoadProgress = 0; // UI：可不显示进度条或固定 0
+				return cached;
+			}
+		}
+
+		// 2) 初始化 UI 状态（未知总数的“拉取计数”模式）
+		this.isFetchingFromNetwork = true;
+		this.loadingText = "正在加载歌曲...";
+		this.networkSongsCount = 0;
+		this.totalTrackCount = " "; // 未知总数：保持空
+		this.networkLoadProgress = 0; // 未知总数：不用百分比
+
+		// 3) 分页参数（穿戴设备建议 20~50）
+		//    你可以让 API_PAGE_SIZE 在设置里改；这里做一个安全兜底
+		let limit = this.API_PAGE_SIZE || 20;
+		if (limit > 80) limit = 80; // 上限别太大，避免 parse 峰值 OOM
+		if (limit < 5) limit = 5;
+
+		let offset = 0;
+		let hasMore = true;
+
+		// 4) 累积轻量对象（注意：只存轻字段）
+		const result = [];
+
+		// 你原来有 TOTAL_LIMIT（例如 200），保留：避免拉 1245 首坐牢 + 写缓存炸
+		const targetTotal = this.TOTAL_LIMIT || 1000;
+
+		while (hasMore && result.length < targetTotal) {
+			const ts = Date.now();
+			let resp;
+
+			try {
+				resp = await request.fetch({
+					url:
+						`https://163api.qijieya.cn/playlist/track/all` +
+						`?id=${this.songlistId}` +
+						`&limit=${limit}` +
+						`&offset=${offset}` +
+						`&timestamp=${ts}`,
+				});
+			} catch (e) {
+				console.error("[songlist] 请求失败 offset=", offset, e);
+				break;
+			}
+
+			const songs = resp.data?.songs;
+			if (!Array.isArray(songs) || songs.length === 0) {
+				// 无数据 => 结束
+				hasMore = false;
+				break;
+			}
+
+			// 逐条瘦身 + 立即释放
+			for (let i = 0; i < songs.length && result.length < targetTotal; i++) {
+				const s = songs[i];
+				result.push({
+					id: s.id,
+					name: s.name,
+					artists: (s.ar || s.artists || []).map((a) => a.name).join(" / "),
+					// cover 如果不是必须建议先别存，带宽/内存都会下降
+				});
+				songs[i] = null; // ✅ 释放大对象
+			}
+
+			// 断开引用，帮助 GC
+			if (resp.data) resp.data.songs = null;
+
+			offset += songs.length;
+
+			// UI：未知总数，只更新已拉取数量
+			this.networkSongsCount = result.length;
+
+			// 结束条件：返回数量 < limit => 已到尾页
+			if (songs.length < limit) {
+				hasMore = false;
+				break;
+			}
+
+			// 让出事件循环，避免峰值堆积导致 OOM（VelaOS 很关键）
+			await new Promise((r) => setTimeout(r, 0));
+		}
+
+		this.isFetchingFromNetwork = false;
+
+		// 5) 缓存（非常重要：writeJson 必须不带缩进，避免 OOM）
+		// 你若仍是 JSON.stringify(data)，请先改掉
+		if (result.length > 0) {
+			await fileService.writeJson(cacheFileUri, result);
+		}
+
+		return result;
+	},
+
+	async _getSourceData_dailyRecommend() {
+		const request = this.$app.$def.requestService;
+		if (!request) throw new Error("内部服务错误");
+		const response = await request.fetch({
+			url: `https://163api.qijieya.cn/recommend/songs`,
+		});
+		const songs = response.data?.data?.dailySongs;
+		if (songs) {
+			return songs.map((s) => ({
+				id: s.id,
+				name: s.name,
+				artists: s.ar.map((a) => a.name).join(" / "),
+			}));
+		}
+		throw new Error("获取每日推荐失败");
+	},
+
+	async _getSourceData_personalFm() {
+		const request = this.$app.$def.requestService;
+		if (!request) throw new Error("内部服务错误");
+		// 添加时间戳参数避免缓存，确保每次请求都能获取最新数据
+		const timestamp = Date.now();
+		const response = await request.fetch({
+			url: `https://163api.qijieya.cn/personal_fm?timestamp=${timestamp}`,
+		});
+		const songs = response.data?.data;
+		if (songs) {
+			return songs.map((s) => ({
+				id: s.id,
+				name: s.name,
+				artists: s.artists.map((a) => a.name).join(" / "),
+			}));
+		}
+		throw new Error("获取私人FM失败");
+	},
+
+	locateSongAndLoadPage: function () {
+		const targetId = this.targetSongId;
+		if (!targetId || !this.fullSongList || this.fullSongList.length === 0) {
+			this.loadPage(1);
+			return;
+		}
+		const songIndex = this.fullSongList.findIndex(
+			(song) => String(song.id) === String(targetId)
+		);
+		if (songIndex !== -1) {
+			const targetPage = Math.floor(songIndex / this.PAGE_SIZE) + 1;
+			this.loadPage(targetPage);
+			this.$nextTick(() => {
+				const indexInPage = songIndex % this.PAGE_SIZE;
+				const scrollOffset = indexInPage * this.ITEM_HEIGHT;
+				this.$element("songListScroll").scrollTo({
+					top: scrollOffset,
+					behavior: "smooth",
+				});
+			});
+		} else {
+			prompt.showToast({ message: "未在列表中找到指定歌曲" });
+			this.loadPage(1);
+		}
+		this.targetSongId = null;
+	},
+
+	loadPage: function (pageNumber) {
+		if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0))
+			return;
+		const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
+		const endIndex = startIndex + this.PAGE_SIZE;
+		this.displaySongList = this.fullSongList
+			.slice(startIndex, endIndex)
+			.map((song, index) => ({
+				...song,
+				displayIndex: startIndex + index + 1,
+			}));
+		this.currentPage = pageNumber;
+		this.$nextTick(() => {
+			this.$element("songListScroll").scrollTo({ top: 1 });
+		});
+	},
+
+	loadPrevPage() {
+		if (this.totalPages <= 1) return;
+		const prev =
+			this.currentPage - 1 < 1 ? this.totalPages : this.currentPage - 1;
+		this.loadPage(prev);
+	},
+
+	loadNextPage() {
+		if (this.totalPages <= 1) return;
+		const next =
+			this.currentPage + 1 > this.totalPages ? 1 : this.currentPage + 1;
+		this.loadPage(next);
+	},
+
+	/**
+	 * 下拉刷新（保留）：
+	 * - 需要连续触发 4 次 onscrolltop
+	 * - 任意两次间隔不超过 2 秒，否则重置计数
+	 * - 仅第 3 次提示 toast
+	 */
+	handleScrollTop() {
+		const now = Date.now();
+
+		// 初始化状态（不需要在 private/protected 里声明）
+		if (!this._pullRefreshMeta) {
+			this._pullRefreshMeta = { count: 0, lastTs: 0, timerId: null };
+		}
+
+		const meta = this._pullRefreshMeta;
+
+		// 如果页面正在加载/刷新，忽略下拉触发，避免并发
+		// 这里尽量兼容你已有字段：isLoading / isRefreshing / needsRefresh
+		if (this.isLoading || this.isRefreshing) return;
+
+		// 2 秒窗口：超过则重置为 1 次
+		if (meta.lastTs && now - meta.lastTs <= 2000) {
+			meta.count += 1;
+		} else {
+			meta.count = 1;
+		}
+		meta.lastTs = now;
+
+		// 每次触发都重置一个“超时清零计数”的定时器
+		if (meta.timerId) clearTimeout(meta.timerId);
+		meta.timerId = setTimeout(() => {
+			// 超过 2 秒没有下一次下拉，清零
+			if (this._pullRefreshMeta) {
+				this._pullRefreshMeta.count = 0;
+				this._pullRefreshMeta.lastTs = 0;
+				this._pullRefreshMeta.timerId = null;
+			}
+		}, 2100);
+
+		// 只有第 3 次提示（第 1、2 次不提示）
+		if (meta.count === 3) {
+			// 提示文案你可自行改
+			prompt.showToast({ message: "再下拉 1 次刷新", duration: 800 });
+			return;
+		}
+
+		// 第 4 次：触发真正刷新，并立即清零计数
+		if (meta.count >= 4) {
+			// 清零 + 清 timer
+			if (meta.timerId) clearTimeout(meta.timerId);
+			meta.count = 0;
+			meta.lastTs = 0;
+			meta.timerId = null;
+
+			// 执行刷新：force=true（按你原 loadData 签名：loadData(shouldLocate=false, force=false)）
+			// 如你的签名不同，替换这一行即可
+			this.loadData(false, true);
+		}
+	},
+
+	async deleteSong(songToDelete, e) {
+		this.stopBubble(e);
+		const fullIndex = this.fullSongList.findIndex(
+			(item) => item.id === songToDelete.id
+		);
+		if (fullIndex > -1) {
+			this.fullSongList.splice(fullIndex, 1);
+			this.totalPages =
+				Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
+			const targetPage =
+				this.currentPage > this.totalPages
+					? Math.max(1, this.totalPages)
+					: this.currentPage;
+			this.loadPage(targetPage);
+			prompt.showToast({ message: "已移除" });
+			await this.persistDeletion(songToDelete);
+		}
+	},
+
+	async persistDeletion(songToDelete) {
+		const songId = songToDelete.id;
+		if (this.listType === "playlist") {
+			await fileService.writeJson(this.listFileUri, this.fullSongList);
+		} else if (this.listType === "favorites") {
+			const favorites = await fileService.readJson(this.favoritesFileUri, {});
+			if (favorites[songId]) {
+				delete favorites[songId];
+				await fileService.writeJson(this.favoritesFileUri, favorites);
+			}
+		} else if (this.listType === "downloadlist") {
+			await fileService.delete(`${DIR_MUSIC}${songId}.mp3`);
+			await fileService.delete(`${DIR_LYRICS}${songId}.json`);
+			const downloaded = await fileService.readJson(this.downloadedFileUri, {});
+			if (downloaded[songId]) {
+				delete downloaded[songId];
+				await fileService.writeJson(this.downloadedFileUri, downloaded);
+			}
+		}
+	},
+
+	async playAll() {
+		if (!this.fullSongList || this.fullSongList.length === 0) {
+			prompt.showToast({ message: "列表为空" });
+			return;
+		}
+		if (this.listType === "personal_fm") {
+			this.play(this.fullSongList[0].id);
+			return;
+		}
+		await fileService.writeJson(this.listFileUri, this.fullSongList);
+		this.play(this.fullSongList[0].id);
+	},
+
+	play: function (songId) {
+		const songToPlay = this.fullSongList.find((song) => song.id === songId);
+		if (!songToPlay) {
+			prompt.showToast({ message: "找不到歌曲信息" });
+			return;
+		}
+		const params = {
+			songId: songId,
+			songInfo: JSON.stringify({
+				id: songToPlay.id,
+				name: songToPlay.name,
+				artists: songToPlay.artists,
+			}),
+		};
+		if (this.listType === "personal_fm") params.startFmMode = true;
+		router.push({ uri: "/pages/player", params });
+	},
+
+	clearPlaylist: function () {
+		prompt.showDialog({
+			title: "清空播放列表",
+			message: "您确定要清空当前播放列表中的所有歌曲吗？",
+			buttons: [{ text: "取消" }, { text: "确定清空", color: "#FF453A" }],
+			success: async () => {
+				this.fullSongList = [];
+				this.displaySongList = [];
+				this.totalPages = 1;
+				await fileService.writeJson(this.listFileUri, []);
+				prompt.showToast({ message: "播放列表已清空" });
+			},
+		});
+	},
+
+	goBack: function () {
+		router.back();
+	},
+	goToStorage: function () {
+		router.push({ uri: "/pages/storage" });
+	},
+	refreshFm: function () {
+		this.loadData(false, true);
+	},
+
+	async addAllToFavorites() {
+		if (!this.fullSongList || this.fullSongList.length === 0) {
+			prompt.showToast({ message: "列表为空，无法添加" });
+			return;
+		}
+		prompt.showToast({ message: "正在添加到收藏..." });
+		const favorites = await fileService.readJson(this.favoritesFileUri, {});
+		let addedCount = 0;
+		this.fullSongList.forEach((song) => {
+			if (!favorites[String(song.id)]) {
+				favorites[String(song.id)] = {
+					id: song.id,
+					name: song.name,
+					artists: song.artists,
+					duration: song.duration || 0,
+				};
+				addedCount++;
+			}
+		});
+		if (addedCount > 0) {
+			const success = await fileService.writeJson(
+				this.favoritesFileUri,
+				favorites
+			);
+			prompt.showToast({
+				message: success
+					? `成功添加 ${addedCount} 首歌曲到收藏`
+					: "保存收藏失败",
+			});
+		} else {
+			prompt.showToast({ message: "所有歌曲均已在收藏中" });
+		}
+	},
+
+	addSongToNext: async function (item, e) {
+		// 阻止触发父级 item 的点击播放
+		this.stopBubble(e);
+
+		if (!item || !item.id) {
+			prompt.showToast({ message: "无效歌曲" });
+			return;
+		}
+
+		// 读取当前播放列表，只追加这一首歌（不覆盖为整个歌单）
+		let playList = await fileService.readJson(this.listFileUri, []);
+		if (!Array.isArray(playList)) playList = [];
+
+		const existsIndex = playList.findIndex((s) => s && s.id === item.id);
+		if (existsIndex === -1) {
+			playList.push(item);
+		} else {
+			// 已存在则把它挪到队尾（更符合“添加”语义），避免重复
+			const [existing] = playList.splice(existsIndex, 1);
+			playList.push(existing);
+		}
+
+		await fileService.writeJson(this.listFileUri, playList);
+
+		// 跳转播放器并播放当前歌曲
+		this.play(item.id);
+	},
+
+	handleItemClick: async function (item) {
+		if (
+			this.isDownloadMode &&
+			(this.listType === "songlist" ||
+				this.listType === "daily_recommend" ||
+				this.listType === "playlist")
+		) {
+			if (
+				item.isDownloaded ||
+				this.downloadingIds.includes(item.id) ||
+				this.downloadQueue.some((q) => q.id === item.id)
+			) {
+				prompt.showToast({
+					message: item.isDownloaded ? "已下载" : "已在下载队列中",
+				});
+				return;
+			}
+			this.downloadQueue.push(item);
+			prompt.showToast({ message: `已将 ${item.name} 加入下载队列` });
+			this._processDownloadQueue();
+		} else {
+			// 点击条目：用当前歌单覆盖播放列表，并播放当前歌曲
+			if (this.listType !== "personal_fm") {
+				await fileService.writeJson(this.listFileUri, this.fullSongList || []);
+			}
+			this.play(item.id);
+		}
+	},
+
+	_processDownloadQueue: function () {
+		var that = this;
+		if (that.isDownloadingLocked || that.downloadQueue.length === 0) {
+			if (!that.isDownloadingLocked && that.downloadQueue.length === 0) {
+				if (brightness && typeof brightness.setKeepScreenOn === "function") {
+					brightness.setKeepScreenOn({ keepScreenOn: false });
+				}
+			}
+			return;
+		}
+
+		if (!that.isDownloadingLocked) {
+			if (brightness && typeof brightness.setKeepScreenOn === "function") {
+				brightness.setKeepScreenOn({ keepScreenOn: true });
+			}
+		}
+
+		that.isDownloadingLocked = true;
+		const songToDownload = that.downloadQueue.shift();
+
+		const downloadService = that.$app.$def.downloadService;
+		if (!downloadService) {
+			prompt.showToast({ message: "下载服务不可用" });
+			that.isDownloadingLocked = false;
+			if (brightness && typeof brightness.setKeepScreenOn === "function") {
+				brightness.setKeepScreenOn({ keepScreenOn: false });
+			}
+			return;
+		}
+
+		const settings = that.$app.$def.settings || {
+			audioQuality: { download: 128 },
+		};
+		const cookie = that.$app.$def.cookie || null;
+		console.log("cookie:", cookie);
+
+		downloadService.start(
+			songToDownload,
+			{ cookie: cookie, downloadBitrate: settings.audioQuality.download },
+			{
+				onStart: function (song) {
+					that.downloadingIds.push(song.id);
+				},
+				onSuccess: async function (downloadedInfo) {
+					try {
+						const currentDownloadedSongs = await fileService.readJson(
+							that.downloadedFileUri,
+							{}
+						);
+						const completeSongInfo = {
+							id: songToDownload.id,
+							name: songToDownload.name,
+							artists: songToDownload.artists,
+							duration: downloadedInfo.duration,
+							localUri: downloadedInfo.localUri,
+							localLyricUri: downloadedInfo.localLyricUri,
+						};
+						const updatedSongs = {
+							...currentDownloadedSongs,
+							[songToDownload.id]: completeSongInfo,
+						};
+
+						await fileService.writeJson(that.downloadedFileUri, updatedSongs);
+
+						const songIndex = that.fullSongList.findIndex(
+							(s) => s.id === songToDownload.id
+						);
+						if (songIndex > -1) {
+							that.fullSongList[songIndex].isDownloaded = true;
+							const startIndex = (that.currentPage - 1) * that.PAGE_SIZE;
+							const endIndex = startIndex + that.PAGE_SIZE;
+							that.displaySongList = that.fullSongList
+								.slice(startIndex, endIndex)
+								.map((song, index) => ({
+									...song,
+									displayIndex: startIndex + index + 1,
+								}));
+						}
+						prompt.showToast({ message: `${songToDownload.name} 下载成功` });
+					} catch (e) {
+						console.error("下载成功后处理失败:", e);
+					} finally {
+						const index = that.downloadingIds.indexOf(songToDownload.id);
+						if (index > -1) that.downloadingIds.splice(index, 1);
+						that.isDownloadingLocked = false;
+						that._processDownloadQueue();
+					}
+				},
+				onError: function (errorMessage) {
+					prompt.showToast({ message: `下载失败: ${errorMessage}` });
+					const index = that.downloadingIds.indexOf(songToDownload.id);
+					if (index > -1) that.downloadingIds.splice(index, 1);
+					that.isDownloadingLocked = false;
+					that._processDownloadQueue();
+				},
+			}
+		);
+	},
+
+	openPageKeypad() {
+		this.showPageKeypad = true;
+		this.pageInput = "";
+	},
+
+	closePageKeypad() {
+		this.showPageKeypad = false;
+	},
+
+	stopBubble(e) {
+		if (e && e.stopPropagation) e.stopPropagation();
+	},
+
+	handlePageKey(k) {
+		if (k === "退格") {
+			this.pageInput = this.pageInput.slice(0, -1);
+			return;
+		}
+		if (this.pageInput.length >= 4) return;
+		this.pageInput += k;
+	},
+
+	confirmPageInput() {
+		const p = parseInt(this.pageInput, 10);
+		if (!p) {
+			this.closePageKeypad();
+			return;
+		}
+		const target = Math.max(1, Math.min(this.totalPages, p));
+		this.closePageKeypad();
+		this.loadPage(target);
+	},
+	toggleDownloadMode: function () {
+		this.isDownloadMode = !this.isDownloadMode;
+	},
 };
 </script>

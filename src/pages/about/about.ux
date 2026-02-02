@@ -72,12 +72,12 @@
   
     /* --- 列表项样式 (保持不变) --- */
     .info-capsule-item { width: 100%; height: 130px; margin: 5px 0; background-color: transparent; }
-    .info-capsule { width: 100%; height: 100%; padding: 0 40px; background-color: #191821; border-radius: 45px; align-items: center; }
-    .app-icon { width: 72px; height: 72px; }
+    .info-capsule { width: 100%; height: 100%; padding: 0 32px; background-color: #2e323c; border-radius: 45px; align-items: center; justify-content: space-between;}
+    .app-icon { width: 80px; height: 80px; }
     .app-details { flex-grow: 1; flex-direction: column; justify-content: center; margin-left: 40px; }
     .app-name { font-size: 36px; font-weight: bold; color: #ffffff; }
     .app-version { font-size: 24px; color: rgba(255, 255, 255, 0.6); font-weight: bold; margin-top: 5px; }
-    .content-item { width: 100%; height: 80px; background-color: #191821; margin: 5px 0; border-radius: 36px; align-items: center; padding: 0 30px; justify-content: space-between; }
+    .content-item { width: 100%; height: 80px; background-color: #2e323c; margin: 5px 0; border-radius: 36px; align-items: center; padding: 0 30px; justify-content: space-between; }
     .item-label { font-size: 28px; font-weight: bold; color: #ffffff; }
     .item-value.small { font-size: 22px; }
     .item-value { font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.7); }

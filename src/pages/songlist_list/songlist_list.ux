@@ -97,7 +97,7 @@
         flex-direction: column;
         padding: 10px;
         margin: 5px 5%; /* 使用百分比外边距实现间隙 */
-        background-color: #191821;
+        background-color: #2e323c;
         border-radius: 36px;
     }
     .item-info {
@@ -170,7 +170,7 @@ const fileService = {
     },
     async writeJson(uri, data) {
         try {
-            await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
+            await this._promisify(file.writeText, { uri, text: JSON.stringify(data) });
             return true;
         } catch (error) {
             console.error(`[FileService] writeJson 失败: ${uri}`, error);

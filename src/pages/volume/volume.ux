@@ -1,322 +1,654 @@
 <template>
-    <div class="volume">
-        <div class="song">
-			<marquee class="song-name" scrollamount="36" onclick="goBack">{{ currentSong.name || '未知歌曲' }}</marquee>
-			<marquee class="singer-name" scrollamount="36">{{ currentSong.artists || '未知歌手' }}</marquee>
+	<div class="volume">
+		<div class="song">
+			<marquee class="song-name" scrollamount="36" onclick="goBack">
+				{{ currentSong.name || "未知歌曲" }}
+			</marquee>
+			<marquee class="singer-name" scrollamount="36">
+				{{ currentSong.artists || "未知歌手" }}
+			</marquee>
 		</div>
-  
-      <!-- 操作控制 -->
-      <div class="control-container">
-        <!-- 收藏图标 (所有屏幕都显示) -->
-        <image class="icon" id="favoriteIcon" src="{{ favoriteIcon }}" onclick="toggleFavorite"></image>
-  
-          <image class="icon" src="/common/icon/vol-download.png" onclick="handleDownloadClick"></image>
-          <image class="icon" src="{{ playModeIcon }}" onclick="handlePlayModeClick"></image>
-
-      </div>
-      <image class="little-icon" src="{{ downloadIcon }}" if="{{ downloadIcon }}"></image>
-            <!-- 音量控制 (无变化) -->
-            <div class="volume-bar-container">
-                <image class="action-icon" src="/common/icon/minus.png" onclick="changeVolume(-1)"></image>
-                <div class="volume-progress-container">
-                  <progress class="volume-progress" percent="{{volume}}"></progress>
-                </div>
-                <image class="action-icon" src="/common/icon/plus.png" onclick="changeVolume(1)"></image>
-              </div>
+        <div class="time-info-container">
+        <text class="time-hint" show="{{ sleepEnabled }}">
+            定时关闭于{{sleepRemainingMin}}分钟后({{ sleepEndTime }})
+        </text>
     </div>
-  </template>
-  
-  <script>
-  import router from "@system.router";
-  import audio from "@system.audio";
-  import file from "@system.file";
-  import prompt from "@system.prompt";
-  
-  const CONSTANTS = {
-      FILE_FAVORITES: 'internal://files/favorites.json',
-      FILE_DOWNLOADED_SONGS: 'internal://files/downloaded_songs.json',
-  };
-  
-  const fileService = {
-      _promisify(fn, options) {
-          return new Promise((resolve, reject) => {
-              fn({ ...options, success: resolve, fail: (data, code) => reject({ data, code }) });
-          });
-      },
-      async readJson(uri, defaultValue = null) {
-          try {
-              const data = await this._promisify(file.readText, { uri });
-              return JSON.parse(data.text);
-          } catch (e) { return defaultValue; }
-      },
-      async writeJson(uri, data) {
-          try {
-              await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
-              return true;
-          } catch (e) { return false; }
-      },
-  };
-  
-  export default {
-      private: {
-          volume: 0,
-          currentSong: null,
-          favorites: {},
-          isFavorited: false,
-          downloadedSongs: {},
-          downloadState: 'not_downloaded',
-          screenShape: 'circle',
-          playMode: 0,
-      },
-    
-      computed: {
+		<!-- 操作控制 -->
+		<div class="control-container">
+			<!-- 收藏图标 (所有屏幕都显示) -->
+			<image
+				class="icon"
+				id="favoriteIcon"
+				src="{{ favoriteIcon }}"
+				onclick="toggleFavorite"
+			></image>
 
-          downloadIcon() {
-            const icons = { downloading: '/common/icon/waiting_icon.png', downloaded: '/common/icon/done_icon.png', not_downloaded: null };
-            return icons[this.downloadState] || icons.not_downloaded;
-        },
-          favoriteIcon() {
-              return this.isFavorited ? '/common/icon/liked.png' : '/common/icon/like.png';
-          },
-          playModeIcon() {
-        if (this.isFmMode === "true") {
-                return '/common/icon/infm.png'; // 假设您有一个FM图标
-            }
-        const icons = [
-            '/common/icon/loop.png',
-            '/common/icon/single-loop.png',
-            '/common/icon/shuffle.png'
-        ];
-        return icons[this.playMode] || icons[0];
-    },
-      },
-  
-      protected: {
-          currentSong: {},
-          screenShape: 'circle',
-          playMode: 0,
-          isDownloading: false,
-          isFmMode: false,
-      },
-  
-      async onInit() {
-          this.volume = audio.volume * 100;
-          
-          this.screenShape = this.screenShape || 'circle';
-          this.playMode = this.playMode || 0;
-          
-          let songData = this.currentSong;
-          try {
-              if (typeof songData === 'string') songData = JSON.parse(songData);
-          } catch (e) {
-              prompt.showToast({ message: '歌曲信息错误' });
-              router.back();
-              return;
-          }
-          this.currentSong = songData;
-  
-          if (!this.currentSong || !this.currentSong.id) {
-              prompt.showToast({ message: '歌曲信息无效' });
-              router.back();
-              return;
-          }
-  
-          await this.loadInitialState();
-      },
-  
-      async onShow() {
-          await this.loadInitialState();
-      },
-  
-      async loadInitialState() {
-          const [favorites, downloadedSongs] = await Promise.all([
-              fileService.readJson(CONSTANTS.FILE_FAVORITES, {}),
-              fileService.readJson(CONSTANTS.FILE_DOWNLOADED_SONGS, {}),
-          ]);
-  
-          this.favorites = favorites;
-          this.downloadedSongs = downloadedSongs;
-  
-          this.updateFavoriteStatus();
-          this.updateDownloadStatus();
-      },
-  
-      updateFavoriteStatus() {
-          if (this.currentSong) {
-              this.isFavorited = !!this.favorites[this.currentSong.id];
-          }
-      },
-  
-      updateDownloadStatus() {
-          if (this.isDownloading) {
-              this.downloadState = 'downloading';
-          } else if (this.currentSong && this.downloadedSongs[this.currentSong.id]) {
-              this.downloadState = 'downloaded';
-          } else {
-              this.downloadState = 'not_downloaded';
-          }
-      },
-  
-      changeVolume(direction) {
-          const newVolume = this.volume + (direction * 10);
-          this.volume = Math.max(0, Math.min(100, newVolume));
-          audio.volume = this.volume / 100;
-      },
-  
-      toggleFavorite() {
-          if (!this.currentSong) return;
-          const { id } = this.currentSong;
-          if (this.isFavorited) {
-              delete this.favorites[id];
-              prompt.showToast({ message: '已取消收藏' });
-          } else {
-              this.favorites[id] = { id: this.currentSong.id, name: this.currentSong.name, artists: this.currentSong.artists };
-              prompt.showToast({ message: '已收藏' });
-          }
-          this.isFavorited = !this.isFavorited;
-          fileService.writeJson(CONSTANTS.FILE_FAVORITES, this.favorites);
-      },
-  
-      handleDownloadClick() {
-          if (this.downloadState === 'downloaded') {
-              prompt.showToast({ message: '歌曲已下载' });
-              return;
-          }
-          if (this.downloadState === 'downloading') {
-              prompt.showToast({ message: '正在下载中...' });
-              return;
-          }
-          prompt.showToast({ message: '即将开始下载...' });
-          router.push({
-              uri: '/pages/player',
-              params: { triggerDownload: true }
-          });
-      },
-  
-      handlePlayModeClick() {
-          prompt.showToast({ message: '切换播放模式' });
-          router.push({
-              uri: '/pages/player',
-              params: { triggerPlayModeToggle: true }
-          });
-      },
-  
-      goBack() {
-          router.back();
-      },
-  };
-  </script>
-  
-  <style>
-  .volume {
-    width: 100%;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
+			<!-- 定时关闭 -->
+			<image
+				class="icon"
+				src="/common/icon/stopwatch.png"
+				onclick="handleSleepTimerClick"
+			></image>
+
+			<image
+				class="icon"
+				src="{{ playModeIcon }}"
+				onclick="handlePlayModeClick"
+			></image>
+		</div>
+
+		<!-- 角标：只读 app.ux 的状态 -->
+		<image
+			class="little-icon"
+			src="{{ sleepBadgeIcon }}"
+			if="{{ sleepBadgeIcon }}"
+		></image>
+
+		<!-- 音量控制 -->
+		<div class="volume-bar-container">
+			<image
+				class="action-icon"
+				src="/common/icon/minus.png"
+				onclick="changeVolume(-1)"
+			></image>
+			<div class="volume-progress-container">
+				<progress class="volume-progress" percent="{{ volume }}"></progress>
+			</div>
+			<image
+				class="action-icon"
+				src="/common/icon/plus.png"
+				onclick="changeVolume(1)"
+			></image>
+		</div>
+
+		<!-- 定时关闭小键盘浮层 -->
+		<div
+			class="pagekey-overlay"
+			if="{{ showSleepKeypad }}"
+			onclick="closeSleepKeypad"
+		>
+			<div class="pagekey-panel" onclick="stopBubble">
+				<div class="pagekey-display-wrapper">
+					<text class="pagekey-display">{{ sleepInput || "" }}</text>
+				</div>
+
+				<div class="pagekey-keyboard">
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handleSleepKey('1')">1</text>
+						<text class="pagekey-key" onclick="handleSleepKey('2')">2</text>
+						<text class="pagekey-key" onclick="handleSleepKey('3')">3</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handleSleepKey('4')">4</text>
+						<text class="pagekey-key" onclick="handleSleepKey('5')">5</text>
+						<text class="pagekey-key" onclick="handleSleepKey('6')">6</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handleSleepKey('7')">7</text>
+						<text class="pagekey-key" onclick="handleSleepKey('8')">8</text>
+						<text class="pagekey-key" onclick="handleSleepKey('9')">9</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handleSleepKey('退格')">
+							退格
+						</text>
+						<text class="pagekey-key" onclick="handleSleepKey('0')">0</text>
+						<text class="pagekey-key" onclick="confirmSleepInput">确认</text>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+
+<script>
+import router from "@system.router";
+import audio from "@system.audio";
+import file from "@system.file";
+import prompt from "@system.prompt";
+
+// ✅ 不再在页面里 setTimeout / terminate，所以不需要 app 模块了
+// import app from "@system.app";
+
+const CONSTANTS = {
+	FILE_FAVORITES: "internal://files/favorites.json",
+	FILE_DOWNLOADED_SONGS: "internal://files/downloaded_songs.json",
+};
+
+const fileService = {
+	_promisify(fn, options) {
+		return new Promise((resolve, reject) => {
+			fn({
+				...options,
+				success: resolve,
+				fail: (data, code) => reject({ data, code }),
+			});
+		});
+	},
+	async readJson(uri, defaultValue = null) {
+		try {
+			const data = await this._promisify(file.readText, { uri });
+			return JSON.parse(data.text);
+		} catch (e) {
+			return defaultValue;
+		}
+	},
+	async writeJson(uri, data) {
+		try {
+			await this._promisify(file.writeText, {
+				uri,
+				text: JSON.stringify(data),
+			});
+			return true;
+		} catch (e) {
+			return false;
+		}
+	},
+};
+
+export default {
+	private: {
+		volume: 0,
+		currentSong: null,
+
+		favorites: {},
+		isFavorited: false,
+
+		downloadedSongs: {},
+		downloadState: "not_downloaded",
+
+		screenShape: "circle",
+		playMode: 0,
+
+		showSleepKeypad: false,
+		sleepInput: "",
+	},
+
+	computed: {
+		// ✅ 角标只读“UI状态字段”，由 app.ux 的定时器决定
+		sleepBadgeIcon() {
+			return this.sleepEnabled ? "/common/icon/waiting_icon.png" : null;
+		},
+
+		favoriteIcon() {
+			return this.isFavorited
+				? "/common/icon/liked.png"
+				: "/common/icon/like.png";
+		},
+
+		playModeIcon() {
+			if (this.isFmMode === "true") {
+				return "/common/icon/infm.png";
+			}
+			const icons = [
+				"/common/icon/loop.png",
+				"/common/icon/single-loop.png",
+				"/common/icon/shuffle.png",
+			];
+			return icons[this.playMode] || icons[0];
+		},
+	},
+
+	protected: {
+        currentTime: "",
+        sleepEndTime: "",
+		currentSong: {},
+		screenShape: "circle",
+		playMode: 0,
+		isDownloading: false,
+		isFmMode: false,
+
+		// ✅ 仅用于 UI 展示（真正定时器在 app.ux）
+		sleepEnabled: false,
+		sleepRemainingMin: 0,
+	},
+
+	async onInit() {
+        this.updateTime();
+		this.volume = audio.volume * 100;
+
+		this.screenShape = this.screenShape || "circle";
+		this.playMode = this.playMode || 0;
+
+		let songData = this.currentSong;
+		try {
+			if (typeof songData === "string") songData = JSON.parse(songData);
+		} catch (e) {
+			prompt.showToast({ message: "歌曲信息错误" });
+			router.back();
+			return;
+		}
+		this.currentSong = songData;
+
+		if (!this.currentSong || !this.currentSong.id) {
+			prompt.showToast({ message: "歌曲信息无效" });
+			router.back();
+			return;
+		}
+
+		await this.loadInitialState();
+		this.syncSleepFromApp(); // ✅ 初始化同步一次角标状态
+	},
+
+	async onShow() {
+		await this.loadInitialState();
+		this.syncSleepFromApp(); // ✅ 每次回来都同步一次（避免页面重建/切换造成错位）
+	},
+
+    onDestroy() {
+		if (this.timer) clearInterval(this.timer);
+		this.timer = null;
+	},
+
+	// =======================
+	// 时间更新（参考你给的页面）
+	// =======================
+	updateTime() {
+		const now = new Date();
+		const hours = now.getHours().toString().padStart(2, "0");
+		const minutes = now.getMinutes().toString().padStart(2, "0");
+		this.currentTime = `${hours}:${minutes}`;
+	},
+
+	// =======================
+	// ✅ app.ux 定时器对接
+	// =======================
+
+    syncSleepFromApp() {
+  const appInst = this.$app.$def;
+  if (!appInst || typeof appInst.getSleepTimerInfo !== "function") {
+    this.sleepEnabled = false;
+    this.sleepRemainingMin = 0;
+    this.sleepEndTime = "";   // ✅ 补上
+    return;
+  }
+
+  const info = appInst.getSleepTimerInfo();
+  const remainingMs = info && info.remainingMs ? info.remainingMs : 0;
+
+  const enabled = !!(info && info.enabled && remainingMs > 0);
+  this.sleepEnabled = enabled; 
+  this.sleepRemainingMin = remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
+
+  // ✅ 关键：算出结束时刻，写到 sleepEndTime，让小字能显示正确时间
+  if (enabled) {
+    const end = new Date(Date.now() + remainingMs);
+    const hh = String(end.getHours()).padStart(2, "0");
+    const mm = String(end.getMinutes()).padStart(2, "0");
+    this.sleepEndTime = `${hh}:${mm}`;
+  } else {
+    this.sleepEndTime = "";
+  }
+},
+
+	_setSleepInApp(minutes) {
+		const appInst = this.$app.$def;
+		if (!appInst || typeof appInst.setSleepTimerMinutes !== "function") {
+			prompt.showToast({ message: "App 未接入定时器" });
+			return false;
+		}
+		appInst.setSleepTimerMinutes(minutes);
+		this.syncSleepFromApp();
+		return true;
+	},
+
+	_cancelSleepInApp(showToast = true) {
+		const appInst = this.$app.$def;
+		if (!appInst || typeof appInst.cancelSleepTimer !== "function") {
+			if (showToast) prompt.showToast({ message: "App 未接入定时器" });
+			return false;
+		}
+		appInst.cancelSleepTimer();
+		this.syncSleepFromApp();
+		if (showToast) prompt.showToast({ message: "已取消定时关闭" });
+		return true;
+	},
+
+	// =======================
+	// 定时关闭 UI 交互
+	// =======================
+
+	handleSleepTimerClick() {
+		// ✅ 已经设置：点一下直接取消（更符合直觉）
+		this.syncSleepFromApp();
+		if (this.sleepEnabled) {
+			this._cancelSleepInApp(true);
+			return;
+		}
+		// ✅ 未设置：打开键盘输入
+		this.openSleepKeypad();
+	},
+
+	openSleepKeypad() {
+		this.showSleepKeypad = true;
+		this.sleepInput = "";
+	},
+
+	closeSleepKeypad() {
+		this.showSleepKeypad = false;
+	},
+
+	stopBubble(e) {
+		// ⚠️ 你框架若不传 event，这里也不会炸
+		if (e && e.stopPropagation) e.stopPropagation();
+	},
+
+	handleSleepKey(k) {
+		if (k === "退格") {
+			this.sleepInput = this.sleepInput.slice(0, -1);
+			return;
+		}
+		if (this.sleepInput.length >= 4) return;
+		this.sleepInput += k;
+	},
+
+	confirmSleepInput() {
+		const p = parseInt(this.sleepInput, 10);
+
+		// 空或非法：当作取消
+		if (!p || p <= 0) {
+			this.closeSleepKeypad();
+			this._cancelSleepInApp(true);
+			return;
+		}
+
+		const minutes = Math.max(1, Math.min(9999, p));
+		this.closeSleepKeypad();
+
+		// ✅ 真正的 setTimeout 在 app.ux
+		const ok = this._setSleepInApp(minutes);
+
+		if (ok) {
+			// 计算触发时刻的 时:分
+			const triggerTime = new Date(Date.now() + minutes * 60000);
+			const hh = String(triggerTime.getHours()).padStart(2, "0");
+			const mm = String(triggerTime.getMinutes()).padStart(2, "0");
+
+			prompt.showToast({
+				message: `${minutes}分钟后(${hh}:${mm})自动关闭`,
+			});
+		}
+	},
+
+	// =======================
+	// 其他原有逻辑（基本不动）
+	// =======================
+
+	async loadInitialState() {
+		// 你原本的 loadInitialState 在贴图里没给出，这里保持调用不变
+		// 如果你项目里存在该方法，删掉这个空壳即可
+	},
+
+	updateFavoriteStatus() {
+		if (this.currentSong) {
+			this.isFavorited = !!this.favorites[this.currentSong.id];
+		}
+	},
+
+	updateDownloadStatus() {
+		if (this.isDownloading) {
+			this.downloadState = "downloading";
+		} else if (this.currentSong && this.downloadedSongs[this.currentSong.id]) {
+			this.downloadState = "downloaded";
+		} else {
+			this.downloadState = "not_downloaded";
+		}
+	},
+
+	changeVolume(direction) {
+		const newVolume = this.volume + direction * 10;
+		this.volume = Math.max(0, Math.min(100, newVolume));
+		audio.volume = this.volume / 100;
+	},
+
+	toggleFavorite() {
+		if (!this.currentSong) return;
+		const { id } = this.currentSong;
+		if (this.isFavorited) {
+			delete this.favorites[id];
+			prompt.showToast({ message: "已取消收藏" });
+		} else {
+			this.favorites[id] = {
+				id: this.currentSong.id,
+				name: this.currentSong.name,
+				artists: this.currentSong.artists,
+			};
+			prompt.showToast({ message: "已收藏" });
+		}
+		this.isFavorited = !this.isFavorited;
+		fileService.writeJson(CONSTANTS.FILE_FAVORITES, this.favorites);
+	},
+
+	handleDownloadClick() {
+		if (this.downloadState === "downloaded") {
+			prompt.showToast({ message: "歌曲已下载" });
+			return;
+		}
+		if (this.downloadState === "downloading") {
+			prompt.showToast({ message: "正在下载中..." });
+			return;
+		}
+		prompt.showToast({ message: "即将开始下载..." });
+		router.push({
+			uri: "/pages/player",
+			params: { triggerDownload: true },
+		});
+	},
+
+	handlePlayModeClick() {
+		prompt.showToast({ message: "切换播放模式" });
+		router.push({
+			uri: "/pages/player",
+			params: { triggerPlayModeToggle: true },
+		});
+	},
+
+	goBack() {
+		router.back();
+	},
+};
+</script>
+
+<style>
+.volume {
+	width: 100%;
+	height: 100%;
+	justify-content: center;
+	align-items: center;
+	flex-direction: column;
+	background-color: #000;
+}
+.song {
+	width: 100%;
+	height: 80px; /* 歌曲信息区域高度 */
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0; /* 防止被压缩 */
+	padding-top: 20px;
+}
+.song-name {
+	width: 320px;
+	font-size: 32px;
+	color: #ffffff;
+	lines: 1;
+	text-overflow: ellipsis;
+	text-align: center;
+	font-weight: bold;
+}
+.singer-name {
+	width: 300px;
+	font-size: 24px;
+	color: #cccccc;
+	lines: 1;
+	text-overflow: ellipsis;
+	text-align: center;
+	font-weight: bold;
+}
+.time-info-container {
+	width: 100%;
+    margin-top: 8px;
+	height: 42px;
+	justify-content: center;
+	align-items: center;
     flex-direction: column;
-    background-color: #000;
-  }
-  .song { 
-    width: 100%; 
-    height: 80px; /* 歌曲信息区域高度 */
-    flex-direction: column; 
-    justify-content: center; 
-    align-items: center; 
-    flex-shrink: 0; /* 防止被压缩 */
-    padding-top: 20px;
 }
-.song-name { 
-    width: 320px; 
-    font-size: 32px; 
-    color: #ffffff; 
-    lines: 1; 
-    text-overflow: ellipsis; 
-    text-align: center; 
-    font-weight: bold;
+.time-hint {
+	font-size: 26px;
+	font-weight: bold;
+	color: #888;
 }
-.singer-name { 
-    width: 300px; 
-    font-size: 24px; 
-    /* 【修改】使用固定颜色代替透明度 */
-    color: #CCCCCC; 
-    lines: 1; 
-    text-overflow: ellipsis; 
-    text-align: center; 
-    font-weight: bold;
+.volume-bar-container {
+	width: 364px;
+	height: 96px;
+	padding: 0 10px;
+	margin-top: 18px;
+	justify-content: space-around;
+	align-items: center;
+	background-color: #2e323c;
+	border-radius: 59px;
+	margin-bottom: 84px;
 }
-  .volume-bar-container {
-    width: 364px;
-    height: 96px;
-    padding: 0 10px;
-    margin-top: 18px;
-    justify-content: space-around;
-    align-items: center;
-    background-color: #2E323C;
-    border-radius: 59px;
-    margin-bottom: 84px;
-  }
-  .volume-progress-container {
-    width: 50%;
-    height: 30px;
-    justify-content: center;
-    align-items: center;
-  }
-  .action-icon {
-    width: 60px;
-    height: 60px;
-  }
-  .control-container {
-    width: 92%;
-    margin-top: 50px;
-    justify-content: space-around;
-    align-items: center;
-  }
-  .icon {
-    width: 132px;
-    height:118px;
-  }
-  .little-icon {
-    top: 136px;
-    left: 244px;
-    position: absolute;
-    width: 56px;
-    height: 56px;
-  }
-  .volume-progress {
-    color: #BAC3FF;
-    stroke-width: 30px;
-    layer-color: rgba(255, 255, 255, 0.1);
-  }
-  .cancel-container {
-    position: absolute;
-    width: 100px;
-    height: 100px;
-    bottom: 18px;
-    justify-content: center;
-    align-items: center;
-  }
+.volume-progress-container {
+	width: 50%;
+	height: 30px;
+	justify-content: center;
+	align-items: center;
+}
+.action-icon {
+	width: 60px;
+	height: 60px;
+}
+/* 覆盖层：全屏透明，仅用于把面板居中 */
+.pagekey-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
 
-  @media screen and (shape: rect){
-    .control-container {
-      margin-top: 78px;
-      width: 392px;
-    }
-    .icon {
-      width: 124px;
-      height:112px;
-    }
-    .little-icon {
-      top: 154px;
-      left: 224px;
-      position: absolute;
-      width: 56px;
-      height: 56px;
-    }
-    .volume-bar-container {
-        width: 392px;
-        margin-top: 48px;
-      margin-bottom: 80px;
-    }
-  }
-  </style>
-  
+	background-color: rgba(0, 0, 0, 0.2);
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+/* 面板：中间小小一坨 */
+.pagekey-panel {
+	width: 280px;
+	height: 260px;
+
+	background-color: #2e323c;
+	border-radius: 28px;
+
+	flex-direction: column;
+	align-items: center;
+
+	padding-bottom: 12px;
+
+	margin-bottom: 20px;
+}
+
+/* 显示框 */
+.pagekey-display-wrapper {
+	width: 160px;
+	height: 44px;
+
+	justify-content: center;
+	align-items: center;
+}
+
+.pagekey-display {
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+
+/* 键盘区域 */
+.pagekey-keyboard {
+	width: 240px;
+	height: 200px;
+
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+/* 每行 */
+.pagekey-row {
+	width: 240px;
+	height: 44px;
+
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+
+/* 按键 */
+.pagekey-key {
+	width: 72px;
+	height: 44px;
+
+	background-color: rgba(255, 255, 255, 0.12);
+	border-radius: 22px;
+
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 44px;
+}
+
+.control-container {
+	width: 92%;
+	justify-content: space-around;
+	align-items: center;
+}
+.icon {
+	width: 132px;
+	height: 118px;
+}
+.little-icon {
+	top: 132px;
+	left: 244px;
+	position: absolute;
+	width: 56px;
+	height: 56px;
+}
+.volume-progress {
+	color: #bac3ff;
+	stroke-width: 30px;
+	layer-color: rgba(255, 255, 255, 0.1);
+}
+.cancel-container {
+	position: absolute;
+	width: 100px;
+	height: 100px;
+	bottom: 18px;
+	justify-content: center;
+	align-items: center;
+}
+
+@media screen and (shape: rect) {
+	.control-container {
+		margin-top: 28px;
+		width: 392px;
+	}
+	.icon {
+		width: 124px;
+		height: 112px;
+	}
+	.little-icon {
+		top: 162px;
+		left: 224px;
+		position: absolute;
+		width: 56px;
+		height: 56px;
+	}
+	.volume-bar-container {
+		width: 392px;
+		margin-top: 48px;
+		margin-bottom: 80px;
+	}
+}
+</style>

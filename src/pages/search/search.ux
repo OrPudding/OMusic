@@ -2,37 +2,163 @@
 	name="input-method"
 	src="../../components/InputMethod/InputMethod.ux"
 ></import>
+
 <template>
-    <div class="container">
-        <!-- 1. 固定的顶部栏 -->
-        <div class="header">
-            <div class="header-top">
-                <text class="title" onclick="goBack">‹搜索</text>
-            </div>
-            <text class="text-input" @click="changeState">{{ textValue || ' ' }}_</text>
-            <scroll class="history-scroll" scroll-x="true" if="{{ searchHistory.length > 0 }}" bounces="true">
-                <text for="{{ searchHistory }}" class="history-tag" onclick="() => searchFromHistory($item)">{{ $item }}</text>
-            </scroll>
-        </div>
+	<div class="container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header">
+			<div class="header-top">
+				<text class="title" onclick="goBack">‹搜索</text>
+			</div>
 
-		<!-- 2. 独立滚动的结果列表 (使用 LIST) -->
-        <list class="result-list" bounces="true" onscrollbottom="handleScrollBottom" onscrolltop="handleScrollTop" id="searchScroll" show="{{ hide }}">
-            <block for="{{ displayResultList }}">
-				<list-item type="songItem" class="song-item-wrapper">
-                    <div class="song-item" onclick="playSong($item)">
-                        <text class="song-title">{{ $item.name }}</text>
-                        <text class="song-artist">{{ $item.artists.map((a) => a.name).join(", ") }}</text>
-                    </div>
-                </list-item>
-			</block>
-            <list-item type="loadingTip" class="loading-tip-wrapper">
-                <text class="loading-tip" if="{{ isLoading }}">正在加载更多...</text>
-                <text class="loading-tip" if="{{ !isLoading && hasMoreData === false && fullResultList.length > 0 }}">已加载全部 {{ fullResultList.length }} 条结果</text>
-                <text class="loading-tip" if="{{ !isLoading && fullResultList.length === 0 && searchInitiated }}">无结果</text>
-            </list-item>
-        </list>
+			<text class="text-input" @click="changeState">
+				{{ textValue || " " }}_
+			</text>
 
-        <!-- 3. 自定义输入法覆盖层 (保持不变) -->
+			<scroll
+				class="history-scroll"
+				scroll-x="true"
+				if="{{ searchHistory.length > 0 }}"
+				bounces="true"
+			>
+				<text
+					for="{{ searchHistory }}"
+					class="history-tag"
+					onclick="() => searchFromHistory($item)"
+				>
+					{{ $item }}
+				</text>
+			</scroll>
+		</div>
+
+		<!-- 2. 独立滚动的结果区：改成和示例一致（scroll + status + list-content） -->
+		<div class="result-area" show="{{ hide }}">
+			<scroll
+				id="searchScroll"
+				class="scroll-wrapper"
+				scroll-y="true"
+				bounces="true"
+			>
+				<!-- 状态区（与示例结构一致） -->
+				<div class="status-container">
+					<!-- 加载中 -->
+					<div if="{{ isLoading }}" class="loading-wrapper">
+						<text class="loading-tip">
+							拉取中...已加载 {{ fullResultList.length }} 条
+						</text>
+					</div>
+
+					<!-- 加载失败 -->
+					<div if="{{ !isLoading && loadError }}" class="error-wrapper">
+						<text class="error-tip">加载失败:{{ loadError }}</text>
+						<text class="retry-button" onclick="retryLoad">点击重试</text>
+					</div>
+
+					<!-- 空列表 -->
+					<text
+						if="{{ !isLoading && !loadError && fullResultList.length === 0 && searchInitiated }}"
+						class="loading-tip"
+					>
+						无结果
+					</text>
+				</div>
+
+				<!-- 列表内容 -->
+				<div
+					class="list-content"
+					if="{{ !isLoading && !loadError && fullResultList.length > 0 }}"
+				>
+					<div
+						for="{{ (index, item) in displayResultList }}"
+						class="song-item"
+						onclick="playSong(item)"
+					>
+						<div class="item-prefix">
+							<text class="item-index">{{ item.displayIndex }}</text>
+						</div>
+
+						<div class="song-info">
+							<text class="song-title">{{ item.name }}</text>
+							<text class="song-artist">
+								{{ item.artists.map((a) => a.name).join(" / ") }}
+							</text>
+						</div>
+
+						<div class="action-btn-wrapper">
+							<!-- 搜索页不做操作按钮，但保留占位结构（与示例一致） -->
+							<image
+								class="action-btn"
+								src="/common/icon/more_light.png"
+							></image>
+						</div>
+					</div>
+				</div>
+			</scroll>
+
+			<!-- 翻页栏（与示例一致） -->
+			<div
+				class="pagination-footer"
+				if="{{ !isLoading && !loadError && fullResultList.length > PAGE_SIZE }}"
+			>
+				<text
+					class="item-value-btn {{ currentPage <= 1 ? 'item-value-btn-disabled' : '' }}"
+					onclick="loadPrevPage"
+				>
+					上一页
+				</text>
+
+				<text class="pagination-text" onclick="openPageKeypad">
+					{{ currentPage }} / {{ totalPages }}
+				</text>
+
+				<text
+					class="item-value-btn {{ currentPage >= totalPages ? 'item-value-btn-disabled' : '' }}"
+					onclick="loadNextPage"
+				>
+					下一页
+				</text>
+			</div>
+
+			<!-- 小键盘浮层（与示例一致） -->
+			<div
+				class="pagekey-overlay"
+				if="{{ showPageKeypad }}"
+				onclick="closePageKeypad"
+			>
+				<div class="pagekey-panel" onclick="stopBubble">
+					<div class="pagekey-display-wrapper">
+						<text class="pagekey-display">{{ pageInput || "" }}</text>
+					</div>
+
+					<div class="pagekey-keyboard">
+						<div class="pagekey-row">
+							<text class="pagekey-key" onclick="handlePageKey('1')">1</text>
+							<text class="pagekey-key" onclick="handlePageKey('2')">2</text>
+							<text class="pagekey-key" onclick="handlePageKey('3')">3</text>
+						</div>
+						<div class="pagekey-row">
+							<text class="pagekey-key" onclick="handlePageKey('4')">4</text>
+							<text class="pagekey-key" onclick="handlePageKey('5')">5</text>
+							<text class="pagekey-key" onclick="handlePageKey('6')">6</text>
+						</div>
+						<div class="pagekey-row">
+							<text class="pagekey-key" onclick="handlePageKey('7')">7</text>
+							<text class="pagekey-key" onclick="handlePageKey('8')">8</text>
+							<text class="pagekey-key" onclick="handlePageKey('9')">9</text>
+						</div>
+						<div class="pagekey-row">
+							<text class="pagekey-key" onclick="handlePageKey('退格')">
+								退格
+							</text>
+							<text class="pagekey-key" onclick="handlePageKey('0')">0</text>
+							<text class="pagekey-key" onclick="confirmPageInput">跳转</text>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 3. 自定义输入法覆盖层 -->
 		<input-method
 			hide="{{ hide }}"
 			keyboardtype="{{ keyboardtype }}"
@@ -40,363 +166,641 @@
 			vibratemode="{{ vibratemode }}"
 			screentype="{{ screentype }}"
 			@visibility-change="onVisibilityChange"
-            @delete="onDelete"
+			@delete="onDelete"
 			@complete="onComplete"
 		></input-method>
 	</div>
 </template>
 
 <style>
-  /* 最终规范样式 */
-  .container {
-    width: 100%;
-    height: 100%;
-    flex-direction: column;
-    align-items: center;
-    background-color: black;
-  }
-
-  /* 固定的顶部栏 */
-  .header {
-    width: 100%;
-    flex-direction: column;
-    align-items: center;
-    flex-shrink: 0;
-    padding-bottom: 10px;
-  }
-  .header-top {
-      width: 100%;
-      height: 60px; /* 标题区域高度 */
-      justify-content: center;
-      align-items: center;
-  }
-  .title {
-    font-size: 32px;
-    font-weight: bold;
-    color: #fff;
-  }
-  .text-input {
-    width: 70%;
-    height: 70px;
-    line-height: 70px; /* 垂直居中文本 */
-    border-radius: 35px;
-    text-align: center;
-    color: white;
-    font-size: 28px;
-    border: 3px solid rgba(255, 255, 255, 0.08);
-	background-color: #191821;
-    margin-top: 5px;
-  }
-  .history-scroll {
-    width: 100%;
-    height: 50px; /* 历史记录区域高度 */
-    margin-top: 15px;
-    padding: 0 20px;
-  }
-  .history-tag {
-    padding: 8px 20px;
-    background-color: #191821;
-    border-radius: 20px;
-    margin-right: 15px;
-    font-size: 22px;
-    color: #eee;
-    lines: 1;
-  }
-
-  /* --- list 样式 (遵循 <list> 组件法则) --- */
-  .result-list {
-    flex-grow: 1;
-    width: 100%;
-    padding-bottom: 80px;
-  }
-  .song-item-wrapper {
-      width: 100%;
-      height: 110px; /* 保持与滚动计算一致的高度 */
-      justify-content: center;
-      align-items: center;
-  }
-  .song-item {
-    width: 90%;
-    height: 100px;
-    padding: 15px;
-	background-color: #191821;
-	border-radius: 36px;
+/* 容器 */
+.container {
+	width: 100%;
+	height: 100%;
 	flex-direction: column;
-    justify-content: center;
-  }
-  .song-title {
-	font-size: 26px;
-	color: #fff;
-    lines: 1;
-    text-overflow: ellipsis;
-  }
-  .song-artist {
-	font-size: 22px;
-	color: #888;
-    lines: 1;
-    text-overflow: ellipsis;
-    margin-top: 5px;
-  }
-  .loading-tip-wrapper {
-      width: 100%;
-      height: 100px;
-      justify-content: center;
-      align-items: center;
-  }
-  .loading-tip {
-    color: #888;
-    font-size: 24px;
-  }
+	align-items: center;
+	background-color: black;
+	position: relative;
+}
 
-  /* 媒体查询 (适配 header) */
-  @media screen and (shape: rect) {
-    .header-top {
-      height: 50px;
-    }
-    .text-input {
-        width: 90%;
-    }
-  }
+/* 固定 Header */
+.header {
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	flex-shrink: 0;
+	padding-bottom: 10px;
+}
+.header-top {
+	width: 100%;
+	height: 60px;
+	justify-content: center;
+	align-items: center;
+}
+.title {
+	font-size: 32px;
+	font-weight: bold;
+	color: #fff;
+}
+.text-input {
+	width: 70%;
+	height: 70px;
+	line-height: 70px;
+	border-radius: 35px;
+	text-align: center;
+	color: white;
+	font-size: 28px;
+	border: 3px solid rgba(255, 255, 255, 0.08);
+	background-color: #2e323c;
+	margin-top: 5px;
+}
+.history-scroll {
+	width: 100%;
+	height: 50px;
+	margin-top: 15px;
+	padding: 0 20px;
+}
+.history-tag {
+	padding: 8px 20px;
+	background-color: #2e323c;
+	border-radius: 20px;
+	margin-right: 15px;
+	font-size: 22px;
+	color: #eee;
+	lines: 1;
+}
+
+/* 结果区：为了分页栏固定在底部，做一个相对容器 */
+.result-area {
+	width: 100%;
+	flex-grow: 1;
+	position: relative;
+}
+
+/* 改成示例同款 scroll-wrapper */
+.scroll-wrapper {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+
+	/* 给底部分页栏让出空间 */
+	padding-bottom: 100px;
+}
+
+/* 状态区 */
+.status-container {
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+.loading-wrapper,
+.error-wrapper {
+	flex-direction: column;
+	align-items: center;
+}
+.loading-tip {
+	width: 100%;
+	padding: 50px 0;
+	text-align: center;
+	color: #888;
+	font-weight: bold;
+	font-size: 26px;
+}
+.error-tip {
+	color: #888;
+	font-size: 28px;
+	margin-bottom: 20px;
+	font-weight: bold;
+	text-align: center;
+}
+.retry-button {
+	padding: 10px 30px;
+	font-size: 26px;
+	background-color: #bac3ff;
+	color: #2e323c;
+	font-weight: bold;
+	border-radius: 30px;
+}
+
+/* 列表内容：示例同款结构 */
+.list-content {
+	flex-direction: column;
+	width: 100%;
+	align-items: center;
+}
+
+/* item：按示例的 400 宽 120 高（你可按设备改） */
+.song-item {
+	padding: 0 10px 0 0;
+	width: 400px;
+	height: 120px;
+	margin: 5px;
+	background-color: #2e323c;
+	border-radius: 60px;
+	justify-content: flex-start;
+	align-items: center;
+}
+.item-prefix {
+	width: 80px;
+	height: 100%;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.item-index {
+	text-align: center;
+	font-size: 28px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.6);
+}
+.song-info {
+	flex-grow: 1;
+	width: 0;
+	flex-direction: column;
+	justify-content: center;
+}
+.song-title {
+	font-size: 26px;
+	font-weight: bold;
+	color: #fff;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.song-artist {
+	font-size: 22px;
+	font-weight: bold;
+	color: #888;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.action-btn-wrapper {
+	width: 80px;
+	height: 120px;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.action-btn {
+	width: 64px;
+	height: 64px;
+	opacity: 0.7;
+}
+
+/* 分页栏（示例同款） */
+.pagination-footer {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+
+	width: 100%;
+	height: 100px;
+	flex-direction: row;
+	padding: 0 20px;
+	justify-content: space-around;
+	align-items: center;
+
+	background-color: rgba(0, 0, 0, 0);
+}
+.pagination-text {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+}
+.item-value-btn {
+	height: 50px;
+	padding: 0 20px;
+	background-color: #191821;
+	border-radius: 25px;
+	color: #bac3ff;
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 50px;
+}
+.item-value-btn-disabled {
+	background-color: #191821;
+	color: #888;
+}
+
+/* 页码键盘浮层（示例同款） */
+.pagekey-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+
+	background-color: rgba(0, 0, 0, 0.2);
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+.pagekey-panel {
+	width: 280px;
+	height: 260px;
+
+	background-color: #2e323c;
+	border-radius: 28px;
+
+	flex-direction: column;
+	align-items: center;
+
+	padding-bottom: 12px;
+	margin-bottom: 20px;
+}
+.pagekey-display-wrapper {
+	width: 160px;
+	height: 44px;
+	justify-content: center;
+	align-items: center;
+}
+.pagekey-display {
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+.pagekey-keyboard {
+	width: 240px;
+	height: 200px;
+	flex-direction: column;
+	justify-content: space-between;
+}
+.pagekey-row {
+	width: 240px;
+	height: 44px;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+.pagekey-key {
+	width: 72px;
+	height: 44px;
+
+	background-color: rgba(255, 255, 255, 0.12);
+	border-radius: 22px;
+
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 44px;
+}
+
+/* 适配 */
+@media screen and (shape: rect) {
+	.header-top {
+		height: 50px;
+	}
+	.text-input {
+		width: 90%;
+	}
+}
+@media (shape: circle) {
+	.list-content {
+		padding-bottom: 114px;
+	}
+	.pagination-footer {
+		width: 100%;
+		justify-content: center;
+	}
+	.item-value-btn {
+		margin: 0 22px 50px 22px;
+	}
+	.pagination-text {
+		position: absolute;
+		bottom: 10px;
+	}
+	.loading-tip {
+		padding-bottom: 120px;
+	}
+}
 </style>
+
 <script>
-import fetch from "@system.fetch";
 import router from "@system.router";
 import file from "@system.file";
-// **新增**: 导入 device 模块
 import device from "@system.device";
 
-const SETTINGS_FILE_URI = 'internal://files/settings.json';
+import apiService from "../../services/api.js";
+
+const SETTINGS_FILE_URI = "internal://files/settings.json";
+const CONSTANTS = {
+	COOKIE_FILE_URI: "internal://files/cookie.txt",
+};
+
+const fileService = {
+	_promisify(fn, options) {
+		return new Promise((resolve, reject) => {
+			fn({
+				...options,
+				success: resolve,
+				fail: (data, code) => reject({ data, code }),
+			});
+		});
+	},
+	async readJson(uri, defaultValue = null) {
+		try {
+			const data = await this._promisify(file.readText, { uri });
+			return JSON.parse(data.text);
+		} catch (e) {
+			return defaultValue;
+		}
+	},
+	async writeJson(uri, data) {
+		try {
+			await this._promisify(file.writeText, {
+				uri,
+				text: JSON.stringify(data),
+			});
+			return true;
+		} catch (e) {
+			return false;
+		}
+	},
+};
 
 export default {
-    private: {
-        textValue: "",
-        
-        fullResultList: [],
-        displayResultList: [],
+	private: {
+		textValue: "",
 
-        // --- 搜索专用的懒加载与网络参数 ---
-        WINDOW_SIZE: 10,
-        PAGE_SIZE: 5,
-        ITEM_HEIGHT: 110,
-        TOTAL_LIMIT: 25,
-        API_PAGE_SIZE: 10,
+		fullResultList: [],
+		displayResultList: [],
 
-        displayStartIndex: 0,
-        isLoading: false,
-        searchInitiated: false,
-        isScrolling: false,
-        hasMoreUp: false,
-        hasMoreDown: true,
-        
-        searchHistoryFileUri: 'internal://files/search_history.json',
-        searchHistory: [],
-        hide: true,
-        keyboardtype: "QWERTY",
-        vibratemode: "short",
-        // **修改**: 提供一个安全的默认值
-        screentype: "rect", 
-    },
-    
-    /**
-     * **核心修改**: 在 onInit 中检测屏幕类型
-     */
-    async onInit() {
-        // 1. 异步获取设备信息
-        device.getInfo({
-            success: (data) => {
-                if (data.screenShape) {
-                    console.log(`检测到屏幕形状: ${data.screenShape}`);
-                    // 2. 将获取到的屏幕形状赋值给 screentype
-                    this.screentype = data.screenShape;
-                }
-            },
-            fail: (data, code) => {
-                console.error(`获取设备信息失败, code=${code}, data=${data}. 将使用默认屏幕类型: ${this.screentype}`);
-            }
-        });
+		cookie: null,
 
-        // 3. 其他初始化操作继续执行
-        await this.applySettings();
-        this.loadSearchHistory();
-    },
+		// ---- 分页参数：改成示例这套 ----
+		PAGE_SIZE: 10, // 每页显示多少条（可被 settings.performance.pageSize 覆盖）
+		currentPage: 1,
+		totalPages: 1,
 
-    async applySettings() {
-        try {
-            const data = await new Promise((resolve, reject) => file.readText({ uri: SETTINGS_FILE_URI, success: resolve, fail: reject }));
-            const settings = JSON.parse(data.text);
-            if (settings) {
-                if (settings.search) {
-                    this.TOTAL_LIMIT = settings.search.totalLimit || this.TOTAL_LIMIT;
-                    this.API_PAGE_SIZE = settings.search.apiPageSize || this.API_PAGE_SIZE;
-                }
-                if (settings.performance) {
-                    this.WINDOW_SIZE = settings.performance.windowSize || this.WINDOW_SIZE;
-                    this.PAGE_SIZE = settings.performance.pageSize || this.PAGE_SIZE;
-                }
-                console.log(`搜索页设置已应用: Search(Total:${this.TOTAL_LIMIT}, APIPage:${this.API_PAGE_SIZE}), Perf(Win:${this.WINDOW_SIZE}, Page:${this.PAGE_SIZE})`);
-            }
-        } catch (e) {
-            console.log("搜索页无法加载设置，使用默认值。");
-        }
-    },
+		// ---- 网络拉取参数（你原来的保留）----
+		TOTAL_LIMIT: 25,
+		API_PAGE_SIZE: 10,
 
-    onVisibilityChange() {
-        if (this.hide) {
-            this.handleSearch();
-        }
-    },
+		// ---- 状态 ----
+		isLoading: false,
+		loadError: null,
+		searchInitiated: false,
 
-    changeState() {
-        this.hide = !this.hide;
-    },
+		// ---- 下拉刷新计数（示例同款“多次触顶刷新”）----
+		isRefreshing: false,
 
-    onDelete() {
-        this.textValue = this.textValue.slice(0, -1);
-    },
+		// 历史
+		searchHistoryFileUri: "internal://files/search_history.json",
+		searchHistory: [],
 
-    onComplete(evt) {
-        this.textValue += evt.detail.content;
-    },
+		// 输入法
+		hide: true,
+		keyboardtype: "QWERTY",
+		vibratemode: "short",
+		screentype: "rect",
 
-    loadSearchHistory() {
-        file.readText({
-            uri: this.searchHistoryFileUri,
-            success: (data) => {
-                try { this.searchHistory = JSON.parse(data.text || "[]"); } catch (e) { this.searchHistory = []; }
-            },
-            fail: () => { this.searchHistory = []; }
-        });
-    },
+		// 跳页键盘
+		showPageKeypad: false,
+		pageInput: "",
+	},
 
-    saveSearchHistory() {
-        file.writeText({
-            uri: this.searchHistoryFileUri,
-            text: JSON.stringify(this.searchHistory, null, 2),
-        });
-    },
+	async onInit() {
+		device.getInfo({
+			success: (data) => {
+				if (data.screenShape) this.screentype = data.screenShape;
+			},
+			fail: () => {},
+		});
 
-    addAndSaveHistory(keyword) {
-        if (!keyword) return;
-        const index = this.searchHistory.indexOf(keyword);
-        if (index > -1) this.searchHistory.splice(index, 1);
-        this.searchHistory.unshift(keyword);
-        if (this.searchHistory.length > 10) this.searchHistory.pop();
-        this.saveSearchHistory();
-    },
+		await this.applySettings();
+		await this.loadCookie();
+		this.loadSearchHistory();
+	},
 
-    searchFromHistory(keyword) {
-        this.textValue = keyword;
-        this.handleSearch();
-    },
+	async applySettings() {
+		try {
+			const data = await new Promise((resolve, reject) =>
+				file.readText({
+					uri: SETTINGS_FILE_URI,
+					success: resolve,
+					fail: reject,
+				})
+			);
+			const settings = JSON.parse(data.text);
 
-    async handleSearch() {
-        const keywords = this.textValue.trim();
-        if (!keywords || this.isLoading) return;
-        
-        this.addAndSaveHistory(keywords);
-        
-        this.isLoading = true;
-        this.searchInitiated = true;
-        this.fullResultList = [];
-        this.displayResultList = [];
-        this.displayStartIndex = 0;
-        this.hasMoreUp = false;
-        this.hasMoreDown = true;
+			if (settings) {
+				if (settings.search) {
+					this.TOTAL_LIMIT = settings.search.totalLimit || this.TOTAL_LIMIT;
+					this.API_PAGE_SIZE =
+						settings.search.apiPageSize || this.API_PAGE_SIZE;
+				}
+				if (settings.performance) {
+					// ✅ 搜索页现在用分页：pageSize 表示每页条数
+					this.PAGE_SIZE = settings.performance.pageSize || this.PAGE_SIZE;
+				}
+			}
+		} catch (e) {
+			// ignore
+		}
+	},
+	async loadCookie() {
+		try {
+			let rawText;
+			try {
+				rawText = (
+					await fileService._promisify(file.readText, {
+						uri: CONSTANTS.COOKIE_FILE_URI,
+					})
+				).text;
+			} catch (e) {
+				rawText = null;
+			}
+			this.cookie = rawText || null;
+			if (this.cookie) console.log("Cookie 加载成功。");
+		} catch (e) {
+			this.cookie = null;
+		}
+	},
 
-        await this.fetchAllSearchResults();
-        
-        this.isLoading = false;
-        this.updateDisplayList(this.displayStartIndex);
-    },
+	// 输入法
+	onVisibilityChange() {
+		if (this.hide) this.handleSearch();
+	},
+	changeState() {
+		this.hide = !this.hide;
+	},
+	onDelete() {
+		this.textValue = this.textValue.slice(0, -1);
+	},
+	onComplete(evt) {
+		this.textValue += evt.detail.content;
+	},
 
-    async fetchAllSearchResults() {
-        let offset = 0;
-        let hasMore = true;
-        while (hasMore && this.fullResultList.length < this.TOTAL_LIMIT) {
-            const apiUrl = `https://163api.qijieya.cn/search?keywords=${encodeURIComponent(this.textValue  )}&limit=${this.API_PAGE_SIZE}&offset=${offset}`;
-            try {
-                const response = await new Promise((resolve, reject) => {
-                    fetch.fetch({ url: apiUrl, responseType: 'text', success: resolve, fail: reject });
-                });
-                const result = JSON.parse(response.data);
-                if (result.code === 200 && result.result?.songs?.length > 0) {
-                    const newSongs = result.result.songs.map(s => ({ id: s.id, name: s.name, artists: s.artists || [] }));
-                    
-                    this.fullResultList.push(...newSongs);
-                    this.updateDisplayList(this.displayStartIndex);
+	// 历史
+	loadSearchHistory() {
+		file.readText({
+			uri: this.searchHistoryFileUri,
+			success: (data) => {
+				try {
+					this.searchHistory = JSON.parse(data.text || "[]");
+				} catch (e) {
+					this.searchHistory = [];
+				}
+			},
+			fail: () => {
+				this.searchHistory = [];
+			},
+		});
+	},
+	saveSearchHistory() {
+		file.writeText({
+			uri: this.searchHistoryFileUri,
+			text: JSON.stringify(this.searchHistory),
+		});
+	},
+	addAndSaveHistory(keyword) {
+		if (!keyword) return;
+		const index = this.searchHistory.indexOf(keyword);
+		if (index > -1) this.searchHistory.splice(index, 1);
+		this.searchHistory.unshift(keyword);
+		if (this.searchHistory.length > 10) this.searchHistory.pop();
+		this.saveSearchHistory();
+	},
+	searchFromHistory(keyword) {
+		this.textValue = keyword;
+		this.handleSearch();
+	},
 
-                    offset += newSongs.length;
-                    if (newSongs.length < this.API_PAGE_SIZE) {
-                        hasMore = false;
-                        this.hasMoreDown = false;
-                    }
-                } else {
-                    hasMore = false;
-                    this.hasMoreDown = false;
-                }
-            } catch (error) {
-                console.error("分页搜索失败:", error);
-                hasMore = false;
-                this.hasMoreDown = false;
-            }
-        }
-    },
+	async handleSearch() {
+		const keywords = this.textValue.trim();
+		if (!keywords) return;
+		if (this.isLoading || this.isRefreshing) return;
 
-    updateDisplayList(startIndex) {
-        this.displayStartIndex = Math.max(0, Math.min(startIndex, this.fullResultList.length - this.PAGE_SIZE));
-        const endIndex = Math.min(this.displayStartIndex + this.WINDOW_SIZE, this.fullResultList.length);
-        this.displayResultList = this.fullResultList.slice(this.displayStartIndex, endIndex);
-        this.hasMoreUp = this.displayStartIndex > 0;
-    },
+		this.addAndSaveHistory(keywords);
 
-    handleScrollTop() {
-        if (this.isScrolling || !this.hasMoreUp) return;
-        this.isScrolling = true;
-        const prevStartIndex = this.displayStartIndex - this.PAGE_SIZE;
-        if (prevStartIndex < 0) {
-            this.isScrolling = false;
-            return;
-        }
-        this.updateDisplayList(prevStartIndex);
-        prompt.showToast({ message: `加载上页，避免操作` });
-        const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
-        this.$element('searchScroll').scrollTo({ top: scrollOffset, behavior: 'instant' });
-        setTimeout(() => { this.isScrolling = false; }, 100);
-    },
+		this.isLoading = true;
+		this.loadError = null;
+		this.searchInitiated = true;
 
-    handleScrollBottom() {
-        if (this.isScrolling || !this.hasMoreDown) return;
-        this.isScrolling = true;
-        const nextStartIndex = this.displayStartIndex + this.PAGE_SIZE;
-        if (nextStartIndex >= this.fullResultList.length) {
-            this.isScrolling = false;
-            return;
-        }
-        this.updateDisplayList(nextStartIndex);
-        prompt.showToast({ message: `加载下页，避免操作` });
-        const scrollOffset = this.PAGE_SIZE * this.ITEM_HEIGHT;
-        this.$element('searchScroll').scrollBy({ top: -scrollOffset, behavior: 'instant' });
-        setTimeout(() => { this.isScrolling = false; }, 100);
-    },
+		this.fullResultList = [];
+		this.displayResultList = [];
+		this.currentPage = 1;
+		this.totalPages = 1;
+		try {
+			this.fullResultList = await apiService.searchSongsAll(
+				keywords,
+				this.TOTAL_LIMIT,
+				this.API_PAGE_SIZE,
+                this.cookie
+			);
+			this.totalPages = Math.max(
+				1,
+				Math.ceil(this.fullResultList.length / this.PAGE_SIZE)
+			);
+			this.loadPage(1);
+		} catch (e) {
+			this.loadError = e?.message || "未知错误";
+			this.fullResultList = [];
+			this.displayResultList = [];
+			this.totalPages = 1;
+		} finally {
+			this.isLoading = false;
+		}
+	},
 
-    playSong(songItem) {
-        const songInfoForPlayer = {
-            id: songItem.id,
-            name: songItem.name,
-            artists: songItem.artists.map(a => a.name).join(' / '),
-        };
+	// ---- 分页：示例同款函数集合 ----
+	loadPage(pageNumber) {
+		if (pageNumber < 1) return;
+		if (pageNumber > this.totalPages) return;
 
-        router.push({
-            uri: 'pages/player',
-            params: { 
-                songId: songItem.id,
-                songInfo: JSON.stringify(songInfoForPlayer)
-            }
-        });
-    },
-    
-    goBack() {
-        router.back();
-    }
+		const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
+		const endIndex = startIndex + this.PAGE_SIZE;
+
+		this.displayResultList = this.fullResultList
+			.slice(startIndex, endIndex)
+			.map((song, i) => ({
+				...song,
+				displayIndex: startIndex + i + 1,
+			}));
+
+		this.currentPage = pageNumber;
+
+		this.$nextTick(() => {
+			// ✅ 和示例一样：翻页后回到顶部（top:1 防止某些机型 0 不触发）
+			this.$element("searchScroll").scrollTo({ top: 1, behavior: "instant" });
+		});
+	},
+
+	loadPrevPage() {
+		if (this.totalPages <= 1) return;
+		if (this.currentPage <= 1) return;
+		this.loadPage(this.currentPage - 1);
+	},
+
+	loadNextPage() {
+		if (this.totalPages <= 1) return;
+		if (this.currentPage >= this.totalPages) return;
+		this.loadPage(this.currentPage + 1);
+	},
+
+	// 跳页键盘
+	openPageKeypad() {
+		this.showPageKeypad = true;
+		this.pageInput = "";
+	},
+	closePageKeypad() {
+		this.showPageKeypad = false;
+	},
+	stopBubble(e) {
+		if (e && e.stopPropagation) e.stopPropagation();
+	},
+	handlePageKey(k) {
+		if (k === "退格") {
+			this.pageInput = this.pageInput.slice(0, -1);
+			return;
+		}
+		if (this.pageInput.length >= 4) return;
+		this.pageInput += k;
+	},
+	confirmPageInput() {
+		const p = parseInt(this.pageInput, 10);
+		if (!p) {
+			this.closePageKeypad();
+			return;
+		}
+		const target = Math.max(1, Math.min(this.totalPages, p));
+		this.closePageKeypad();
+		this.loadPage(target);
+	},
+
+	retryLoad() {
+		this.handleSearch();
+	},
+
+	// 播放
+	playSong(songItem) {
+		const songInfoForPlayer = {
+			id: songItem.id,
+			name: songItem.name,
+			artists: (songItem.artists || []).map((a) => a.name).join(" / "),
+		};
+
+		router.push({
+			uri: "pages/player",
+			params: {
+				songId: songItem.id,
+				songInfo: JSON.stringify(songInfoForPlayer),
+			},
+		});
+	},
+
+	goBack() {
+		router.back();
+	},
 };
 </script>

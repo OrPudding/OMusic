@@ -1,114 +1,581 @@
 <template>
-    <!-- 根组件使用 div -->
-    <div class="page-container">
-        <!-- 1. 固定的顶部栏 -->
-        <div class="header" onclick="goBack">
-            <text class="time-display">{{currentTime}}</text>
-            <text class="title">‹存储管理</text>
-        </div>
+	<div class="page-container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header" onclick="goBack">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹存储管理</text>
+		</div>
 
-        <!-- 2. 独立滚动的内容区 -->
-        <scroll id="songListScroll" class="scroll-wrapper" scroll-y="true" bounces="true">
-            
-            <!-- 存储概览 -->
-            <div class="storage-overview">
-                <text class="storage-text">{{ usedStorageText }} / {{ totalStorageText }}</text>
-                <progress class="storage-progress" type="horizontal" percent="{{ usedPercent }}"></progress>
-                <div class="storage-details">
-                    <div class="detail-item">
-                        <div class="color-box music-color"></div>
-                        <text class="detail-text">歌曲: {{ musicSizeText }}</text>
-                    </div>
-                    <div class="detail-item">
-                        <div class="color-box lyrics-color"></div>
-                        <text class="detail-text">歌词: {{ lyricsSizeText }}</text>
-                    </div>
-                    <div class="detail-item">
-                        <div class="color-box free-color"></div>
-                        <text class="detail-text">可用: {{ availableStorageText }}</text>
-                    </div>
-                </div>
-                <!-- 一键修复按钮 -->
-                <div class="header-action-btn-wrapper" if="{{ hasUnknownSongs }}" onclick="fixAllUnknownSongs">
-                    <image class="header-action-btn-icon" src="/common/icon/fix.png"></image>
-                    <text class="header-action-btn-text">修复未知歌曲</text>
-                </div>
-            </div>
-            
-            <!-- 歌曲列表 -->
-            <div class="list-content">
-                <div for="{{(index, item) in displaySongList}}" class="song-item">
-                   <div class="item-prefix">
-                        <text class="item-index">{{ item.displayIndex }}</text>
-                   </div>
-                   <div class="song-info">
-                       <text class="song-title {{ item.isUnknown ? 'unknown-title' : '' }}">{{ item.name }}</text>
-                       <text class="song-artist">{{ item.artists }}</text>
-                       <div class="file-size-details">
-                           <text class="size-tag music">{{ formatSize(item.musicFileSize, 'MB') }}</text>
-                           <text class="size-tag lyric">{{ formatSize(item.lyricFileSize, 'KB') }}</text>
-                       </div>
-                   </div>
-                   <div class="action-btn-wrapper" onclick="deleteSong(item)">
-                       <image class="action-btn" src="/common/icon/cancel.png"></image>
-                   </div>
-                </div>
-            </div>
+		<!-- 2. 独立滚动的内容区 -->
+		<scroll
+			id="songListScroll"
+			class="scroll-wrapper"
+			scroll-y="true"
+			bounces="true"
+		>
+			<!-- 存储概览 -->
+			<div class="storage-overview">
+				<text class="storage-text">
+					{{ usedStorageText }} / {{ totalStorageText }}
+				</text>
+				<progress
+					class="storage-progress"
+					type="horizontal"
+					percent="{{ usedPercent }}"
+				></progress>
 
-            <!-- 底部提示 -->
-            <text class="loading-tip" if="{{ isLoading }}">正在计算存储...</text>
-            <text class="loading-tip" if="{{ !isLoading && fullSongList.length === 0 }}">没有已下载的歌曲</text>
-        </scroll>
+				<div class="storage-details">
+					<div class="detail-item">
+						<div class="color-box music-color"></div>
+						<text class="detail-text">歌曲: {{ musicSizeText }}</text>
+					</div>
+					<div class="detail-item">
+						<div class="color-box lyrics-color"></div>
+						<text class="detail-text">歌词: {{ lyricsSizeText }}</text>
+					</div>
+					<div class="detail-item">
+						<div class="color-box free-color"></div>
+						<text class="detail-text">可用: {{ availableStorageText }}</text>
+					</div>
+				</div>
 
-        <!-- 悬浮的底部翻页操作栏 -->
-        <div class="pagination-footer" if="{{ !isLoading && fullSongList.length > PAGE_SIZE }}">
-            <text class="item-value-btn {{ currentPage === 1 ? 'item-value-btn-disabled' : '' }}" onclick="loadPrevPage">上一页</text>
-            <text class="pagination-text">{{ currentPage }} / {{ totalPages }}</text>
-            <text class="item-value-btn {{ currentPage >= totalPages ? 'item-value-btn-disabled' : '' }}" onclick="loadNextPage">下一页</text>
-        </div>
-    </div>
+				<!-- 一键修复按钮 -->
+				<div
+					class="header-action-btn-wrapper"
+					if="{{ hasUnknownSongs }}"
+					onclick="fixAllUnknownSongs"
+				>
+					<image
+						class="header-action-btn-icon"
+						src="/common/icon/fix.png"
+					></image>
+					<text class="header-action-btn-text">修复未知歌曲</text>
+				</div>
+
+				<!-- 批量删除模式（条状胶囊） -->
+				<div
+					class="batch-delete-pill"
+					if="{{ fullSongList.length > 0 }}"
+					onclick="toggleDeleteMode"
+				>
+					<image
+						class="batch-delete-icon"
+						src="{{ isDeleteMode ? '/common/icon/check.png' : '/common/icon/delete.png' }}"
+					></image>
+					<text class="batch-delete-text">
+						{{ isDeleteMode ? "完成删除" : "批量删除" }}
+					</text>
+				</div>
+			</div>
+
+			<!-- 歌曲列表 -->
+			<div class="list-content">
+				<div for="{{ (index, item) in displaySongList }}" class="song-item">
+					<div class="item-prefix">
+						<text class="item-index">{{ item.displayIndex }}</text>
+					</div>
+
+					<div class="song-info">
+						<text
+							class="song-title {{ item.isUnknown ? 'unknown-title' : '' }}"
+						>
+							{{ item.name }}
+						</text>
+						<text class="song-artist">{{ item.artists }}</text>
+						<div class="file-size-details">
+							<text class="size-tag music">
+								{{ formatSize(item.musicFileSize, "MB") }}
+							</text>
+							<text class="size-tag lyric">
+								{{ formatSize(item.lyricFileSize, "KB") }}
+							</text>
+						</div>
+					</div>
+
+					<!-- 右侧删除按钮：始终点这里删（普通模式弹确认，批量模式直接删） -->
+					<div class="action-btn-wrapper" onclick="handleDeleteClick(item)">
+						<image class="action-btn" src="/common/icon/cancel.png"></image>
+					</div>
+				</div>
+			</div>
+
+			<!-- 底部提示 -->
+			<text class="loading-tip" if="{{ isLoading }}">正在计算存储...</text>
+			<text
+				class="loading-tip"
+				if="{{ !isLoading && fullSongList.length === 0 }}"
+			>
+				没有已下载的歌曲
+			</text>
+		</scroll>
+
+		<!-- 悬浮的底部翻页操作栏 -->
+		<div
+			class="pagination-footer"
+			if="{{ !isLoading && fullSongList.length > PAGE_SIZE }}"
+		>
+			<text class="item-value-btn" onclick="loadPrevPage">上一页</text>
+			<text class="pagination-text" onclick="openPageKeypad">
+				{{ currentPage }} / {{ totalPages }}
+			</text>
+			<text class="item-value-btn" onclick="loadNextPage">下一页</text>
+		</div>
+
+		<!-- 跳页键盘（小坨居中） -->
+		<div
+			class="pagekey-overlay"
+			if="{{ showPageKeypad }}"
+			onclick="closePageKeypad"
+		>
+			<div class="pagekey-panel" onclick="noop">
+				<div class="pagekey-display-wrapper">
+					<text class="pagekey-display">{{ pageInput || "" }}</text>
+				</div>
+
+				<div class="pagekey-keyboard">
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('1')">1</text>
+						<text class="pagekey-key" onclick="handlePageKey('2')">2</text>
+						<text class="pagekey-key" onclick="handlePageKey('3')">3</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('4')">4</text>
+						<text class="pagekey-key" onclick="handlePageKey('5')">5</text>
+						<text class="pagekey-key" onclick="handlePageKey('6')">6</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="handlePageKey('7')">7</text>
+						<text class="pagekey-key" onclick="handlePageKey('8')">8</text>
+						<text class="pagekey-key" onclick="handlePageKey('9')">9</text>
+					</div>
+					<div class="pagekey-row">
+						<text class="pagekey-key" onclick="closePageKeypad">取消</text>
+						<text class="pagekey-key" onclick="handlePageKey('0')">0</text>
+						<text class="pagekey-key" onclick="handlePageKey('退格')">
+							退格
+						</text>
+					</div>
+				</div>
+
+				<text class="pagekey-confirm" onclick="confirmJumpPage">跳转</text>
+			</div>
+		</div>
+	</div>
 </template>
 
 <style>
-    .page-container { width: 100%; height: 100%; background-color: black; position: relative; }
-    .header { width: 100%; height: 90px; flex-direction: column; justify-content: center; align-items: center; background-color: black; }
-    .time-display { font-size: 28px; font-weight: bold; color: #ffffff; padding-top: 5px; text-align: center; }
-    .title { font-size: 32px; padding: 5px; text-align: center; font-weight: bold; color: #fff; }
-    .scroll-wrapper { position: absolute; top: 90px; bottom: 0; left: 0; right: 0; width: 100%; flex-direction: column; align-items: center; padding-bottom: 100px; }
-    .storage-overview { display: flex; flex-direction: column; align-items: center; margin: 10px 0 20px 0; padding: 15px; background-color: #191821; border-radius: 20px; width: 360px; }
-    .storage-text { font-size: 24px; color: #ffffff; font-weight: bold; margin-bottom: 10px; }
-    .storage-progress { width: 100%; height: 12px; stroke-width: 12px; color: #BAC3FF; background-color: #333; }
-    .storage-details { flex-direction: column; display: flex; justify-content: space-around; width: 100%; margin-top: 15px; }
-    .detail-item { display: flex; align-items: center; font-size: 20px; font-weight: bold; color: #cccccc; }
-    .detail-text { font-size: 20px; font-weight: bold; color: #cccccc; }
-    .color-box { width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; }
-    .music-color { background-color: #BAC3FF; }
-    .lyrics-color { background-color: #697699; }
-    .free-color { background-color: #555555; }
-    .header-action-btn-wrapper { margin-top: 15px; display: flex; flex-direction: row; align-items: center; padding: 8px 15px; background-color: rgba(255, 204, 0, 0.2); border-radius: 20px; }
-    .header-action-btn-icon { width: 32px; height: 32px; margin-right: 8px; }
-    .header-action-btn-text { color: #FFCC00; font-size: 22px; font-weight: bold; }
-    .list-content { flex-direction: column; width: 100%; align-items: center; }
-    .song-item { padding: 0 10px 0 0; width: 400px; height: 120px; margin: 5px; background-color: #191821; border-radius: 60px; justify-content: flex-start; align-items: center; }
-    .item-prefix { width: 80px; height: 100%; justify-content: center; align-items: center; flex-shrink: 0; }
-    .item-index { text-align: center; font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.6); }
-    .song-info { flex-grow: 1; width: 0; flex-direction: column; justify-content: center; }
-    .song-title { font-size: 26px; font-weight: bold; color: #fff; lines: 1; text-overflow: ellipsis; }
-    .song-artist { font-size: 22px; font-weight: bold; color: #888; lines: 1; text-overflow: ellipsis; }
-    .action-btn-wrapper { width: 80px; height: 120px; justify-content: center; align-items: center; flex-shrink: 0; }
-    .action-btn { width: 64px; height: 64px; }
-    .loading-tip { width: 100%; text-align: center; color: #888; font-size: 24px; padding: 30px 0; }
-    .unknown-title { color: #FFCC00; }
-    .file-size-details { display: flex; flex-direction: row; margin-top: 6px; }
-    .size-tag { font-size: 18px; font-weight: bold; padding: 2px 6px; border-radius: 5px; margin-right: 8px; }
-    .size-tag.music { background-color: #2E323C; color: #BAC3FF; }
-    .size-tag.lyric { background-color: rgba(200, 200, 200, 0.2); color: #cccccc; }
-    .pagination-footer { position: absolute; bottom: 0; left: 0; right: 0; width: 100%; height: 100px; flex-direction: row; padding: 0 20px; justify-content: space-around; align-items: center; }
-    .pagination-text { font-size: 28px; font-weight: bold; color: #ffffff; }
-    .item-value-btn { height: 50px; padding: 0 20px; background-color: #2E323C; border-radius: 25px; color: #BAC3FF; font-size: 26px; font-weight: bold; text-align: center; line-height: 50px; }
-    .item-value-btn-disabled { background-color: #2E323C; color: #888; }
-    @media (shape: rect) { .header { height: 65px; flex-direction: row-reverse; padding-top: 10px; justify-content: space-around; } .scroll-wrapper { top: 65px; } .time-display { font-size: 32px; padding-top: 0px; } }
-    @media (shape: circle) { .pagination-footer { width: 100%; justify-content: center; } .item-value-btn { margin: 0 22px 50px 22px; } .pagination-text { position: absolute; bottom: 10px; } }
+.page-container {
+	width: 100%;
+	height: 100%;
+	background-color: black;
+	position: relative;
+}
+.header {
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	background-color: black;
+}
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
+.title {
+	font-size: 32px;
+	padding: 5px;
+	text-align: center;
+	font-weight: bold;
+	color: #fff;
+}
+
+.scroll-wrapper {
+	position: absolute;
+	top: 90px;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	flex-direction: column;
+	align-items: center;
+	padding-bottom: 100px;
+}
+
+.storage-overview {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin: 10px 0 20px 0;
+	padding: 15px;
+	background-color: #2e323c;
+	border-radius: 20px;
+	width: 360px;
+}
+.storage-text {
+	font-size: 24px;
+	color: #ffffff;
+	font-weight: bold;
+	margin-bottom: 10px;
+}
+.storage-progress {
+	width: 100%;
+	height: 12px;
+	stroke-width: 12px;
+	color: #bac3ff;
+	background-color: #555555;
+}
+.storage-details {
+	flex-direction: column;
+	display: flex;
+	justify-content: space-around;
+	width: 100%;
+	margin-top: 15px;
+}
+.detail-item {
+	display: flex;
+	align-items: center;
+	font-size: 20px;
+	font-weight: bold;
+	color: #cccccc;
+}
+.detail-text {
+	font-size: 20px;
+	font-weight: bold;
+	color: #cccccc;
+}
+.color-box {
+	width: 12px;
+	height: 12px;
+	border-radius: 3px;
+	margin-right: 8px;
+}
+.music-color {
+	background-color: #bac3ff;
+}
+.lyrics-color {
+	background-color: #697699;
+}
+.free-color {
+	background-color: #555555;
+}
+
+.header-action-btn-wrapper {
+	margin-top: 15px;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	padding: 8px 15px;
+	background-color: rgba(136, 136, 136, 0.2);
+	border-radius: 20px;
+}
+.header-action-btn-icon {
+	width: 32px;
+	height: 32px;
+	margin-right: 8px;
+	background-color: #bac3ff;
+	border-radius: 16px;
+}
+.header-action-btn-text {
+	color: #bac3ff;
+	font-size: 22px;
+	font-weight: bold;
+}
+
+/* 批量删除胶囊 */
+.batch-delete-pill {
+	width: 240px;
+	height: 56px;
+	margin-top: 12px;
+	background-color: #bac3ff;
+	border-radius: 28px;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+}
+.batch-delete-icon {
+	width: 28px;
+	height: 28px;
+	margin-right: 10px;
+}
+.batch-delete-text {
+	color: #2e323c;
+	font-size: 24px;
+	font-weight: bold;
+}
+
+.list-content {
+	flex-direction: column;
+	width: 100%;
+	align-items: center;
+}
+.song-item {
+	padding: 0 10px 0 0;
+	width: 400px;
+	height: 120px;
+	margin: 5px;
+	background-color: #2e323c;
+	border-radius: 60px;
+	justify-content: flex-start;
+	align-items: center;
+}
+.item-prefix {
+	width: 80px;
+	height: 100%;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.item-index {
+	text-align: center;
+	font-size: 28px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.song-info {
+	flex-grow: 1;
+	width: 0;
+	flex-direction: column;
+	justify-content: center;
+}
+.song-title {
+	font-size: 26px;
+	font-weight: bold;
+	color: #fff;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.song-artist {
+	font-size: 22px;
+	font-weight: bold;
+	color: #888;
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.unknown-title {
+	color: #888;
+}
+
+.file-size-details {
+	display: flex;
+	flex-direction: row;
+	margin-top: 6px;
+}
+.size-tag {
+	font-size: 18px;
+	font-weight: bold;
+	padding: 2px 6px;
+	border-radius: 5px;
+	margin-right: 8px;
+}
+.size-tag.music {
+	background-color: #2e323c;
+	color: #bac3ff;
+}
+.size-tag.lyric {
+	background-color: rgba(200, 200, 200, 0.2);
+	color: #cccccc;
+}
+
+.action-btn-wrapper {
+	width: 80px;
+	height: 120px;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.action-btn {
+	width: 64px;
+	height: 64px;
+}
+
+.loading-tip {
+	width: 100%;
+	text-align: center;
+	color: #888;
+	font-size: 24px;
+	padding: 30px 0;
+}
+
+.pagination-footer {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	width: 100%;
+	height: 100px;
+	flex-direction: row;
+	padding: 0 20px;
+	justify-content: space-around;
+	align-items: center;
+}
+.pagination-text {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+}
+.item-value-btn {
+	height: 50px;
+	padding: 0 20px;
+	background-color: #2e323c;
+	border-radius: 25px;
+	color: #bac3ff;
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 50px;
+}
+
+/* ===== 跳页键盘（小坨居中） ===== */
+.pagekey-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.2);
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+.pagekey-panel {
+	width: 280px;
+	height: 300px;
+	background-color: rgba(25, 24, 33);
+	border-radius: 28px;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 0 12px 0;
+	margin-bottom: 20px;
+}
+
+.pagekey-display-wrapper {
+	width: 160px;
+	height: 44px;
+	background-color: #2e323c;
+	border-radius: 18px;
+	justify-content: center;
+	align-items: center;
+}
+
+.pagekey-display {
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+}
+
+.pagekey-keyboard {
+	width: 240px;
+	height: 200px;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.pagekey-row {
+	width: 240px;
+	height: 44px;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.pagekey-key {
+	width: 72px;
+	height: 44px;
+	background-color: rgba(255, 255, 255, 0.12);
+	border-radius: 22px;
+	color: #fff;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 44px;
+}
+
+.pagekey-confirm {
+	width: 160px;
+	height: 46px;
+	border-radius: 23px;
+	background-color: #bac3ff;
+	color: #000;
+	font-size: 24px;
+	font-weight: bold;
+	text-align: center;
+	line-height: 46px;
+}
+
+@media (shape: rect) {
+	.header {
+		height: 65px;
+		flex-direction: row-reverse;
+		padding-top: 10px;
+		justify-content: space-around;
+	}
+	.scroll-wrapper {
+		top: 65px;
+	}
+	.time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
+
+	/* rect：键盘整体放大一点 */
+	.pagekey-panel {
+		width: 320px;
+		height: 340px;
+		border-radius: 32px;
+	}
+	.pagekey-display-wrapper {
+		width: 200px;
+		height: 52px;
+		border-radius: 22px;
+	}
+	.pagekey-display {
+		font-size: 28px;
+	}
+	.pagekey-keyboard {
+		width: 280px;
+		height: 230px;
+	}
+	.pagekey-row {
+		width: 280px;
+		height: 52px;
+	}
+	.pagekey-key {
+		width: 86px;
+		height: 52px;
+		border-radius: 26px;
+		font-size: 28px;
+		line-height: 52px;
+	}
+	.pagekey-confirm {
+		width: 200px;
+		height: 54px;
+		border-radius: 27px;
+		font-size: 26px;
+		line-height: 54px;
+	}
+}
+
+@media (shape: circle) {
+	.pagination-footer {
+		width: 100%;
+		justify-content: center;
+	}
+	.item-value-btn {
+		margin: 0 22px 50px 22px;
+	}
+	.pagination-text {
+		position: absolute;
+		bottom: 10px;
+	}
+}
 </style>
 
 <script>
@@ -118,7 +585,6 @@ import prompt from "@system.prompt";
 import device from "@system.device";
 import fetch from "@system.fetch";
 
-// 【【【核心新增】】】 将 fileService 封装完整地放入
 const fileService = {
     _promisify(fn, options) {
         return new Promise((resolve, reject) => {
@@ -134,15 +600,18 @@ const fileService = {
             return defaultValue;
         }
     },
-    async writeJson(uri, data) {
-        try {
-            await this._promisify(file.writeText, { uri, text: JSON.stringify(data, null, 2) });
-            return true;
-        } catch (error) {
-            console.error(`[FileService] writeJson 失败: ${uri}`, error);
-            return false;
-        }
-    },
+	async writeJson(uri, data) {
+  try {
+    await this._promisify(file.writeText, {
+      uri,
+      text: JSON.stringify(data), // ✅ 去掉 null,2，显著降低峰值内存
+    });
+    return true;
+  } catch (error) {
+    console.error(`[FileService] writeJson 失败: ${uri}`, error);
+    return false;
+  }
+},
     async delete(uri) {
         try {
             await this._promisify(file.delete, { uri });
@@ -151,88 +620,127 @@ const fileService = {
             if (error.code !== 301) console.error(`[FileService] delete 失败: ${uri}`, error);
             return false;
         }
+    },
+    async ensureDirExists(uri) {
+        try {
+            await this._promisify(file.mkdir, { uri });
+        } catch (error) { /* 忽略目录已存在的错误 */ }
     }
 };
 
-const DIR_MUSIC = 'internal://files/music/';
-const DIR_LYRICS = 'internal://files/lyrics/';
-const FILE_DOWNLOADED_SONGS = 'internal://files/downloaded_songs.json';
-const API_SONG_DETAIL = 'https://163api.qijieya.cn/song/detail?ids=';
+const DIR_MUSIC = "internal://files/music/";
+const DIR_LYRICS = "internal://files/lyrics/";
+const FILE_DOWNLOADED_SONGS = "internal://files/downloaded_songs.json";
+const API_SONG_DETAIL = "https://163api.qijieya.cn/song/detail?ids=";
 
 export default {
-    private: {
-        totalStorage: 0,
-        availableStorage: 0,
-        musicSize: 0,
-        lyricsSize: 0,
-        fullSongList: [],
-        displaySongList: [],
-        PAGE_SIZE: 10,
-        ITEM_HEIGHT: 150,
-        isLoading: true,
-        currentTime: "00:00",
-        hasUnknownSongs: false,
-        totalPages: 1,
-        currentPage: 1,
-    },
+	private: {
+		totalStorage: 0,
+		availableStorage: 0,
+		musicSize: 0,
+		lyricsSize: 0,
 
-    computed: {
-        usedStorage( ) { return this.totalStorage - this.availableStorage; },
-        usedPercent() { return this.totalStorage > 0 ? Math.round((this.usedStorage / this.totalStorage) * 100) : 0; },
-        totalStorageText() { return this.formatSize(this.totalStorage); },
-        availableStorageText() { return this.formatSize(this.availableStorage); },
-        usedStorageText() { return this.formatSize(this.usedStorage); },
-        musicSizeText() { return this.formatSize(this.musicSize); },
-        lyricsSizeText() { return this.formatSize(this.lyricsSize); },
-    },
+		fullSongList: [],
+		displaySongList: [],
 
-    onInit() {
-        this.updateTime();
-        setInterval(() => this.updateTime(), 1000 * 60);
-    },
+		PAGE_SIZE: 10,
+		isLoading: true,
 
-    onShow() {
-        this.loadAndScanStorage();
-    },
+		currentTime: "00:00",
+		hasUnknownSongs: false,
 
-    updateTime() {
-        const now = new Date();
-        this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    },
+		totalPages: 1,
+		currentPage: 1,
 
-    loadPage(pageNumber) {
-        if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0)) {
-            return;
-        }
-        const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
-        const endIndex = startIndex + this.PAGE_SIZE;
-        this.displaySongList = this.fullSongList.slice(startIndex, endIndex).map((song, index) => ({
-            ...song,
-            displayIndex: startIndex + index + 1,
-        }));
-        this.currentPage = pageNumber;
-        this.$nextTick(() => {
-            this.$element('songListScroll').scrollTo({ top: 1 });
-        });
-    },
+		/* 新增：批量删除模式 */
+		isDeleteMode: false,
 
-    loadPrevPage() {
-        if (this.currentPage > 1) {
-            this.loadPage(this.currentPage - 1);
-        }
-    },
+		/* 新增：跳页键盘 */
+		showPageKeypad: false,
+		pageInput: "",
+	},
 
-    loadNextPage() {
-        if (this.currentPage < this.totalPages) {
-            this.loadPage(this.currentPage + 1);
-        }
-    },
+	computed: {
+		usedStorage() {
+			return this.totalStorage - this.availableStorage;
+		},
+		usedPercent() {
+			return this.totalStorage > 0
+				? Math.round((this.usedStorage / this.totalStorage) * 100)
+				: 0;
+		},
+		totalStorageText() {
+			return this.formatSize(this.totalStorage);
+		},
+		availableStorageText() {
+			return this.formatSize(this.availableStorage);
+		},
+		usedStorageText() {
+			return this.formatSize(this.usedStorage);
+		},
+		musicSizeText() {
+			return this.formatSize(this.musicSize);
+		},
+		lyricsSizeText() {
+			return this.formatSize(this.lyricsSize);
+		},
+	},
 
-    async loadAndScanStorage() {
-        if (this.isLoading && this.fullSongList.length > 0) return;
-        this.isLoading = true;
-        this.fullSongList = [];
-        this.hasUnknownSongs = false;
+	onInit() {
+		this.updateTime();
+		setInterval(() => this.updateTime(), 1000 * 60);
+	},
+
+	onShow() {
+		this.loadAndScanStorage();
+	},
+
+	updateTime() {
+		const now = new Date();
+		this.currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
+			.getMinutes()
+			.toString()
+			.padStart(2, "0")}`;
+	},
+
+	loadPage(pageNumber) {
+		if (pageNumber < 1 || (pageNumber > this.totalPages && this.totalPages > 0))
+			return;
+
+		const startIndex = (pageNumber - 1) * this.PAGE_SIZE;
+		const endIndex = startIndex + this.PAGE_SIZE;
+
+		this.displaySongList = this.fullSongList
+			.slice(startIndex, endIndex)
+			.map((song, index) => ({
+				...song,
+				displayIndex: startIndex + index + 1,
+			}));
+
+		this.currentPage = pageNumber;
+		this.$nextTick(() => {
+			this.$element("songListScroll").scrollTo({ top: 1 });
+		});
+	},
+
+	/* 翻页：循环 */
+	loadPrevPage() {
+		if (this.totalPages <= 1) return;
+		const prev = this.currentPage <= 1 ? this.totalPages : this.currentPage - 1;
+		this.loadPage(prev);
+	},
+
+	loadNextPage() {
+		if (this.totalPages <= 1) return;
+		const next = this.currentPage >= this.totalPages ? 1 : this.currentPage + 1;
+		this.loadPage(next);
+	},
+
+	async loadAndScanStorage() {
+		if (this.isLoading && this.fullSongList.length > 0) return;
+		this.isLoading = true;
+		this.fullSongList = [];
+		this.hasUnknownSongs = false;
 
         try {
             const [
@@ -249,8 +757,8 @@ export default {
                 fileService._promisify(file.list, { uri: DIR_LYRICS }).catch(() => ({ fileList: [] }))
             ]);
 
-            this.totalStorage = totalStorageData.totalStorage;
-            this.availableStorage = availableStorageData.availableStorage;
+			this.totalStorage = totalStorageData.totalStorage;
+			this.availableStorage = availableStorageData.availableStorage;
 
             const musicFiles = musicFilesData.fileList || [];
             const lyricFiles = lyricFilesData.fileList || [];
@@ -292,58 +800,146 @@ export default {
         }
     },
 
-    /**
-     * 【【【核心重构】】】
-     * 删除歌曲的入口函数
-     */
-    deleteSong: function(songToDelete) {
-        var that = this;
-        prompt.showDialog({
-            title: '删除歌曲',
-            message: `您确定要删除《${songToDelete.name}》吗？`,
-            buttons: [{ text: '取消' }, { text: '确定', color: '#FF453A' }],
-            success: function() {
-                const songId = songToDelete.id;
-                const index = that.fullSongList.findIndex(s => s.id === songId);
-                if (index > -1) {
-                    that.fullSongList.splice(index, 1);
-                    that.totalPages = Math.ceil(that.fullSongList.length / that.PAGE_SIZE) || 1;
-                    const targetPage = that.currentPage > that.totalPages ? that.totalPages : that.currentPage;
-                    that.loadPage(targetPage);
-                    prompt.showToast({ message: '已移除' });
-                }
-                that.persistDeletion(songId);
-            },
-            cancel: function() {
-                prompt.showToast({ message: '操作已取消' });
-            }
-        });
-    },
+	/* 右侧按钮点击删除：普通模式弹窗；批量模式直接删 */
+	handleDeleteClick(item) {
+		if (!item) return;
+		if (this.isDeleteMode) {
+			this.deleteSongDirect(item);
+		} else {
+			this.deleteSong(item);
+		}
+	},
 
-    /**
-     * 【【【核心重构】】】
-     * 持久化删除操作 (删除物理文件和元数据)
-     * @param {string} songId - 要删除的歌曲ID
-     */
-    persistDeletion: async function(songId) {
-        try {
-            await fileService.delete(`${DIR_MUSIC}${songId}.mp3`);
-            await fileService.delete(`${DIR_LYRICS}${songId}.json`);
+	toggleDeleteMode() {
+		if (this.fullSongList.length === 0) return;
+		this.isDeleteMode = !this.isDeleteMode;
+		prompt.showToast({
+			message: this.isDeleteMode
+				? "进入批量删除模式，删除无弹窗确认"
+				: "已退出批量删除",
+		});
+	},
 
-            const downloaded = await fileService.readJson(FILE_DOWNLOADED_SONGS, {});
-            if (downloaded[String(songId)]) {
-                delete downloaded[String(songId)];
-                await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
-            }
-            
-            // 删除成功后，重新扫描存储以确保数据完全同步
-            this.loadAndScanStorage();
+	/* 普通模式：弹确认 */
+	deleteSong(songToDelete) {
+		var that = this;
+		prompt.showDialog({
+			title: "删除歌曲",
+			message: `您确定要删除《${songToDelete.name}》吗？`,
+			buttons: [{ text: "取消" }, { text: "确定", color: "#FF453A" }],
+			success: function () {
+				that.removeFromListAndPaging(songToDelete.id);
+				prompt.showToast({ message: "已移除" });
+				that.persistDeletion(songToDelete.id);
+			},
+			cancel: function () {
+				prompt.showToast({ message: "操作已取消" });
+			},
+		});
+	},
 
-        } catch (error) {
-            console.error("持久化删除失败:", error);
-            prompt.showToast({ message: '删除文件时发生错误' });
-        }
-    },
+	/* 批量模式：不弹窗 */
+	deleteSongDirect(songToDelete) {
+		this.removeFromListAndPaging(songToDelete.id);
+		prompt.showToast({ message: "已移除" });
+		this.persistDeletion(songToDelete.id);
+	},
+
+	removeFromListAndPaging(songId) {
+		// 1) 先从 fullSongList 删
+		const fullIndex = this.fullSongList.findIndex((s) => s.id === songId);
+		if (fullIndex > -1) this.fullSongList.splice(fullIndex, 1);
+
+		// 2) 再从当前页 displaySongList 删（只动这一页，不重建）
+		const displayIndex = this.displaySongList.findIndex((s) => s.id === songId);
+		if (displayIndex > -1) this.displaySongList.splice(displayIndex, 1);
+
+		// 3) 更新 totalPages（但不强制 loadPage）
+		this.totalPages = Math.ceil(this.fullSongList.length / this.PAGE_SIZE) || 1;
+
+		// 4) 如果删到当前页没数据了：再补一页数据（只有这种情况才“重建”）
+		if (this.displaySongList.length === 0 && this.fullSongList.length > 0) {
+			// 保底：当前页可能超了
+			if (this.currentPage > this.totalPages)
+				this.currentPage = this.totalPages;
+
+			const startIndex = (this.currentPage - 1) * this.PAGE_SIZE;
+			const endIndex = startIndex + this.PAGE_SIZE;
+			this.displaySongList = this.fullSongList.slice(startIndex, endIndex);
+		}
+
+		// 5) 重新计算 displayIndex（不滚动、不 scrollToTop）
+		const startIndex = (this.currentPage - 1) * this.PAGE_SIZE;
+		this.displaySongList = this.displaySongList.map((song, idx) => ({
+			...song,
+			displayIndex: startIndex + idx + 1,
+		}));
+	},
+
+	/* 持久化删除：删文件 + 删元数据；轻量刷新存储数字（不全盘重扫） */
+	persistDeletion: async function (songId) {
+		try {
+			await fileService.delete(`${DIR_MUSIC}${songId}.mp3`);
+			await fileService.delete(`${DIR_LYRICS}${songId}.json`);
+
+			const downloaded = await fileService.readJson(FILE_DOWNLOADED_SONGS, {});
+			if (downloaded[String(songId)]) {
+				delete downloaded[String(songId)];
+				await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
+			}
+
+			try {
+				const totalStorageData = await fileService
+					._promisify(device.getTotalStorage)
+					.catch(() => ({ totalStorage: this.totalStorage }));
+				const availableStorageData = await fileService
+					._promisify(device.getAvailableStorage)
+					.catch(() => ({ availableStorage: this.availableStorage }));
+				this.totalStorage = totalStorageData.totalStorage;
+				this.availableStorage = availableStorageData.availableStorage;
+			} catch (e) {}
+		} catch (error) {
+			console.error("持久化删除失败:", error);
+			prompt.showToast({ message: "删除文件时发生错误" });
+		}
+	},
+
+	/* 跳页键盘 */
+	noop() {},
+	openPageKeypad() {
+		if (this.totalPages <= 1) return;
+		this.showPageKeypad = true;
+		this.pageInput = String(this.currentPage);
+	},
+
+	closePageKeypad() {
+		this.showPageKeypad = false;
+		this.pageInput = "";
+	},
+
+	handlePageKey(key) {
+		if (key === "退格") {
+			this.pageInput = (this.pageInput || "").slice(0, -1);
+			return;
+		}
+		const next = (this.pageInput || "") + key;
+		if (next.length > 3) return;
+		this.pageInput = next.replace(/^0+(\d)/, "$1");
+	},
+
+	confirmJumpPage() {
+		const p = parseInt(this.pageInput, 10);
+		if (!p || isNaN(p)) {
+			prompt.showToast({ message: "请输入页码" });
+			return;
+		}
+		let target = p;
+		if (target < 1) target = 1;
+		if (target > this.totalPages) target = this.totalPages;
+
+		this.closePageKeypad();
+		this.loadPage(target);
+	},
 
     fixAllUnknownSongs() {
         const unknownSongIds = this.fullSongList.filter(song => song.isUnknown).map(song => song.id);
@@ -373,6 +969,8 @@ export default {
                             }
                         });
                         if (fixedCount > 0) {
+							console.log('[fix] downloaded count=', Object.keys(downloaded).length);
+
                             const success = await fileService.writeJson(FILE_DOWNLOADED_SONGS, downloaded);
                             prompt.showToast({ message: success ? `成功修复 ${fixedCount} 首歌曲！` : '保存修复信息失败' });
                             this.loadAndScanStorage();
@@ -405,8 +1003,8 @@ export default {
         return `${value} ${units[i]}`;
     },
 
-    goBack() {
-        router.back();
-    }
+	goBack() {
+		router.back();
+	},
 };
 </script>

@@ -1,50 +1,55 @@
 <script>
-import file from '@system.file';
-import fetch from '@system.fetch';
-import app from '@system.app';
+import file from "@system.file";
+import fetch from "@system.fetch";
+import app from "@system.app";
 import interconnect from "@system.interconnect";
-import crypto from '@system.crypto'; // 验证需要
-import device from '@system.device';   // 验证需要
+import crypto from "@system.crypto"; // 验证需要
+import device from "@system.device"; // 验证需要
 
-import downloadService from './services/download.js';
+import downloadService from "./services/download.js";
 
 // --- 常量定义 ---
-const COOKIE_FILE_URI = 'internal://files/cookie.txt';
-const FILE_PLAY_LIST = 'internal://files/play_list.json';
-const LICENSE_FILE_URI = 'internal://files/license.json'; // 激活码文件
+const COOKIE_FILE_URI = "internal://files/cookie.txt";
+const FILE_PLAY_LIST = "internal://files/play_list.json";
+const LICENSE_FILE_URI = "internal://files/license.json"; // 激活码文件
 
 export default {
-    // ===================================================================
-    // =================== 全局状态与配置 ================================
-    // ===================================================================
-    
-    // --- 授权相关的全局状态 ---
-    isActivated: false, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
-    deviceId: null,    // 全局设备ID
-    cookie: null, // 全局 cookie
+	// ===================================================================
+	// =================== 全局状态与配置 ================================
+	// ===================================================================
 
-    // =================== App 版本与 Debug 标识 ===================
+	// --- 授权相关的全局状态 ---
+	isActivated: false, // 初始为 null (验证中), 后续为 true (已激活) 或 false (未激活)
+	deviceId: null, // 全局设备ID
+	cookie: null, // 全局 cookie
 
-// 从系统读取的版本号
-APP_VERSION: '',
+	player: null,
 
-// 是否 Debug 构建
-IS_DEBUG_BUILD: false,
-
-
-        // 1. 全局 interconnect 实例 (保持不变)
-    //connectInstance: interconnect.instance(),
-
-    downloadService: downloadService,
+	// =================== 全局睡眠定时器 ===================
+sleepTimerAt: 0,        // 触发时间戳 (ms)，0=未设置
+_sleepTimerId: null,    // setTimeout id（仅内存）
+sleepTimerMinutes: 0,   // 记录用户设置的分钟数（可选，给UI显示）
 
 
-    // --- 服务器和密钥配置 ---
-    // !! 替换为你的 服务器 URL
-    ACTIVATION_SERVER_URL: 'https://vela-verify.orpu.moe',
+	// =================== App 版本与 Debug 标识 ===================
 
-    
-    // !! 替换为你的服务器公钥 (server_public.pem 的内容 )
-    SERVER_PUBLIC_KEY: `-----BEGIN PUBLIC KEY-----
+	// 从系统读取的版本号
+	APP_VERSION: "",
+
+	// 是否 Debug 构建
+	IS_DEBUG_BUILD: false,
+
+	// 1. 全局 interconnect 实例 (保持不变)
+	//connectInstance: interconnect.instance(),
+
+	downloadService: downloadService,
+
+	// --- 服务器和密钥配置 ---
+	// !! 替换为你的 服务器 URL
+	ACTIVATION_SERVER_URL: "https://vela-verify.orpu.moe",
+
+	// !! 替换为你的服务器公钥 (server_public.pem 的内容 )
+	SERVER_PUBLIC_KEY: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0YQakr41N+9bHZ7SI5Il
 IO7FDTkf6708E94ZUH57zUgzLtx4LwUxp6w+374D2LU/xVRBNaJhvdbTHwPV0CKS
 w2IvHtZDMCYlTpZ/CKMkcTioHJ+49roCquhETWiEGWf7dQJFhxsdndqsrzx4Cih/
@@ -53,317 +58,480 @@ uEknhKNaBOc0r2sDFSyAGBz4aVkF3X95dGmfWQ6aoTMZpmoEi0zMfQXUUIxl7lN1
 ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
 6QIDAQAB
 -----END PUBLIC KEY-----`,
-    
-    // !! 替换为你的爱发电购买链接
-    AFDIAN_PURCHASE_URL: 'https://afdian.com/item/64db28ce9f7d11f088fc52540025c377',
 
-    // --- 激活码文件URI (暴露出来方便其他页面使用 ) ---
-    LICENSE_FILE_URI: LICENSE_FILE_URI,
+	// !! 替换为你的爱发电购买链接
+	AFDIAN_PURCHASE_URL:
+		"https://afdian.com/item/64db28ce9f7d11f088fc52540025c377",
 
-    // --- 你原有的全局实例和方法 ---
+	// --- 激活码文件URI (暴露出来方便其他页面使用 ) ---
+	LICENSE_FILE_URI: LICENSE_FILE_URI,
 
+	// --- 你原有的全局实例和方法 ---
 
+	// ===================================================================
+	// =================== App 生命周期 ==================================
+	// ===================================================================
 
-    // ===================================================================
-    // =================== App 生命周期 ==================================
-    // ===================================================================
+	async onCreate() {
+		console.info("App onCreate: 应用启动");
 
-    async onCreate() {
-    console.info('App onCreate: 应用启动');
+		// ===== 读取应用版本号（只在这里做一次）=====
+		try {
+			const info = app.getInfo && app.getInfo();
+			if (info && info.versionName) {
+				this.APP_VERSION = String(info.versionName);
+				this.IS_DEBUG_BUILD = this.APP_VERSION.toLowerCase().includes("debug");
+			} else {
+				this.APP_VERSION = "";
+				this.IS_DEBUG_BUILD = false;
+			}
+			console.log(
+				"[App] version:",
+				this.APP_VERSION,
+				"debug:",
+				this.IS_DEBUG_BUILD
+			);
+		} catch (e) {
+			console.error("[App] 获取版本号失败:", e);
+			this.APP_VERSION = "";
+			this.IS_DEBUG_BUILD = false;
+		}
 
-    // ===== 读取应用版本号（只在这里做一次）=====
-    try {
-        const info = app.getInfo && app.getInfo();
-        if (info && info.versionName) {
-            this.APP_VERSION = String(info.versionName);
-            this.IS_DEBUG_BUILD = this.APP_VERSION.toLowerCase().includes('debug');
-        } else {
-            this.APP_VERSION = '';
-            this.IS_DEBUG_BUILD = false;
-        }
-        console.log('[App] version:', this.APP_VERSION, 'debug:', this.IS_DEBUG_BUILD);
-    } catch (e) {
-        console.error('[App] 获取版本号失败:', e);
-        this.APP_VERSION = '';
-        this.IS_DEBUG_BUILD = false;
-    }
-        
-        // 步骤 1: 在任何其他操作之前，首先执行激活验证
-        await this.runActivationFlow();
+		// 步骤 1: 在任何其他操作之前，首先执行激活验证
+		await this.runActivationFlow();
 
-                // 步骤 2: 加载全局 Cookie
-                await this.loadGlobalCookie();
+		// 步骤 2: 加载全局 Cookie
+		await this.loadGlobalCookie();
 
-        // 步骤 2: 根据验证结果，条件性地执行后续初始化任务
-        if (this.isActivated) {
-            console.info('授权验证通过，继续执行应用初始化...');
-            
-            // 初始化你原有的服务
-            const connect = this.connectInstance;
-            connect.onopen = (data) => { console.log("Global onopen:", data); };
-            connect.onerror = (error) => { console.error("Global onerror:", error); };
-            connect.onclose = () => { console.log("Global onclose"); };
+		// 步骤 2: 根据验证结果，条件性地执行后续初始化任务
+		if (this.isActivated) {
+			console.info("授权验证通过，继续执行应用初始化...");
 
-            this.resetDownloadingStatusOnLaunch();
-        } else {
-            console.warn('授权验证失败！应用功能将受限。');
-            // 如果验证失败，入口页面 splash.ux 会负责显示引导界面
-            // 此处无需做额外操作
-        }
-        downloadService.initialize().then(() => {
-            console.log('下载目录初始化成功!');
-        }).catch((error) => {
-            console.error('下载目录初始化失败:', error);
-        });
-    },
+			// 初始化你原有的服务
+			const connect = this.connectInstance;
+			connect.onopen = (data) => {
+				console.log("Global onopen:", data);
+			};
+			connect.onerror = (error) => {
+				console.error("Global onerror:", error);
+			};
+			connect.onclose = () => {
+				console.log("Global onclose");
+			};
+			// 初始化全局播放器状态
+			this.initGlobalPlayer();
+			// 重置下载状态
+			this.resetDownloadingStatusOnLaunch();
+		} else {
+			console.warn("授权验证失败！应用功能将受限。");
+			// 如果验证失败，入口页面 splash.ux 会负责显示引导界面
+			// 此处无需做额外操作
+		}
+		downloadService
+			.initialize()
+			.then(() => {
+				console.log("下载目录初始化成功!");
+			})
+			.catch((error) => {
+				console.error("下载目录初始化失败:", error);
+			});
+	},
 
-    onDestroy() {
-        console.info('App onDestroy: 应用销毁');
-    },
+	onDestroy() {
+		console.info("App onDestroy: 应用销毁");
+	},
 
-    // ===================================================================
-    // =================== 激活验证核心逻辑 ==============================
-    // ===================================================================
+	// ===================================================================
+	// =================== 激活验证核心逻辑 ==============================
+	// ===================================================================
 
-    checkLocalActivation(currentDeviceId, callbacks) {
-    console.log("开始检查本地激活状态...");
-    file.readText({
-        uri: this.LICENSE_FILE_URI,
-        success: (data) => {
-            try {
-                console.log("成功读取本地激活文件。");
-                // 这里的 data.text 是字符串，需要解析
-                const license = JSON.parse(data.text);
+	checkLocalActivation(currentDeviceId, callbacks) {
+		console.log("开始检查本地激活状态...");
+		file.readText({
+			uri: this.LICENSE_FILE_URI,
+			success: (data) => {
+				try {
+					console.log("成功读取本地激活文件。");
+					// 这里的 data.text 是字符串，需要解析
+					const license = JSON.parse(data.text);
 
-                if (license.payload.device_id !== currentDeviceId) {
-                    console.error('激活码与本设备不匹配。');
-                    if (callbacks && callbacks.fail) callbacks.fail();
-                    return;
-                }
-                console.log("设备ID匹配成功。");
+					if (license.payload.device_id !== currentDeviceId) {
+						console.error("激活码与本设备不匹配。");
+						if (callbacks && callbacks.fail) callbacks.fail();
+						return;
+					}
+					console.log("设备ID匹配成功。");
 
-                const payloadStr = JSON.stringify(license.payload, Object.keys(license.payload).sort());
-                console.log("开始验证签名...");
-                crypto.verify({
-                    data: payloadStr,
-                    signature: license.signature,
-                    publicKey: this.SERVER_PUBLIC_KEY,
-                    algo: 'RSA-SHA256',
-                    success: (verifyResult) => {
-                        console.log(`签名验证结果: ${verifyResult}`);
-                        if (verifyResult) {
-                            if (callbacks && callbacks.success) callbacks.success();
-                        } else {
-                            if (callbacks && callbacks.fail) callbacks.fail();
-                        }
-                    },
-                    fail: (data, code) => {
-                        console.error(`签名验证API调用失败, code=${code}, data=${data}`);
-                        if (callbacks && callbacks.fail) callbacks.fail();
-                    }
-                });
-            } catch (e) {
-                console.error(`解析本地激活文件失败: ${e.message}`);
-                if (callbacks && callbacks.fail) callbacks.fail();
-            }
-        },
-        fail: (data, code) => {
-            console.log(`本地未找到激活文件或读取失败 (code: ${code})，视为未激活。`);
-            if (callbacks && callbacks.fail) callbacks.fail();
-        }
-    });
-},
+					const payloadStr = JSON.stringify(
+						license.payload,
+						Object.keys(license.payload).sort()
+					);
+					console.log("开始验证签名...");
+					crypto.verify({
+						data: payloadStr,
+						signature: license.signature,
+						publicKey: this.SERVER_PUBLIC_KEY,
+						algo: "RSA-SHA256",
+						success: (verifyResult) => {
+							console.log(`签名验证结果: ${verifyResult}`);
+							if (verifyResult) {
+								if (callbacks && callbacks.success) callbacks.success();
+							} else {
+								if (callbacks && callbacks.fail) callbacks.fail();
+							}
+						},
+						fail: (data, code) => {
+							console.error(`签名验证API调用失败, code=${code}, data=${data}`);
+							if (callbacks && callbacks.fail) callbacks.fail();
+						},
+					});
+				} catch (e) {
+					console.error(`解析本地激活文件失败: ${e.message}`);
+					if (callbacks && callbacks.fail) callbacks.fail();
+				}
+			},
+			fail: (data, code) => {
+				console.log(
+					`本地未找到激活文件或读取失败 (code: ${code})，视为未激活。`
+				);
+				if (callbacks && callbacks.fail) callbacks.fail();
+			},
+		});
+	},
 
-    /**
-     * @description 从文件加载全局 Cookie
-     */
-     async loadGlobalCookie() {
-        try {
-            const data = await new Promise((resolve, reject) => {
-                file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: (data, code) => {
-                    // 文件不存在是正常情况，不应视为 reject
-                    if (code === 301) resolve({ text: null });
-                    else reject({ data, code });
-                }});
-            });
-            const cookieText = data.text;
-            if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
-                console.log("有效的 Cookie 已从文件加载并设置为全局变量。");
-                this.cookie = cookieText.trim();
-            } else {
-                // 文件内容无效或为空，也视为未登录
-                this.cookie = null;
-            }
-        } catch (e) {
-            // 其他读取错误
-            this.cookie = null;
-        }
-    },
+	/**
+	 * @description 从文件加载全局 Cookie
+	 */
+	async loadGlobalCookie() {
+		try {
+			const data = await new Promise((resolve, reject) => {
+				file.readText({
+					uri: COOKIE_FILE_URI,
+					success: resolve,
+					fail: (data, code) => {
+						// 文件不存在是正常情况，不应视为 reject
+						if (code === 301) resolve({ text: null });
+						else reject({ data, code });
+					},
+				});
+			});
+			const cookieText = data.text;
+			if (
+				cookieText &&
+				typeof cookieText === "string" &&
+				cookieText.trim().startsWith("MUSIC_U=")
+			) {
+				console.log("有效的 Cookie 已从文件加载并设置为全局变量。");
+				this.cookie = cookieText.trim();
+			} else {
+				// 文件内容无效或为空，也视为未登录
+				this.cookie = null;
+			}
+		} catch (e) {
+			// 其他读取错误
+			this.cookie = null;
+		}
+	},
 
-// 确保 runActivationFlow 也使用回调
-runActivationFlow() {
-    console.log("--- 开始执行激活验证流程 ---");
+	runActivationFlow() {
+  console.log("--- 开始执行激活验证流程 ---");
+
+  return new Promise((resolve) => {
+    let done = false;
+
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+
+      // ✅ 统一在这里写状态，避免 late callback 改回去
+      this.isActivated = (val === true);
+
+      resolve(val === true);
+    };
+
+    const t = setTimeout(() => {
+      console.error("激活验证超时，按未激活处理");
+      finish(false);
+    }, 8000);
+
     this.getDeviceIdentifier({
-        success: (deviceId) => {
-            this.deviceId = deviceId;
-            this.checkLocalActivation(deviceId, {
-                success: () => {
-                    this.isActivated = true;
-                    console.log("--- 激活验证流程结束，结果: true ---");
-                },
-                fail: () => {
-                    this.isActivated = false;
-                    console.warn("授权验证失败！应用功能将受限。");
-                    console.log("--- 激活验证流程结束，结果: false ---");
-                }
-            });
-        },
-        fail: (errorMsg) => {
-            this.isActivated = false;
-            console.error(`激活流程中发生严重错误: ${errorMsg}`);
+      success: (deviceId) => {
+        if (done) return;
+        this.deviceId = deviceId;
+
+        this.checkLocalActivation(deviceId, {
+          success: () => {
+            if (done) return;
+            clearTimeout(t);
+            console.log("--- 激活验证流程结束，结果: true ---");
+            finish(true);
+          },
+          fail: () => {
+            if (done) return;
+            clearTimeout(t);
             console.log("--- 激活验证流程结束，结果: false ---");
-        }
-    });
-},
-
-// 确保 getDeviceIdentifier 也使用回调
-getDeviceIdentifier(callbacks) {
-    console.log("正在获取设备ID...");
-    device.getDeviceId({
-        success: (data) => {
-            if (data && data.deviceId) {
-                console.log(`成功获取设备ID: ${data.deviceId}`);
-                if (callbacks && callbacks.success) callbacks.success(data.deviceId);
-            } else {
-                if (callbacks && callbacks.fail) callbacks.fail('未能获取到有效的设备ID');
-            }
-        },
-        fail: (data, code) => {
-            const errorMsg = `获取设备ID失败 (code: ${code})`;
-            console.error(errorMsg, data);
-            if (callbacks && callbacks.fail) callbacks.fail(errorMsg);
-        }
-    });
-},
-
-
-    // ===================================================================
-    // =================== 其他原有逻辑 ==================================
-    // ===================================================================
-
-// 在 app.js 或您的服务定义文件中
-requestService: {
-    /**
-     * @description 从文件加载 Cookie。这个方法本身没有问题。
-     */
-    async loadCookie() {
-        try {
-            const data = await new Promise((resolve, reject) => {
-                file.readText({ uri: COOKIE_FILE_URI, success: resolve, fail: (data, code) => {
-                    // 文件不存在是正常情况，不应视为 reject
-                    if (code === 301) resolve({ text: null });
-                    else reject({ data, code });
-                }});
-            });
-            const cookieText = data.text;
-            if (cookieText && typeof cookieText === 'string' && cookieText.trim().startsWith('MUSIC_U=')) {
-                console.log("有效的 Cookie 已从文件加载。");
-                return cookieText.trim();
-            } else {
-                // 文件内容无效或为空，也视为未登录
-                return null;
-            }
-        } catch (e) {
-            // 其他读取错误
-            return null;
-        }
-    },
-
-    /**
-     * @description 【【【最终修正版】】】
-     * @param {object} options - 请求选项，包含 url, method, data 等
-     * @param {string} [options.cookie] - 【关键】一个临时的、高优先级的 Cookie
-     */
-    async fetch(options) {
-        try {
-            // 【核心修正】: 决定本次请求到底使用哪个 Cookie
-            // 1. 优先使用 options 中临时传入的 cookie (用于登录流程)
-            // 2. 如果没有临时的，再从文件加载全局的 cookie (用于常规请求)
-            const cookieForRequest = options.cookie || await this.loadCookie();
-            
-            let url = options.url;
-            if (cookieForRequest) {
-                const connector = url.includes('?') ? '&' : '?';
-                url = `${url}${connector}cookie=${encodeURIComponent(cookieForRequest)}`;
-            }
-
-            console.log(`Requesting URL: ${url}`);
-            
-            const response = await new Promise((resolve, reject) => {
-                fetch.fetch({
-                    ...options,
-                    url: url,
-                    header: {}, // 确保 header 为空对象，避免潜在问题
-                    responseType: 'text',
-                    success: resolve,
-                    fail: (data, code) => reject({ data, code }),
-                });
-            });
-
-            if (response.code === 200) {
-                try {
-                    const jsonData = JSON.parse(response.data);
-                    return { status: 'success', data: jsonData };
-                } catch (e) {
-                    return { status: 'fail', message: 'JSON解析失败', data: response.data };
-                }
-            } else {
-                return { status: 'fail', message: `网络错误, code: ${response.code}`, code: response.code };
-            }
-        } catch (error) {
-            return { status: 'fail', message: error.message || '未知请求异常', data: error.data, code: error.code };
-        }
-    }
-},
-
-
-    resetDownloadingStatusOnLaunch() {
-        console.info('开始检查并重置下载状态...');
-        file.readText({
-            uri: FILE_PLAY_LIST,
-            success: (data) => {
-                if (!data || !data.text) { console.info('播放列表为空，无需重置。'); return; }
-                try {
-                    let playList = JSON.parse(data.text);
-                    let statusChanged = false;
-                    playList = playList.map(song => {
-                        if (song.downloadStatus === 'downloading') {
-                            console.warn(`发现悬空下载任务: ${song.name} (ID: ${song.id})，状态将被重置。`);
-                            song.downloadStatus = 'failed';
-                            statusChanged = true;
-                        }
-                        return song;
-                    });
-                    if (statusChanged) {
-                        console.info('正在将重置后的播放列表写回文件...');
-                        file.writeText({
-                            uri: FILE_PLAY_LIST,
-                            text: JSON.stringify(playList, null, 2),
-                            success: () => console.info('下载状态重置完成。'),
-                            fail: (errData, code) => console.error(`写回重置后的播放列表失败，错误码: ${code}`)
-                        });
-                    } else {
-                        console.info('未发现悬空下载任务，无需重置。');
-                    }
-                } catch (e) {
-                    console.error('解析播放列表JSON时发生错误:', e);
-                }
-            },
-            fail: (data, code) => {
-                if (code === 301) { console.info('播放列表文件不存在，无需重置。'); }
-                else { console.error(`读取播放列表文件失败，错误码: ${code}`); }
-            }
+            finish(false);
+          },
         });
-    }
+      },
+      fail: (errorMsg) => {
+        if (done) return;
+        clearTimeout(t);
+        console.error(`激活流程中发生严重错误: ${errorMsg}`);
+        console.log("--- 激活验证流程结束，结果: false ---");
+        finish(false);
+      },
+    });
+  });
+},
+
+	// 确保 getDeviceIdentifier 也使用回调
+	getDeviceIdentifier(callbacks) {
+		console.log("正在获取设备ID...");
+		device.getDeviceId({
+			success: (data) => {
+				if (data && data.deviceId) {
+					console.log(`成功获取设备ID: ${data.deviceId}`);
+					if (callbacks && callbacks.success) callbacks.success(data.deviceId);
+				} else {
+					if (callbacks && callbacks.fail)
+						callbacks.fail("未能获取到有效的设备ID");
+				}
+			},
+			fail: (data, code) => {
+				const errorMsg = `获取设备ID失败 (code: ${code})`;
+				console.error(errorMsg, data);
+				if (callbacks && callbacks.fail) callbacks.fail(errorMsg);
+			},
+		});
+	},
+
+	initGlobalPlayer() {
+		if (!this.player) {
+			this.player = {
+				playerState: {
+					isPlaying: false,
+					playDuration: 0,
+					currentLyricIndex: -1,
+					lyricType: "default",
+					coverUrl: null,
+				},
+				currSong: null,
+				playList: [],
+			};
+		}
+	},
+	setSleepTimerMinutes(minutes) {
+  const m = parseInt(minutes, 10);
+
+  // 非法/<=0：当作取消
+  if (!m || m <= 0) {
+    this.cancelSleepTimer();
+    return { ok: true, at: 0, remainingMs: 0 };
+  }
+
+  const safeM = Math.max(1, Math.min(9999, m));
+  const ms = safeM * 60 * 1000;
+
+  // 先清旧的
+  if (this._sleepTimerId) {
+    clearTimeout(this._sleepTimerId);
+    this._sleepTimerId = null;
+  }
+
+  this.sleepTimerMinutes = safeM;
+  this.sleepTimerAt = Date.now() + ms;
+
+  this._sleepTimerId = setTimeout(() => {
+    try { app.terminate && app.terminate(); } catch (e) {}
+  }, ms);
+
+  return {
+    ok: true,
+    at: this.sleepTimerAt,
+    remainingMs: this.sleepTimerAt - Date.now(),
+    minutes: safeM,
+  };
+},
+
+cancelSleepTimer() {
+  if (this._sleepTimerId) {
+    clearTimeout(this._sleepTimerId);
+    this._sleepTimerId = null;
+  }
+  this.sleepTimerAt = 0;
+  this.sleepTimerMinutes = 0;
+  return { ok: true, at: 0, remainingMs: 0 };
+},
+
+getSleepTimerInfo() {
+  const at = this.sleepTimerAt || 0;
+  const remainingMs = at > 0 ? Math.max(0, at - Date.now()) : 0;
+
+  // 如果理论上已过期但 timer 没清（比如系统卡顿/时间跳变），顺手清一下
+  if (at > 0 && remainingMs === 0) {
+    // 不触发终止，只是状态清理
+    this.sleepTimerAt = 0;
+    this.sleepTimerMinutes = 0;
+  }
+
+  return {
+    enabled: at > 0 && remainingMs > 0,
+    at,
+    remainingMs,
+    minutes: this.sleepTimerMinutes || 0,
+  };
+},
+
+
+	// ===================================================================
+	// =================== 其他原有逻辑 ==================================
+	// ===================================================================
+
+	// 在 app.js 或您的服务定义文件中
+	requestService: {
+		/**
+		 * @description 从文件加载 Cookie。这个方法本身没有问题。
+		 */
+		async loadCookie() {
+			try {
+				const data = await new Promise((resolve, reject) => {
+					file.readText({
+						uri: COOKIE_FILE_URI,
+						success: resolve,
+						fail: (data, code) => {
+							// 文件不存在是正常情况，不应视为 reject
+							if (code === 301) resolve({ text: null });
+							else reject({ data, code });
+						},
+					});
+				});
+				const cookieText = data.text;
+				if (
+					cookieText &&
+					typeof cookieText === "string" &&
+					cookieText.trim().startsWith("MUSIC_U=")
+				) {
+					console.log("有效的 Cookie 已从文件加载。");
+					return cookieText.trim();
+				} else {
+					// 文件内容无效或为空，也视为未登录
+					return null;
+				}
+			} catch (e) {
+				// 其他读取错误
+				return null;
+			}
+		},
+
+		/**
+		 * @description 【【【最终修正版】】】
+		 * @param {object} options - 请求选项，包含 url, method, data 等
+		 * @param {string} [options.cookie] - 【关键】一个临时的、高优先级的 Cookie
+		 */
+		async fetch(options) {
+			try {
+				// 【核心修正】: 决定本次请求到底使用哪个 Cookie
+				// 1. 优先使用 options 中临时传入的 cookie (用于登录流程)
+				// 2. 如果没有临时的，再从文件加载全局的 cookie (用于常规请求)
+				const cookieForRequest = options.cookie || (await this.loadCookie());
+
+				let url = options.url;
+				if (cookieForRequest) {
+					const connector = url.includes("?") ? "&" : "?";
+					url = `${url}${connector}cookie=${encodeURIComponent(
+						cookieForRequest
+					)}`;
+				}
+
+				console.log(`Requesting URL: ${url}`);
+
+				const response = await new Promise((resolve, reject) => {
+					fetch.fetch({
+						...options,
+						url: url,
+						header: {}, // 确保 header 为空对象，避免潜在问题
+						responseType: "text",
+						success: resolve,
+						fail: (data, code) => reject({ data, code }),
+					});
+				});
+
+				if (response.code === 200) {
+					try {
+						const jsonData = JSON.parse(response.data);
+						return { status: "success", data: jsonData };
+					} catch (e) {
+						return {
+							status: "fail",
+							message: "JSON解析失败",
+							data: response.data,
+						};
+					}
+				} else {
+					return {
+						status: "fail",
+						message: `网络错误, code: ${response.code}`,
+						code: response.code,
+					};
+				}
+			} catch (error) {
+				return {
+					status: "fail",
+					message: error.message || "未知请求异常",
+					data: error.data,
+					code: error.code,
+				};
+			}
+		},
+	},
+
+	resetDownloadingStatusOnLaunch() {
+		console.info("开始检查并重置下载状态...");
+		file.readText({
+			uri: FILE_PLAY_LIST,
+			success: (data) => {
+				if (!data || !data.text) {
+					console.info("播放列表为空，无需重置。");
+					return;
+				}
+				try {
+					let playList = JSON.parse(data.text);
+					let statusChanged = false;
+					playList = playList.map((song) => {
+						if (song.downloadStatus === "downloading") {
+							console.warn(
+								`发现悬空下载任务: ${song.name} (ID: ${song.id})，状态将被重置。`
+							);
+							song.downloadStatus = "failed";
+							statusChanged = true;
+						}
+						return song;
+					});
+					if (statusChanged) {
+						console.info("正在将重置后的播放列表写回文件...");
+						file.writeText({
+							uri: FILE_PLAY_LIST,
+							text: JSON.stringify(playList, null, 2),
+							success: () => console.info("下载状态重置完成。"),
+							fail: (errData, code) =>
+								console.error(`写回重置后的播放列表失败，错误码: ${code}`),
+						});
+					} else {
+						console.info("未发现悬空下载任务，无需重置。");
+					}
+				} catch (e) {
+					console.error("解析播放列表JSON时发生错误:", e);
+				}
+			},
+			fail: (data, code) => {
+				if (code === 301) {
+					console.info("播放列表文件不存在，无需重置。");
+				} else {
+					console.error(`读取播放列表文件失败，错误码: ${code}`);
+				}
+			},
+		});
+	},
 };
 </script>

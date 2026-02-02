@@ -17,37 +17,46 @@
 			<!-- ==================== 主菜单 (根页面)，已替换为用户页的 item 样式 ==================== -->
 			<div class="menu-list" if="{{ currentView === 'main' }}">
 				<div class="menu-item" onclick="navigateTo('lyrics')">
+					<image class="item-icon" src="/common/icon/songlist.png"></image>
 					<text class="item-text">歌词显示</text>
-					<text class="item-arrow">›</text>
 				</div>
 				<div class="menu-item" onclick="navigateTo('gestures')">
+					<image class="item-icon" src="/common/icon/edit.png"></image>
                     <text class="item-text">快捷手势</text>
-                    <text class="item-arrow">›</text>
                 </div>
 				<div class="menu-item" onclick="navigateTo('audioQuality')">
+					<image class="item-icon" src="/common/icon/headset.png"></image>
 					<text class="item-text">音质设置</text>
-					<text class="item-arrow">›</text>
 				</div>
 				<div class="menu-item" onclick="navigateTo('performance')">
+					<image class="item-icon" src="/common/icon/about.png"></image>
 					<text class="item-text">列表性能</text>
-					<text class="item-arrow">›</text>
 				</div>
 				<div class="menu-item" onclick="navigateTo('network')">
+					<image class="item-icon" src="/common/icon/wlan.png"></image>
 					<text class="item-text">网络与加载</text>
-					<text class="item-arrow">›</text>
 				</div>
 				<div class="menu-item" onclick="navigateTo('search')">
+					<image class="item-icon" src="/common/icon/search.png"></image>
 					<text class="item-text">搜索设置</text>
-					<text class="item-arrow">›</text>
 				</div>
 				<div class="menu-item" onclick="navigateTo('data')">
+					<image class="item-icon" src="/common/icon/watch_light.png"></image>
 					<text class="item-text">应用数据</text>
-					<text class="item-arrow">›</text>
 				</div>
 			</div>
 
 			<!-- ==================== 歌词显示 (子页面) ==================== -->
 			<div class="settings-list" if="{{ currentView === 'lyrics' }}">
+					<div class="setting-item">
+						<text class="item-label">显示模式</text>
+						<text class="item-value-btn" onclick="toggleLyricRenderMode">
+							{{ lyricRenderModeText }}
+						</text>
+					</div>
+					<text class="item-desc">
+						fullscreen 更轻量；all 为完整滚动歌词。
+					</text>
 				<div id="lyrics-item-3" class="setting-item">
 					<text class="item-label">歌词提前</text>
 					<text class="item-value-btn" onclick="toggleLyricAdvanceTime">
@@ -312,24 +321,24 @@
     padding-bottom: 80px; /* 适配圆形屏幕底部 */
 }
 .menu-item {
-    width: 100%;
-    height: 80px;
-    background-color: #191821;
-    margin: 5px 0;
-    border-radius: 36px;
-    align-items: center;
-    padding: 0 30px;
-    justify-content: space-between;
+	width: 100%;
+	height: 80px;
+	background-color: #2e323c;
+	margin: 5px 0;
+	border-radius: 36px;
+	align-items: center;
+	padding: 0 24px;
+	justify-content: space-between;
 }
 .item-text {
-    font-size: 30px;
-    font-weight: bold;
-    color: #fff;
+	margin-left: 10px;
+	font-size: 30px;
+	font-weight: bold;
+	color: #fff;
 }
-.item-arrow {
-    font-size: 36px;
-    font-weight: bold;
-    color: rgba(255, 255, 255, 0.5);
+.item-icon {
+	width: 50px;
+	height: 50px;
 }
 
 /* --- 子页面列表样式 (原 settings.ux 样式) --- */
@@ -346,7 +355,7 @@
 	height: 80px;
 	padding: 0 20px;
 	margin: 5px 0;
-	background-color: #191821;
+	background-color: #2e323c;
 	border-radius: 40px;
 	justify-content: space-between;
 	align-items: center;
@@ -438,6 +447,7 @@
     const USER_PLAYLISTS_DIR = 'internal://files/user_playlists/';
     const PRESETS = {
         lyrics: { japaneseMode: ['translation', 'romaji', 'original'], cantoneseMode: ['romaji', 'original'], englishMode: ['translation', 'original'], },
+		lyricRenderMode: ['fullscreen', 'all'],
         lyricAdvanceTime: [0, 0.3, 0.5, 0.8, 1.0, 1.2, 1.5, 1.8, 2], // 单位：秒
         audioQuality: { online: [64, 128, 192, 320, 990], download: [64, 128, 192, 320] },
         performance: { windowSize: [10, 20, 40], pageSize: [10, 15, 20], },
@@ -473,6 +483,7 @@ const GESTURE_ACTION_TEXTS = {
             },
             settings: {
                 lyrics: { japaneseMode: 'translation', cantoneseMode: 'romaji', englishMode: 'translation' },
+				lyricRenderMode: 'fullscreen',
                 lyricAdvanceTime: 1.5,
                 audioQuality: { online: 64, download: 128 },
                 performance: { windowSize: 10, pageSize: 10 },
@@ -489,6 +500,10 @@ const GESTURE_ACTION_TEXTS = {
 
         computed: {
             titleText() { return this.viewTitles[this.currentView] || '‹设置'; },
+			lyricRenderModeText() {
+		const map = { fullscreen: '全屏', all: '完整' };
+		return map[this.settings.lyricRenderMode] || '未知';
+	},
             japaneseLyricModeText() { const map = { 'translation': '显示翻译', 'romaji': '显示罗马音', 'original': '仅显示原文' }; return map[this.settings.lyrics.japaneseMode] || '未知'; },
             cantoneseLyricModeText() { const map = { 'romaji': '显示粤拼', 'original': '仅显示原文' }; return map[this.settings.lyrics.cantoneseMode] || '未知'; },
             englishLyricModeText() { const map = { 'translation': '显示翻译', 'original': '仅显示原文' }; return map[this.settings.lyrics.englishMode] || '未知'; },
@@ -507,7 +522,9 @@ const GESTURE_ACTION_TEXTS = {
 
         navigateTo(viewName) {
             this.currentView = viewName;
+			this.$nextTick(() => {
             this.$element('settings-scroller').scrollTo({ top: 0, behavior: 'instant' });
+			});
         },
 
         goBack() {
@@ -553,7 +570,7 @@ const GESTURE_ACTION_TEXTS = {
     saveSettings() {
         file.writeText({
             uri: SETTINGS_FILE_URI,
-            text: JSON.stringify(this.settings, null, 2)
+            text: JSON.stringify(this.settings)
         });
     },
 
@@ -589,7 +606,10 @@ const GESTURE_ACTION_TEXTS = {
         this.saveSettings();
     },
 
-    // 【调用方式修正】
+	toggleLyricRenderMode() {
+	this._toggleSetting('lyricRenderMode', null, PRESETS.lyricRenderMode);
+},
+
     // 调用 _toggleSetting 时，顶层属性的 key 传入 null
     toggleLyricAdvanceTime() {
         this._toggleSetting('lyricAdvanceTime', null, PRESETS.lyricAdvanceTime);

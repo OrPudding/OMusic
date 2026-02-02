@@ -5,9 +5,12 @@ import file from '@system.file';
 import prompt from '@system.prompt';
 import apiService from './api.js'; // 依赖 api.js
 import brightness from '@system.brightness'; // 导入模块
+import { cookLyricsFromRaw, isCookedLyricFormat } from '../utils/lyric_cook.js';
+
 
 const DIR_MUSIC = 'internal://files/music/';
 const DIR_LYRICS = 'internal://files/lyrics/';
+const DIR_COVER = 'internal://files/cover/';
 
 // 内部函数：写歌词文件
 function saveLyricFile(path, data) {
@@ -18,7 +21,7 @@ function saveLyricFile(path, data) {
         }
         file.writeText({
             uri: path,
-            text: JSON.stringify(data, null, 2),
+            text: JSON.stringify(data),
             success: resolve,
             fail: (err, code) => reject({ message: `保存歌词失败, code: ${code}`, code })
         });
@@ -61,7 +64,8 @@ export default {
     initialize() {
         return Promise.all([
             new Promise(resolve => file.mkdir({ uri: DIR_MUSIC, complete: resolve })),
-            new Promise(resolve => file.mkdir({ uri: DIR_LYRICS, complete: resolve }))
+            new Promise(resolve => file.mkdir({ uri: DIR_LYRICS, complete: resolve })),
+            new Promise(resolve => file.mkdir({ uri: DIR_COVER, complete: resolve }))
         ]);
     },
 
@@ -89,14 +93,16 @@ export default {
 
         const lyricFilePath = `${DIR_LYRICS}${songToDownload.id}.json`;
         const songFilePath = `${DIR_MUSIC}${songToDownload.id}.mp3`;
+        const coverFilePath = `${DIR_COVER}${songToDownload.id}_200px.jpg`;
 
         onStart(songToDownload);
 
         try {
-            // 1. 并行获取歌曲和歌词信息
-            const [songPlaybackInfo, lyricData] = await Promise.all([
+            // 1. 并行获取歌曲、歌词、封面（封面失败不影响下载成功）
+            const [songPlaybackInfo, lyricData, coverUrl] = await Promise.all([
                 apiService.getSongPlaybackInfo(songToDownload.id, downloadBitrate, cookie),
-                apiService.getLyricData(songToDownload.id, cookie)
+                apiService.getLyricData(songToDownload.id, cookie),
+                apiService.getSongCoverUrl(songToDownload.id, 200, cookie).catch(() => '')
             ]);
 
             if (!songPlaybackInfo?.url) {
@@ -104,17 +110,22 @@ export default {
             }
 
             // 2. 并行下载歌曲和保存歌词
+            const cookedLyric = lyricData ? cookLyricsFromRaw(lyricData, songToDownload.id) : null;
+
             await Promise.all([
-                downloadSongToDestination(songPlaybackInfo.url, songFilePath),
-                saveLyricFile(lyricFilePath, lyricData)
+              downloadSongToDestination(songPlaybackInfo.url, songFilePath),
+              saveLyricFile(lyricFilePath, cookedLyric)
             ]);
+            
 
             // 3. 构建最终的下载信息并通知成功
             const downloadedInfo = {
                 ...songToDownload,
                 localUri: songFilePath,
                 localLyricUri: lyricData ? lyricFilePath : null,
-                duration: songPlaybackInfo.duration
+                duration: songPlaybackInfo.duration,
+                // 只持久化本地封面；远程兜底 URL 不写入下载记录
+                coverUrl: (coverUrl && String(coverUrl).startsWith('internal://')) ? String(coverUrl) : null
             };
             onSuccess(downloadedInfo);
 
@@ -125,6 +136,7 @@ export default {
             // 无论错误发生在哪一步，都尝试删除所有可能已创建的文件
             file.delete({ uri: songFilePath });
             file.delete({ uri: lyricFilePath });
+            file.delete({ uri: coverFilePath });
 
             // 向UI层报告更具体的错误信息
             onError(error.message || '下载过程中发生未知错误');

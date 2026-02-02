@@ -6,14 +6,44 @@
 			<text class="title">‹主菜单</text>
 		</div>
 		<!-- 2. 独立滚动的内容区域 -->
-		<scroll class="scroll-wrapper" scroll-y="true" bounces="true">
+		<scroll class="scroll-wrapper" scroll-y="true">
+			<div class="search-box" onclick="goToSearch">
+				<div class="box-icon-wrapper">
+					<image class="box-item-icon" src="/common/icon/search.png"></image>
+				</div>
+				<text class="box-item-text">搜索</text>
+			</div>
+			<div class="music-card" onclick="goToPlayer">
+				<!-- a. 左侧封面 -->
+				<image class="card-cover" src="{{ songCoverUrl }}"></image>
+
+				<div class="card-main">
+					<text class="card-title">
+						{{ songName || "暂无播放" }}
+					</text>
+					<text class="card-subtitle">
+						{{ songArtists || "点击前往播放器页" }}
+					</text>
+					<!-- b. 播放进度条 -->
+					<div class="progress">
+						<progress class="card-progress" percent="{{ progress }}"></progress>
+						<div class="progress-text">
+							<text class="card-time">{{ progressCurrentTime }}</text>
+							<text class="card-time">{{ progressTotalTime }}</text>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<div class="menu-columns-container">
 				<!-- 左列容器 -->
 				<div class="column">
 					<!-- FIX: 统一调用 handleMenuClick，并传入 item 数据 -->
 					<block for="{{ leftColumnItems }}">
 						<div class="menu-item" onclick="handleMenuClick($item)">
-							<image class="item-icon" src="{{ $item.icon }}"></image>
+							<div class="icon-wrapper">
+								<image class="item-icon" src="{{ $item.icon }}"></image>
+							</div>
 							<text class="item-text">{{ $item.text }}</text>
 						</div>
 					</block>
@@ -23,7 +53,9 @@
 					<!-- FIX: 统一调用 handleMenuClick，并传入 item 数据 -->
 					<block for="{{ rightColumnItems }}">
 						<div class="menu-item" onclick="handleMenuClick($item)">
-							<image class="item-icon" src="{{ $item.icon }}"></image>
+							<div class="icon-wrapper">
+								<image class="item-icon" src="{{ $item.icon }}"></image>
+							</div>
 							<text class="item-text">{{ $item.text }}</text>
 						</div>
 					</block>
@@ -35,68 +67,136 @@
 
 <script>
 import router from "@system.router";
+import prompt from "@system.prompt";
+import app from "@system.app";
 
 export default {
 	private: {
 		currentTime: "",
 		timer: null,
-		leftColumnItems: [],
-		rightColumnItems: [],
-	},
-
-	onInit() {
-		this.updateTime();
-		this.timer = setInterval(() => {
-			this.updateTime();
-		}, 1000);
-		this.prepareMenuItems();
-	},
-
-	onDestroy() {
-		if (this.timer) {
-			clearInterval(this.timer);
-		}
-	},
-	
-	prepareMenuItems() {
-		const allItems = [
-			{ text: "搜索", handler: "goToSearch", icon: "/common/icon/search.png" },
-			{
-				text: "已下载",
-				handler: "goToDownloadList",
-				icon: "/common/icon/downloaded.png",
-			},
+		leftColumnItems: [
 			{
 				text: "播放列表",
 				handler: "goToList",
 				icon: "/common/icon/playlist.png",
 			},
-			{ text: "我的收藏", handler: "goToLike", icon: "/common/icon/star-filled.png" },
 			{
 				text: "私人FM",
 				handler: "goToPersonalFM",
 				icon: "/common/icon/fm.png",
 			},
 			{
+				text: "我的歌单",
+				handler: "goToSongList",
+				icon: "/common/icon/songlist.png",
+			},
+			{
+				text: "应用设置",
+				handler: "goToSettings",
+				icon: "/common/icon/settings.png",
+			},
+		],
+		rightColumnItems: [
+			{
+				text: "已下载",
+				handler: "goToDownloadList",
+				icon: "/common/icon/downloaded.png",
+			},
+
+			{
 				text: "每日推荐",
 				handler: "goToDailyRecommend",
 				icon: "/common/icon/calendar.png",
 			},
 			{
-				text: "我的歌单",
-				handler: "goToSongList",
-				icon: "/common/icon/songlist.png",
+				text: "本地收藏",
+				handler: "goToLike",
+				icon: "/common/icon/star-filled.png",
 			},
 			{ text: "个人中心", handler: "goToUser", icon: "/common/icon/user.png" },
-		];
+		],
+		pressedKey: "",
+		pressedAnimKey: "",
+		pressedAnim: "",
+		scrollLock: false, // 语义：true = 最近滚动过/正在滚动，禁止跳转
+		_scrollUnlockTimer: null, // 300ms 解锁用
+		_scrollThrottleTimer: null, // 32ms 节流用
+	},
 
-		allItems.forEach((item, index) => {
-			if (index % 2 === 0) {
-				this.leftColumnItems.push(item);
-			} else {
-				this.rightColumnItems.push(item);
-			}
-		});
+	computed: {
+		songCoverUrl() {
+			// 🔥 强制依赖一个一定会变化的值（你这边进度能刷，说明它能触发重算）
+			const _tick = this.$app.$def.player.playerState.playDuration;
+
+			const coverUrl = this.$app.$def.player.currSong?.coverUrl;
+			return coverUrl || "/common/icon/more_light.png";
+		},
+
+		songName() {
+			const _tick = this.$app.$def.player.playerState.playDuration;
+
+			const name = this.$app.$def.player.currSong?.name;
+			return name || "暂无播放";
+		},
+
+		songArtists() {
+			const _tick = this.$app.$def.player.playerState.playDuration;
+
+			const artists = this.$app.$def.player.currSong?.artists;
+			return artists || "点击前往播放器页";
+		},
+
+		progress() {
+			const duration = this.$app.$def.player.currSong?.duration || 0;
+			if (duration === 0) return 0;
+			return (this.$app.$def.player.playerState.playDuration / duration) * 100;
+		},
+		progressCurrentTime() {
+			const t = this.$app.$def.player.playerState.playDuration;
+			return this.second2time(t);
+		},
+		progressTotalTime() {
+			const duration = this.$app.$def.player.currSong?.duration || 0;
+			return this.second2time(duration);
+		},
+	},
+
+	async onInit() {
+		this.updateTime();
+
+		// ① 先挡：不是严格 true 直接 terminate
+		if (this.$app.$def.isActivated !== true) {
+			prompt.showToast({
+				message: "非法绕过，IP及设备信息已上传！",
+				duration: 3000,
+			});
+			app.terminate();
+			return;
+		}
+
+		// ② 强制再跑一次激活验证（防中间页插入/改flag）
+		//    必须 await，确保顺序
+		const ok = await this.$app.$def.runActivationFlow();
+
+		// ③ 再挡：以 runActivationFlow 的结果 + isActivated 双重判断
+		//    （你 flow 里已经会写 isActivated，这里双判更硬）
+		if (ok !== true || this.$app.$def.isActivated !== true) {
+			prompt.showToast({
+				message: "非法绕过，IP及设备信息已上传！",
+				duration: 3000,
+			});
+			app.terminate();
+			return;
+		}
+		this.timer = setInterval(() => {
+			this.updateTime();
+		}, 1000);
+	},
+
+	onDestroy() {
+		if (this.timer) {
+			clearInterval(this.timer);
+		}
 	},
 
 	/**
@@ -117,8 +217,17 @@ export default {
 		const minutes = now.getMinutes().toString().padStart(2, "0");
 		this.currentTime = `${hours}:${minutes}`;
 	},
+
+	second2time(second) {
+		const minutes = Math.floor(second / 60);
+		const seconds = Math.floor(second % 60);
+		return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+	},
 	back() {
 		router.back();
+	},
+	goToPlayer() {
+		router.push({ uri: "/pages/player" });
 	},
 	goToList() {
 		router.push({ uri: "/pages/list", params: { listType: "playlist" } });
@@ -143,6 +252,12 @@ export default {
 	},
 	goToSongList() {
 		router.push({ uri: "/pages/songlist_list" });
+	},
+	goToStorage() {
+		router.push({ uri: "/pages/storage" });
+	},
+	goToSettings() {
+		router.push({ uri: "/pages/settings" });
 	},
 	goToUser() {
 		router.push({ uri: "/pages/user" });
@@ -186,6 +301,110 @@ export default {
 	flex-direction: column;
 	align-items: center;
 }
+.search-box {
+	width: 160px;
+	height: 64px;
+	padding: 12px 12px;
+	border-radius: 32px;
+	margin-bottom: 10px;
+	background-color: #2e323c;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+}
+.box-icon-wrapper {
+	padding: 4px 5px 6px 5px;
+	border-radius: 30px;
+	background-color: rgba(136, 136, 136, 0.2);
+}
+.box-item-icon {
+	width: 32px;
+	height: 32px;
+}
+.box-item-text {
+	padding-right: 22px;
+	font-size: 26px;
+	font-weight: bold;
+	color: #ffffff;
+}
+/* 音乐胶囊本体：必须明确尺寸/背景，否则很容易“看不到” */
+.music-card {
+	width: 370px;
+	height: 140px;
+	padding: 28px 22px;
+	margin-bottom: 10px;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+
+	background-color: #2e323c;
+	border-radius: 36px; /* 胶囊圆角 */
+}
+
+/* 左侧封面 */
+.card-cover {
+	width: 96px;
+	height: 96px;
+	margin-right: 16px;
+	border-radius: 18px;
+	background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* 右侧竖排（必要层） */
+.card-main {
+	flex: 1;
+	flex-direction: column;
+	justify-content: space-around;
+}
+
+/* 歌名 */
+.card-title {
+	font-size: 28px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.96);
+
+	lines: 1;
+	text-overflow: ellipsis;
+}
+
+/* 歌手 */
+.card-subtitle {
+	margin-top: 2px;
+	font-size: 22px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.62);
+
+	lines: 1;
+	text-overflow: ellipsis;
+}
+.progress {
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+}
+/* 进度条：只用 progress 支持的样式项 */
+.card-progress {
+	margin-top: 8px;
+	stroke-width: 12px;
+	color: #bac3ff;
+	background-color: rgba(136, 136, 136, 0.2);
+}
+.progress-text {
+	width: 100%;
+	flex-direction: row;
+	justify-content: space-between;
+	margin-top: 4px;
+}
+/* 右侧时间 */
+.card-time {
+	font-size: 18px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.55);
+	text-align: right;
+
+	lines: 1;
+}
+
 .menu-columns-container {
 	width: 380px;
 	flex-direction: row;
@@ -198,23 +417,29 @@ export default {
 .menu-item {
 	width: 180px;
 	height: 140px;
-	background-color: #191821;
-	margin: 5px 0;
+	background-color: #2e323c;
+	margin-bottom: 10px;
 	border-radius: 36px;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
 }
+.icon-wrapper {
+	padding: 4px 5px 6px 5px;
+	border-radius: 30px;
+	background-color: rgba(136, 136, 136, 0.2);
+	margin-bottom: 8px;
+}
 .item-icon {
 	width: 50px;
 	height: 50px;
-	margin-bottom: 8px;
 }
 .item-text {
 	font-size: 28px;
 	font-weight: bold;
 	color: #ffffff;
 }
+
 @media screen and (shape: rect) {
 	.header {
 		padding-top: 10px;
