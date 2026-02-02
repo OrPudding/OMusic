@@ -40,7 +40,7 @@ sleepTimerMinutes: 0,   // 记录用户设置的分钟数（可选，给UI显示
 	IS_DEBUG_BUILD: false,
 
 	// 1. 全局 interconnect 实例 (保持不变)
-	//connectInstance: interconnect.instance(),
+	connectInstance: interconnect.instance(),
 
 	downloadService: downloadService,
 

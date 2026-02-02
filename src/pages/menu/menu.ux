@@ -13,7 +13,7 @@
 				</div>
 				<text class="box-item-text">搜索</text>
 			</div>
-			<div class="music-card" onclick="goToPlayer">
+			<div class="music-card" onclick="back">
 				<!-- a. 左侧封面 -->
 				<image class="card-cover" src="{{ songCoverUrl }}"></image>
 

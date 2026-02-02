@@ -44,7 +44,7 @@
 					<!-- 加载中 -->
 					<div if="{{ isLoading }}" class="loading-wrapper">
 						<text class="loading-tip">
-							拉取中...已加载 {{ fullResultList.length }} 条
+							搜索中...
 						</text>
 					</div>
 
