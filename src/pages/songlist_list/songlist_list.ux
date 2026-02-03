@@ -33,6 +33,7 @@
 </template>
 
 <style>
+@import '../../common/font/MiSans-Demibold.css';
     /* --- 页面整体布局 (已修正顶栏固定问题) --- */
     .page-container {
         width: 100%;

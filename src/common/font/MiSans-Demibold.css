@@ -1,0 +1,10 @@
+@font-face {
+    font-family: "MiSans-Demibold";
+    src: url("../../common/font/MiSans-Demibold.ttf");
+  }
+text {
+    font-family: "MiSans-Demibold";
+}
+marquee {
+    font-family: "MiSans-Demibold";
+}

@@ -173,6 +173,7 @@
 </template>
 
 <style>
+@import '../../common/font/MiSans-Demibold.css';
 /* 容器 */
 .container {
 	width: 100%;
