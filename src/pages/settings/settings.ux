@@ -55,7 +55,7 @@
 						</text>
 					</div>
 					<text class="item-desc">
-						fullscreen 更轻量；all 为完整滚动歌词。
+						全屏更轻量更流畅，但单句歌词过长会被截断；完整为完整滚动歌词，支持双击跳转进度，性能开销较大。
 					</text>
 				<div id="lyrics-item-3" class="setting-item">
 					<text class="item-label">歌词提前</text>

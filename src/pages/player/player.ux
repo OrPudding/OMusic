@@ -89,31 +89,28 @@
 		></image>
 <!-- 视图 1: 歌词页 -->
  <!-- fullscreen：固定容器，不可手动滚动 -->
-<div
-  if="{{ swiperCurrentIndex === 1 && settings.lyricRenderMode === 'fullscreen' }}"
-  class="fullscreen-lyrics"
-  onswipe="handleSwipe"
+ <div
+ if="{{ swiperCurrentIndex === 1 && settings.lyricRenderMode === 'fullscreen' }}"
+ class="fullscreen-lyrics"
+ onswipe="handleSwipe"
 >
-  <div
-    for="{{(i, line) in fullscreenLines}}"
-    tid="line.id"
-    class="fs-line lyric-line-wrapper
-           {{ line.isCurrent ? 'is-current-wrapper' : '' }}
-           {{ line.isSelected ? 'is-selected-wrapper' : '' }}"
-  >
-    <!-- 主歌词 -->
-    <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}">
-      {{ line.original }}
-    </text>
+ <div
+   for="{{(i, line) in fullscreenLines}}"
+   class="fs-line lyric-line-wrapper
+		  {{ line.isCurrent ? 'is-current-wrapper' : '' }}
+		  {{ line.isSelected ? 'is-selected-wrapper' : '' }}"
+ >
+   <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}">
+	 {{ line.original }}
+   </text>
 
-    <!-- 附加歌词：fullscreen 下主/次都显示 -->
-    <text
-      if="{{ line.extra }}"
-      class="lyric-line extra-lyric {{ line.isCurrent ? 'extra-current' : 'extra-secondary' }}"
-    >
-      {{ line.extra }}
-    </text>
-  </div>
+   <text
+	 if="{{ line.extra }}"
+	 class="lyric-line extra-lyric {{ line.isCurrent ? 'extra-current' : 'extra-secondary' }}"
+   >
+	 {{ line.extra }}
+   </text>
+ </div>
 </div>
 
 
@@ -559,39 +556,14 @@
 .fullscreen-lyrics {
 	width: 100%;
 	height: 376px;      /* 同原 lyrics-scroll-view */
-	padding: 0 10px;
-
+	padding: 0 3px;
 	flex-direction: column;
-	justify-content: space-around; /* 你要的 around */
+	justify-content: center;
 	align-items: center;
-}
-/* 普通行 */
-.fullscreen-lyrics ,.lyric-line {
-	font-size: 32px;
-	font-weight: 600;
-	text-align: center;
-	width: 100%;
-}
-
-/* 当前行更突出 */
-.fullscreen-lyrics ,.current-lyric {
-	font-size: 40px;   /* 再加大一档 */
-	font-weight: 700;
-}
-
-
-.fullscreen-lyrics ,.current-lyric {
-	font-size: 36px;     /* 当前行更大 */
-	font-weight: 700;
-}
-.fullscreen-lyrics ,.extra-lyric {
-	font-size: 26px;   /* 原来 22 → 稍微拉高 */
-	text-align: center;
 }
 
 /* 每行占一个固定槽位：保证 5/7 行一定会超过 376px，从而上下被裁掉 */
 .fs-line {
-	min-height: 76px;   /* 行高想更松就加大，比如 82/88 */
 	width: 100%;
 	align-items: center;
 	justify-content: center;
@@ -632,14 +604,21 @@
 	color: #bac3ff;
 	font-weight: bold;
 	font-size: 28px;
-	padding: 6px 0;
+	padding: 3px 0;
 }
-
+/* 非当前行 */
+.secondary-lyric {
+  font-size: 24px;        /* 明显小一档 */
+  font-weight: 500;
+  font-weight: bold;
+  color: #888888;
+}
 .extra-lyric {
 	font-size: 22px;
+	font-weight: bold;
+	lines: -1;
 	/* 【修改】使用固定颜色代替白色+透明度 */
 	color: #bbbbbb;
-	padding-bottom: 6px;
 }
 /* --- 评论区占位符 --- */
 .comments-view {
@@ -748,7 +727,6 @@
 		height: 424px;
 	}
 	.fullscreen-lyrics { height: 424px; }
-	.fs-line { min-height: 82px; } /* 方屏可稍微更松 */
 	.is-current-wrapper {
 		/* 【修改】使用固定颜色代替透明度 */
 		background-color: #1a1a1a;
@@ -792,8 +770,10 @@ import brightness from "@system.brightness";
 import apiService from "../../services/api.js";
 import {
   isCookedLyricFormat,
-  cookLyricsFromRaw
+  cookLyricsFromRaw,
+  makeFallbackCooked,
 } from "../../utils/lyric_cook.js";
+
 import throttle from "../../utils/throttle.js";
 
 const CONSTANTS = {
@@ -805,7 +785,7 @@ const CONSTANTS = {
 	COOKIE_FILE_URI: "internal://files/cookie.txt",
 	FILE_PLAYER_STATE: "internal://files/player_state.json",
 	MAX_PLAYBACK_RETRIES: 3,
-	PLAY_TIMEOUT: 15000,
+	PLAY_TIMEOUT: 25000,
 };
 
 const REVERSE_DIRECTIONS = {
@@ -834,16 +814,14 @@ const fileService = {
 		}
 	},
 	async writeJson(uri, data) {
-		try {
-			await this._promisify(file.writeText, {
-				uri,
-				text: JSON.stringify(data),
-			});
-			return true;
-		} catch (e) {
-			return false;
-		}
-	},
+  try {
+    await this._promisify(file.writeText, { uri, text: JSON.stringify(data) });
+    return true;
+  } catch (e) {
+    throw e; // ✅ 让 .catch 生效
+  }
+}
+
 };
 
 export default {
@@ -928,6 +906,8 @@ export default {
 		lyricGroup61: [],
 		lyricGroup62: [],
 		lyricGroup63: [],
+
+		_lyricReqId: 0,
 
 		swiperCurrentIndex: 0, // DOM if 开关
 
@@ -1194,13 +1174,6 @@ export default {
 	onPlayBtnClick() {
 		// 点击：无论业务是否 return，都保证按钮恢复
 		this._releasePlayBtnWithPop();
-		console.log(
-			"点击播放按钮,playerState=" +
-				JSON.stringify(this.playerState) +
-				", currSong=" +
-				JSON.stringify(this.currSong)
-		);
-
 		// 再执行业务逻辑
 		this.playOrPause();
 	},
@@ -1360,63 +1333,146 @@ export default {
 },
 
 buildFullscreenLines() {
-	const lines = this.lyricLines || [];
-	const total = lines.length;
-	if (!total) {
-		this.fullscreenLines = [];
-		return;
-	}
+  const lines = this.lyricLines || [];
+  const total = lines.length;
 
-	// 取一个“当前索引”：优先用 playerState.currentLyricIndex
-	let cur = typeof this.playerState?.currentLyricIndex === "number"
-		? this.playerState.currentLyricIndex
-		: -1;
+  if (!total) {
+    this.fullscreenLines = [];
+    this._fsKey = null;
+    return;
+  }
 
-	// 兜底：还没算出 currentLyricIndex 时，用播放时间快速算一个
-	if (!(cur >= 0 && cur < total)) {
-		const lookaheadTime =
-			(this.playerState?.playDuration || 0) +
-			(this.settings?.lyricAdvanceTime || 1.5);
+  const ps = this.playerState || {};
+  const st = this.settings || {};
+  const rawLyrics = this.lyrics || [];
 
-		let newIndex = 0;
-		let low = 0;
-		let high = (this.lyrics ? this.lyrics.length : 0) - 1;
-		while (low <= high) {
-			const mid = (low + high) >> 1;
-			if (this.lyrics[mid].time > lookaheadTime) high = mid - 1;
-			else {
-				newIndex = mid;
-				low = mid + 1;
-			}
-		}
-		cur = newIndex;
-	}
+  // 1) 当前索引
+  let cur = typeof ps.currentLyricIndex === "number" ? ps.currentLyricIndex : -1;
 
-	// 是否有附加歌词：以“当前行将显示的 extra 文本”为准
-	const extraText = this.getExtraLyricText(this.lyrics[cur]);
-	const hasExtra = !!(extraText && String(extraText).trim());
+  // 兜底：用播放时间算一个
+  if (!(cur >= 0 && cur < total)) {
+    const lookaheadTime = (ps.playDuration || 0) + (st.lyricAdvanceTime || 1.5);
 
-	// 可见行：有 extra → 3；无 extra → 5
-	// 但上下各多带 1 行不可见，所以总行数分别为 5 / 7
-	const visible = hasExtra ? 3 : 5;
-	const N = visible + 2;
+    let newIndex = 0;
+    let low = 0;
+    let high = rawLyrics.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (rawLyrics[mid].time > lookaheadTime) high = mid - 1;
+      else {
+        newIndex = mid;
+        low = mid + 1;
+      }
+    }
+    cur = newIndex;
+  }
 
-	const half = N >> 1;
-	let start = cur - half;
-	let end = start + N - 1;
+  // 2) hasExtra：只看当前行
+  const extraText = this.getExtraLyricText(rawLyrics[cur]);
+  const hasExtra = !!(extraText && String(extraText).trim());
 
-	if (start < 0) {
-		start = 0;
-		end = Math.min(total - 1, N - 1);
-	}
-	if (end >= total) {
-		end = total - 1;
-		start = Math.max(0, end - (N - 1));
-	}
+  // 3) 行数：有 extra 5 行；无 extra 7 行（无 extra 不隐藏）
+  const N = hasExtra ? 5 : 7;
+  const half = N >> 1;
 
-	this.fullscreenLines = lines.slice(start, end + 1);
+  // 4) 长度：只看 original（ASCII=1，非ASCII=2）
+  const MID_MAX_LEN = 18;
+
+  const textLen = (s) => {
+    if (!s) return 0;
+    let n = 0;
+    for (let k = 0; k < s.length; k++) n += s.charCodeAt(k) <= 0x007f ? 1 : 2;
+    return n;
+  };
+
+  const isLongOriginal = (o) => {
+    if (!o) return false;
+    const s = String(o).trim();
+    if (!s) return false;
+    // 快速剪枝
+    if (s.length <= MID_MAX_LEN) return false;
+    return textLen(s) > MID_MAX_LEN;
+  };
+
+  // fullscreen 行对象：最小集合
+  const toFsLine = (src) => ({
+    id: src && src.id ? String(src.id) : "",
+    original: (src && src.original != null ? String(src.original) : "") || " ",
+    extra: src && src.extra ? String(src.extra) : null,
+    isCurrent: !!(src && src.isCurrent),
+  });
+
+  const makePad = (i) => ({
+    id: `pad-${cur}-${i}`,
+    original: " ", // 占位必须是空格，不要空字符串
+    extra: null,
+    isCurrent: false,
+  });
+
+  // 5) 隐藏规则（只在 hasExtra 时启用）
+  let hideTop = false;
+  let hideBottom = false;
+
+  if (hasExtra) {
+    let longCount = 0;
+    let checked = 0;
+
+    for (let i = -1; i <= 1; i++) {
+      const idx = cur + i;
+      if (idx < 0 || idx >= total) continue;
+
+      const src = lines[idx];
+      const o = src && src.original != null ? String(src.original) : "";
+      const t = o.trim();
+      if (!t) continue; // 空行不计入
+
+      checked++;
+      if (isLongOriginal(t)) longCount++;
+    }
+
+    if (checked === 0 || longCount === 0) {
+      hideTop = false;
+      hideBottom = false;
+    } else if (checked === 3 && longCount === 3) {
+      hideTop = true;
+      hideBottom = true;
+    } else {
+      // 1~2 行过长（或 checked<3 但存在过长）→ 只隐藏上
+      hideTop = true;
+      hideBottom = false;
+    }
+  }
+
+  // 6) 缓存 key：不变就不重建
+  const fsKey = `${total}|${cur}|${hasExtra ? 1 : 0}|${hideTop ? 1 : 0}|${hideBottom ? 1 : 0}`;
+  if (
+    this._fsKey === fsKey &&
+    Array.isArray(this.fullscreenLines) &&
+    this.fullscreenLines.length === N
+  ) {
+    return;
+  }
+  this._fsKey = fsKey;
+
+  // 7) 生成结果（无交互字段）
+  const result = [];
+  for (let i = -half; i <= half; i++) {
+    if (hasExtra && i === -2 && hideTop) {
+      result.push(makePad(i));
+      continue;
+    }
+    if (hasExtra && i === 2 && hideBottom) {
+      result.push(makePad(i));
+      continue;
+    }
+
+    const idx = cur + i;
+    if (idx >= 0 && idx < total) result.push(toFsLine(lines[idx]));
+    else result.push(makePad(i));
+  }
+
+  this.fullscreenLines = result;
 },
-
 
 
 	distributeLyricsToGroups() {
@@ -2109,54 +2165,49 @@ if (newIndex >= 0) {
 		// 注意：updateUiForNewSong 里已经 fetchLyric 了
 	},
 
-	// ✅ 请用这一版（确认：包含两次 syncToGlobalPlayer，且绝不继承上一首 coverUrl）
 	updateUiForNewSong(song) {
-		audio.stop();
+	audio.stop();
 
-		// 1) 先写基础信息
-		if (!this.currSong) this.currSong = { ...song, duration: 0 };
-		else {
-			this.currSong.id = song.id;
-			this.currSong.name = song.name;
-			this.currSong.artists = song.artists;
-			this.currSong.duration = 0;
-		}
+	// 1) 先写基础信息
+	if (!this.currSong) this.currSong = { ...song, duration: 0 };
+	else {
+		this.currSong.id = song.id;
+		this.currSong.name = song.name;
+		this.currSong.artists = song.artists;
+		this.currSong.duration = 0;
+	}
 
-		// 2) 关键：新歌封面先清空（绝不沿用上一首）
-		this.currSong.coverUrl = "";
+	// 2) 关键：新歌封面先清空（绝不沿用上一首）
+	this.currSong.coverUrl = "";
 
-		// 3) 立刻同步一次：全局先拿到“当前歌已切换”
-		this.syncToGlobalPlayer();
+	// 3) 立刻同步一次：全局先拿到“当前歌已切换”
+	this.syncToGlobalPlayer();
 
-		// 4) 恢复进度逻辑（保留你的行为）
-		if (this.resumeTime < 0) {
-			this.playerState.playDuration = 0;
-		} else {
-			this.playerState.playDuration = this.resumeTime;
-			this._pendingRestoreTime = this.resumeTime;
-		}
+	// 4) 恢复进度逻辑（保留你的行为）
+	if (this.resumeTime < 0) {
+		this.playerState.playDuration = 0;
+	} else {
+		this.playerState.playDuration = this.resumeTime;
+		this._pendingRestoreTime = this.resumeTime;
+	}
 
-		// 5) 歌词
-		this.resetLyrics();
-		this.fetchLyric(song.id);
+	// 5) 歌词：只调用 fetchLyric（它内部会 reset + gate）
+	this.fetchLyric(song.id);
 
-		// 6) 拿封面：回来后再同步一次（防止切歌快导致串台）
-		const requestSongId = String(song.id);
+	// 6) 拿封面：回来后再同步一次（防止切歌快导致串台）
+	const requestSongId = String(song.id);
 
-		apiService
-			.getSongCoverUrl(song.id, 96, this.cookie)
-			.then((coverUrl) => {
-				if (!this.currSong || String(this.currSong.id) !== requestSongId)
-					return;
+	apiService
+		.getSongCoverUrl(song.id, 96, this.cookie)
+		.then((coverUrl) => {
+			if (!this.currSong || String(this.currSong.id) !== requestSongId) return;
 
-				// 只更新当前歌 UI，不写 downloaded_songs.json
-				if (coverUrl) this.currSong.coverUrl = coverUrl;
+			if (coverUrl) this.currSong.coverUrl = coverUrl;
+			this.syncToGlobalPlayer();
+		})
+		.catch(() => {});
+},
 
-				// 封面到位后再同步一次
-				this.syncToGlobalPlayer();
-			})
-			.catch(() => {});
-	},
 
 	startPlaybackTimeout() {
 		if (this.playTimeoutId) clearTimeout(this.playTimeoutId);
@@ -2422,100 +2473,124 @@ if (newIndex >= 0) {
 	},
 // 【【【进阶优化：更可靠的缓存检查 + cooked格式迁移】】】
 fetchLyric(songId) {
-	this.resetLyrics();
-	const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
-	const downloadedInfo = this.downloadedSongs[songId];
+	// ✅ 每次请求生成 token；任何旧回调只要 token 不一致，直接作废
+	const reqId = (this._lyricReqId = (this._lyricReqId || 0) + 1);
+	const songIdStr = String(songId);
 
-	// 优先使用下载记录中的路径（如果有）
+	// ✅ 只在这里 reset，别在 updateUiForNewSong 再 reset 一遍
+	this.resetLyrics();
+
+	const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
+	const downloadedInfo = this.downloadedSongs && this.downloadedSongs[songId];
 	const finalLyricPath = downloadedInfo?.localLyricUri || lyricFilePath;
 
-	// 直接检查文件是否存在
 	file.access({
 		uri: finalLyricPath,
 		success: () => {
-			// 文件存在，直接从本地加载（可能是旧raw，也可能是新cooked）
+			// ✅ gate：只允许最新请求 + 当前歌
+			if (reqId !== this._lyricReqId) return;
+			if (!this._isCurrentSong(songIdStr)) return;
+
 			console.log(`发现本地歌词缓存: ${finalLyricPath}`);
-			this.loadLyricFromFile(finalLyricPath, songId);
+			this.loadLyricFromFile(finalLyricPath, songId, reqId);
 		},
 		fail: () => {
-			// 文件不存在，从在线获取（并会自动缓存 cooked）
+			if (reqId !== this._lyricReqId) return;
+			if (!this._isCurrentSong(songIdStr)) return;
+
 			console.log(`本地无歌词缓存，从网络获取: ${songId}`);
-			this.fetchLyricOnline(songId);
+			this.fetchLyricOnline(songId, reqId);
 		},
 	});
 },
 
-loadLyricFromFile(uri, songId) {
+loadLyricFromFile(uri, songId, reqId = this._lyricReqId) {
+	const songIdStr = String(songId);
+
 	file.readText({
-		uri: uri,
+		uri,
 		success: (data) => {
+			// ✅ gate：只允许最新请求 + 当前歌
+			if (reqId !== this._lyricReqId) return;
+			if (!this._isCurrentSong(songIdStr)) return;
+
 			try {
 				const obj = JSON.parse(data.text);
 
-				// ✅ 1) 新格式：cooked 直接应用
+				// ✅ 1) cooked 直接用
 				if (isCookedLyricFormat(obj)) {
 					this.applyCookedLyrics(obj);
 					return;
 				}
 
-				// ✅ 2) 旧格式：raw → cook → 覆写回同一路径 → 应用
+				// ✅ 2) raw → cooked
 				const cooked = cookLyricsFromRaw(obj, songId);
 
-				// 覆写升级（不阻塞播放；写失败也不影响本次使用）
+				// 覆写升级（不阻塞；写失败不影响本次使用）
 				fileService
 					.writeJson(uri, cooked)
 					.then(() => console.log(`歌词缓存已升级为 cooked: ${songId}.json`))
 					.catch((err) =>
-						console.error(`歌词升级写入失败: ${err.message || err}`)
+						console.error(`歌词升级写入失败: ${err?.message || err}`)
 					);
 
 				this.applyCookedLyrics(cooked);
 			} catch (e) {
 				// 文件损坏/格式异常：走在线获取
 				console.error("本地歌词解析失败，转在线获取:", e);
-				this.fetchLyricOnline(songId);
+
+				if (reqId !== this._lyricReqId) return;
+				if (!this._isCurrentSong(songIdStr)) return;
+
+				this.fetchLyricOnline(songId, reqId);
 			}
 		},
-		fail: () => this.fetchLyricOnline(songId),
+		fail: () => {
+			if (reqId !== this._lyricReqId) return;
+			if (!this._isCurrentSong(songIdStr)) return;
+
+			this.fetchLyricOnline(songId, reqId);
+		},
 	});
 },
 
 // 【【【核心修改：网络获取后只缓存 cooked】】】
-async fetchLyricOnline(songId) {
+async fetchLyricOnline(songId, reqId = this._lyricReqId) {
+	const songIdStr = String(songId);
 	const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
 
 	try {
-		// 1) 从网络获取 raw 歌词数据
 		const raw = await apiService.getLyricData(songId, this.cookie);
 
-		// 2) raw → cooked
+		// ✅ gate：网络回来后再判断是否还是当前歌 + 最新请求
+		if (reqId !== this._lyricReqId) return;
+		if (!this._isCurrentSong(songIdStr)) return;
+
+		// ✅ raw 校验：失败明确显示“加载失败”，不要混成“暂无歌词”
+		if (!raw || typeof raw !== "object" || (raw.code != null && raw.code !== 200)) {
+			const cookedFail = makeFallbackCooked(songId, "歌词加载失败");
+			this.applyCookedLyrics(cookedFail);
+			return;
+		}
+
+		// raw → cooked
 		const cooked = cookLyricsFromRaw(raw, songId);
 
-		// 3) 异步写入 cooked（彻底抛弃 raw 缓存）
+		// ✅ 异步写入 cooked（失败不影响本次渲染）
 		fileService
 			.writeJson(lyricFilePath, cooked)
-			.then(() => {
-				console.log(`歌词 cooked 缓存成功: ${songId}.json`);
-			})
-			.catch((err) => {
-				console.error(`歌词 cooked 文件写入失败: ${err.message}`);
-			});
+			.then(() => console.log(`歌词 cooked 缓存成功: ${songId}.json`))
+			.catch((err) => console.error(`歌词 cooked 写入失败: ${err?.message || err}`));
 
-		// 4) 立即使用 cooked 渲染（不阻塞）
+		// 立即应用
 		this.applyCookedLyrics(cooked);
 	} catch (error) {
+		// gate：catch 也要防串歌
+		if (reqId !== this._lyricReqId) return;
+		if (!this._isCurrentSong(songIdStr)) return;
+
 		console.error("在线获取歌词失败:", error);
-		// 兜底：给一个最小 cooked，避免后续逻辑崩
-		const cooked = {
-			v: 3,
-			songId: String(songId),
-			type: "chinese",
-			flags: { sgc: false, sfy: false, qfy: false },
-			ver: { lrc: 0, tlyric: 0, romalrc: 0 },
-			by: { lyric: null, trans: null },
-			lines: [{ t: 0, o: "歌词加载失败" }],
-		};
-		this.applyCookedLyrics(cooked);
+		this.applyCookedLyrics(makeFallbackCooked(songId, "歌词加载失败"));
 	}
 },
 
@@ -2537,20 +2612,20 @@ applyCookedLyrics(cooked) {
 		romaji: it.ro || null,
 	}));
 
+	// ✅ fallback：统一结构，永远用 original 字段
 	if (!this.lyrics.length) {
-		this.lyrics = [{ time: 0, text: "暂无歌词" }];
+		this.lyrics = [{ time: 0, original: "暂无歌词", translation: null, romaji: null }];
 	}
 
 	// 3) 构建渲染状态中心
 	this.lyricLines = this.lyrics.map((line, index) => ({
-	id: `lyric-${line.time}-${index}`,
-	originalIndex: index,
-	original: line.original || line.text || "",
-	extra: this.getExtraLyricText(this.lyrics[index]) || null,
-	isCurrent: false,
-	isSelected: false,
-}));
-
+		id: `lyric-${line.time}-${index}`,
+		originalIndex: index,
+		original: line.original || "",
+		extra: this.getExtraLyricText(this.lyrics[index]) || null,
+		isCurrent: false,
+		isSelected: false,
+	}));
 
 	// 4) 分流：fullscreen 不初始化 64 管道
 	const mode = (this.settings && this.settings.lyricRenderMode) || "fullscreen";
@@ -2911,14 +2986,19 @@ getExtraLyricText(lineData) {
 		);
 	},
 	resetPlayer() {
-		audio.stop();
-		this.currSong = null;
-		this.playerState.isPlaying = false;
-		this.playerState.playDuration = 0;
-		this.isChangingSong = false;
-		this.retryCount = 0;
-		this.resetLyrics();
-	},
+	audio.stop();
+	this.currSong = null;
+	this.playerState.isPlaying = false;
+	this.playerState.playDuration = 0;
+	this.isChangingSong = false;
+	this.retryCount = 0;
+
+	// ✅ 让所有旧歌词回调失效
+	this._lyricReqId = (this._lyricReqId || 0) + 1;
+
+	this.resetLyrics();
+},
+
 
 	handlePlaybackError(message) {
 		if (this.playTimeoutId) {
@@ -2951,6 +3031,11 @@ getExtraLyricText(lineData) {
 			this.playCurrent();
 		}, 1500 + this.retryCount * 1000);
 	},
+
+	_isCurrentSong(songId) {
+	return !!(this.currSong && String(this.currSong.id) === String(songId));
+},
+
 
 	// --- 工具函数 ---
 	second2time(second) {

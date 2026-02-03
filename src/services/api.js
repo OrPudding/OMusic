@@ -295,26 +295,27 @@ export default {
    */
   async getLyricData(songId, cookie) {
     const finalUrl = buildAuthenticatedUrl(`${API_BASE}/lyric?id=${songId}`, cookie);
-    console.log("API: Fetching lyric:", finalUrl);
-
     try {
       const response = await fetchPromise(finalUrl);
       const parsed = tryParseJson(response.data);
-      if (!parsed) {
+  
+      if (!parsed || typeof parsed !== "object") {
         console.error("API: 获取歌词失败（格式异常）", { url: finalUrl });
-        return null;
+        return { code: -1, _reason: "bad_json" };
       }
-      if (typeof parsed.code !== 'undefined' && parsed.code !== 200) {
-        const m = parsed.message || parsed?.data?.blockText || '请求失败';
+  
+      if (typeof parsed.code !== "undefined" && parsed.code !== 200) {
+        const m = parsed.message || parsed?.data?.blockText || "请求失败";
         console.error(`API: 获取歌词失败 ${parsed.code}: ${m}`);
-        return null;
+        return { ...parsed, _reason: "bad_code" };
       }
+  
       return parsed;
-    } catch (error) {
-      console.error("API: 获取歌词失败", error?.message || error, error);
-      return null;
+    } catch (e) {
+      console.error("API: 获取歌词失败", e?.message || e, e);
+      return { code: -2, _reason: "network_error" };
     }
-  },
+  },  
 
   /**
    * 获取私人FM歌曲列表
