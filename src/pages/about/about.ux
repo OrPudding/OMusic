@@ -9,7 +9,7 @@
       <!-- 2. 独立滚动的内容列表 -->
       <list class="content-list" bounces="true">
         <!-- 软件信息块 -->
-        <list-item type="infoCapsule" class="info-capsule-item">
+        <list-item type="infoCapsule" class="info-capsule-item" onclick="handleInfoClick">
           <div class="info-capsule">
             <image class="app-icon" src="/common/icon.png"></image>
             <div class="app-details">
@@ -109,6 +109,7 @@
       private: {
         currentTime: '00:00',
         timer: null,
+        infoClickTimes: 0,
         listItems: [
           { label: '参与开发', value: 'OrPudding' },
           { label: '参与设计', value: 'VanguardHello_',small: true },
@@ -129,7 +130,14 @@
           clearInterval(this.timer);
         }
       },
-  
+
+      handleInfoClick() {
+        this.infoClickTimes++;
+        if (this.infoClickTimes >= 5) {
+          router.push({ uri: '/pages/debug' });
+        }
+      },
+
       /**
        * 统一的列表项点击处理函数
        * @param {object} item - 被点击的列表项的数据对象

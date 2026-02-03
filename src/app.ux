@@ -26,10 +26,9 @@ export default {
 	player: null,
 
 	// =================== 全局睡眠定时器 ===================
-sleepTimerAt: 0,        // 触发时间戳 (ms)，0=未设置
-_sleepTimerId: null,    // setTimeout id（仅内存）
-sleepTimerMinutes: 0,   // 记录用户设置的分钟数（可选，给UI显示）
-
+	sleepTimerAt: 0, // 触发时间戳 (ms)，0=未设置
+	_sleepTimerId: null, // setTimeout id（仅内存）
+	sleepTimerMinutes: 0, // 记录用户设置的分钟数（可选，给UI显示）
 
 	// =================== App 版本与 Debug 标识 ===================
 
@@ -234,56 +233,56 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
 	},
 
 	runActivationFlow() {
-  console.log("--- 开始执行激活验证流程 ---");
+		console.log("--- 开始执行激活验证流程 ---");
 
-  return new Promise((resolve) => {
-    let done = false;
+		return new Promise((resolve) => {
+			let done = false;
 
-    const finish = (val) => {
-      if (done) return;
-      done = true;
+			const finish = (val) => {
+				if (done) return;
+				done = true;
 
-      // ✅ 统一在这里写状态，避免 late callback 改回去
-      this.isActivated = (val === true);
+				// ✅ 统一在这里写状态，避免 late callback 改回去
+				this.isActivated = val === true;
 
-      resolve(val === true);
-    };
+				resolve(val === true);
+			};
 
-    const t = setTimeout(() => {
-      console.error("激活验证超时，按未激活处理");
-      finish(false);
-    }, 8000);
+			const t = setTimeout(() => {
+				console.error("激活验证超时，按未激活处理");
+				finish(false);
+			}, 8000);
 
-    this.getDeviceIdentifier({
-      success: (deviceId) => {
-        if (done) return;
-        this.deviceId = deviceId;
+			this.getDeviceIdentifier({
+				success: (deviceId) => {
+					if (done) return;
+					this.deviceId = deviceId;
 
-        this.checkLocalActivation(deviceId, {
-          success: () => {
-            if (done) return;
-            clearTimeout(t);
-            console.log("--- 激活验证流程结束，结果: true ---");
-            finish(true);
-          },
-          fail: () => {
-            if (done) return;
-            clearTimeout(t);
-            console.log("--- 激活验证流程结束，结果: false ---");
-            finish(false);
-          },
-        });
-      },
-      fail: (errorMsg) => {
-        if (done) return;
-        clearTimeout(t);
-        console.error(`激活流程中发生严重错误: ${errorMsg}`);
-        console.log("--- 激活验证流程结束，结果: false ---");
-        finish(false);
-      },
-    });
-  });
-},
+					this.checkLocalActivation(deviceId, {
+						success: () => {
+							if (done) return;
+							clearTimeout(t);
+							console.log("--- 激活验证流程结束，结果: true ---");
+							finish(true);
+						},
+						fail: () => {
+							if (done) return;
+							clearTimeout(t);
+							console.log("--- 激活验证流程结束，结果: false ---");
+							finish(false);
+						},
+					});
+				},
+				fail: (errorMsg) => {
+					if (done) return;
+					clearTimeout(t);
+					console.error(`激活流程中发生严重错误: ${errorMsg}`);
+					console.log("--- 激活验证流程结束，结果: false ---");
+					finish(false);
+				},
+			});
+		});
+	},
 
 	// 确保 getDeviceIdentifier 也使用回调
 	getDeviceIdentifier(callbacks) {
@@ -322,67 +321,68 @@ ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
 		}
 	},
 	setSleepTimerMinutes(minutes) {
-  const m = parseInt(minutes, 10);
+		const m = parseInt(minutes, 10);
 
-  // 非法/<=0：当作取消
-  if (!m || m <= 0) {
-    this.cancelSleepTimer();
-    return { ok: true, at: 0, remainingMs: 0 };
-  }
+		// 非法/<=0：当作取消
+		if (!m || m <= 0) {
+			this.cancelSleepTimer();
+			return { ok: true, at: 0, remainingMs: 0 };
+		}
 
-  const safeM = Math.max(1, Math.min(9999, m));
-  const ms = safeM * 60 * 1000;
+		const safeM = Math.max(1, Math.min(9999, m));
+		const ms = safeM * 60 * 1000;
 
-  // 先清旧的
-  if (this._sleepTimerId) {
-    clearTimeout(this._sleepTimerId);
-    this._sleepTimerId = null;
-  }
+		// 先清旧的
+		if (this._sleepTimerId) {
+			clearTimeout(this._sleepTimerId);
+			this._sleepTimerId = null;
+		}
 
-  this.sleepTimerMinutes = safeM;
-  this.sleepTimerAt = Date.now() + ms;
+		this.sleepTimerMinutes = safeM;
+		this.sleepTimerAt = Date.now() + ms;
 
-  this._sleepTimerId = setTimeout(() => {
-    try { app.terminate && app.terminate(); } catch (e) {}
-  }, ms);
+		this._sleepTimerId = setTimeout(() => {
+			try {
+				app.terminate && app.terminate();
+			} catch (e) {}
+		}, ms);
 
-  return {
-    ok: true,
-    at: this.sleepTimerAt,
-    remainingMs: this.sleepTimerAt - Date.now(),
-    minutes: safeM,
-  };
-},
+		return {
+			ok: true,
+			at: this.sleepTimerAt,
+			remainingMs: this.sleepTimerAt - Date.now(),
+			minutes: safeM,
+		};
+	},
 
-cancelSleepTimer() {
-  if (this._sleepTimerId) {
-    clearTimeout(this._sleepTimerId);
-    this._sleepTimerId = null;
-  }
-  this.sleepTimerAt = 0;
-  this.sleepTimerMinutes = 0;
-  return { ok: true, at: 0, remainingMs: 0 };
-},
+	cancelSleepTimer() {
+		if (this._sleepTimerId) {
+			clearTimeout(this._sleepTimerId);
+			this._sleepTimerId = null;
+		}
+		this.sleepTimerAt = 0;
+		this.sleepTimerMinutes = 0;
+		return { ok: true, at: 0, remainingMs: 0 };
+	},
 
-getSleepTimerInfo() {
-  const at = this.sleepTimerAt || 0;
-  const remainingMs = at > 0 ? Math.max(0, at - Date.now()) : 0;
+	getSleepTimerInfo() {
+		const at = this.sleepTimerAt || 0;
+		const remainingMs = at > 0 ? Math.max(0, at - Date.now()) : 0;
 
-  // 如果理论上已过期但 timer 没清（比如系统卡顿/时间跳变），顺手清一下
-  if (at > 0 && remainingMs === 0) {
-    // 不触发终止，只是状态清理
-    this.sleepTimerAt = 0;
-    this.sleepTimerMinutes = 0;
-  }
+		// 如果理论上已过期但 timer 没清（比如系统卡顿/时间跳变），顺手清一下
+		if (at > 0 && remainingMs === 0) {
+			// 不触发终止，只是状态清理
+			this.sleepTimerAt = 0;
+			this.sleepTimerMinutes = 0;
+		}
 
-  return {
-    enabled: at > 0 && remainingMs > 0,
-    at,
-    remainingMs,
-    minutes: this.sleepTimerMinutes || 0,
-  };
-},
-
+		return {
+			enabled: at > 0 && remainingMs > 0,
+			at,
+			remainingMs,
+			minutes: this.sleepTimerMinutes || 0,
+		};
+	},
 
 	// ===================================================================
 	// =================== 其他原有逻辑 ==================================

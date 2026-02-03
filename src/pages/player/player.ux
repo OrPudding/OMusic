@@ -23,6 +23,7 @@
 					ontouchcancel="pressCancel('prevBtn')"
 					onclick="change(-1)"
 				/>
+
 				<!-- Play/Pause -->
 				<image
 					class="pressable {{ playBtnClass }} {{ playBtnAnim }}"
@@ -393,7 +394,6 @@
 </template>
 
 <style>
-@import '../../common/font/MiSans-Demibold.css';
 /* --- 基础布局 --- */
 .demo-page {
 	width: 100%;
@@ -593,6 +593,7 @@
 	width: 90%;
 	text-align: center;
 	lines: -1;
+
 	/* 【核心修改】默认状态：非当前行，使用灰色代替白色+透明度 */
 	color: #999999;
 	font-size: 26px;

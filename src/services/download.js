@@ -102,7 +102,7 @@ export default {
             const [songPlaybackInfo, lyricData, coverUrl] = await Promise.all([
                 apiService.getSongPlaybackInfo(songToDownload.id, downloadBitrate, cookie),
                 apiService.getLyricData(songToDownload.id, cookie),
-                apiService.getSongCoverUrl(songToDownload.id, 200, cookie).catch(() => '')
+                apiService.getSongCoverUrl(songToDownload.id, 96, cookie).catch(() => '')
             ]);
 
             if (!songPlaybackInfo?.url) {

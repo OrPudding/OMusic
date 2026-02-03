@@ -1,0 +1,280 @@
+<template>
+	<div class="container">
+		<div class="header" onclick="goBack">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹Debug</text>
+		</div>
+
+		<div class="body">
+			<div class="pill" onclick="optimizeAllLyrics">
+				<text class="pill-text">优化全部歌词</text>
+			</div>
+			<div class="pill" onclick="clearLyricsDir">
+				<text class="pill-text">清空歌词缓存</text>
+			</div>
+			<div class="pill" onclick="clearCoverDir">
+				<text class="pill-text">清空封面缓存</text>
+			</div>
+			<div class="pill" onclick="clearSonglistsDir">
+				<text class="pill-text">清空歌单缓存</text>
+			</div>
+			<div class="pill" onclick="fetchServerMessage">
+				<text class="pill-text">拉取服务器消息</text>
+			</div>
+		</div>
+	</div>
+</template>
+
+<script>
+import router from "@system.router";
+import file from "@system.file";
+import prompt from "@system.prompt";
+import apiService from "../../services/api.js";
+import {
+	isCookedLyricFormat,
+	cookLyricsFromRaw,
+	makeFallbackCooked,
+} from "../../utils/lyric_cook.js";
+
+const PATHS = {
+	lyricsDir: "internal://files/lyrics/",
+	coverDir: "internal://files/cover/",
+	songlistsDir: "internal://files/songlists/",
+};
+
+const fs = {
+	p(fn, opts) {
+		return new Promise((res, rej) => {
+			fn({ ...opts, success: res, fail: () => rej() });
+		});
+	},
+	get(uri, r) {
+		return this.p(file.get, { uri, recursive: !!r });
+	},
+	readText(uri) {
+		return this.p(file.readText, { uri });
+	},
+	writeText(uri, t) {
+		return this.p(file.writeText, { uri, text: String(t) });
+	},
+	rmdir(uri) {
+		return this.p(file.rmdir, { uri, recursive: true });
+	},
+	mkdir(uri) {
+		return this.p(file.mkdir, { uri, recursive: true });
+	},
+};
+
+function collectJson(node, out) {
+	if (!node) return;
+	if (node.type === "file" && node.uri.endsWith(".json")) out.push(node.uri);
+	(node.subFiles || []).forEach((n) => collectJson(n, out));
+}
+
+export default {
+	private: {
+		currentTime: "00:00",
+		timer: null,
+		busy: false,
+	},
+
+	onInit() {
+		this.updateTime();
+		this.timer = setInterval(this.updateTime, 1000);
+	},
+
+	onDestroy() {
+		if (this.timer) clearInterval(this.timer);
+	},
+
+	updateTime() {
+		const d = new Date();
+		this.currentTime =
+			d.getHours().toString().padStart(2, "0") +
+			":" +
+			d.getMinutes().toString().padStart(2, "0");
+	},
+
+	goBack() {
+		router.back();
+	},
+
+	toast(m) {
+		prompt.showToast({ message: String(m), duration: 1500 });
+	},
+
+	async run(fn) {
+		if (this.busy) return this.toast("正在执行");
+		this.busy = true;
+		try {
+			await fn();
+		} finally {
+			this.busy = false;
+		}
+	},
+
+	optimizeAllLyrics() {
+		this.run(async () => {
+			this.toast("开始扫描歌词");
+
+			let tree;
+			try {
+				tree = await fs.get(PATHS.lyricsDir, true);
+			} catch {
+				return this.toast("读取目录失败");
+			}
+
+			const files = [];
+			collectJson(tree, files);
+
+			let upgraded = 0;
+
+			for (const uri of files) {
+				const name = uri.split("/").pop();
+				if (!/^\d+\.json$/.test(name)) continue;
+
+				try {
+					const txt = (await fs.readText(uri)).text || "";
+					let obj;
+					try {
+						obj = JSON.parse(txt);
+					} catch {
+						const id = name.replace(".json", "");
+						await fs.writeText(
+							uri,
+							JSON.stringify(makeFallbackCooked(id, "歌词损坏"))
+						);
+						upgraded++;
+						continue;
+					}
+
+					if (isCookedLyricFormat(obj)) continue;
+
+					const id = name.replace(".json", "");
+					await fs.writeText(uri, JSON.stringify(cookLyricsFromRaw(obj, id)));
+					upgraded++;
+				} catch {}
+			}
+
+			this.toast("处理完成 " + upgraded + " 首");
+		});
+	},
+
+	clearLyricsDir() {
+		this.run(async () => {
+			try {
+				await fs.rmdir(PATHS.lyricsDir);
+			} catch {}
+			this.toast("lyrics已清空,建议重启应用确保数据正常刷新");
+		});
+	},
+
+	clearCoverDir() {
+		this.run(async () => {
+			try {
+				await fs.rmdir(PATHS.coverDir);
+			} catch {}
+			this.toast("cover已清空,建议重启应用确保数据正常刷新");
+		});
+	},
+
+	clearSonglistsDir() {
+		this.run(async () => {
+			try {
+				await fs.rmdir(PATHS.songlistsDir);
+			} catch {}
+			this.toast("songlists已清空,建议重启应用确保数据正常刷新");
+		});
+	},
+
+	fetchServerMessage() {
+		this.run(async () => {
+			const fn = ["getServerMessage", "getAnnouncement", "getNotice"].find(
+				(k) => typeof apiService[k] === "function"
+			);
+			if (!fn) return this.toast("未找到接口");
+
+			try {
+				const res = await apiService[fn]();
+				this.toast("收到服务器消息");
+				console.log("server message:", res);
+			} catch {
+				this.toast("请求失败");
+			}
+		});
+	},
+};
+</script>
+
+<style>
+.container {
+	width: 100%;
+	height: 100%;
+	flex-direction: column;
+	align-items: center;
+	background-color: #000;
+}
+
+.header {
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
+
+.title {
+	font-size: 32px;
+	padding: 5px;
+	text-align: center;
+	font-weight: bold;
+	color: #ffffff;
+}
+
+.body {
+	flex: 1;
+	width: 100%;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+}
+
+.pill {
+	background-color: #bac3ff;
+	padding: 8px 8px;
+	border-radius: 24px;
+	margin-bottom: 18px;
+	align-items: center;
+}
+
+.pill-text {
+	color: #000000;
+	font-size: 26px;
+	font-weight: bold;
+	text-align: center;
+}
+
+/* 横屏适配补回 */
+@media screen and (shape: rect) {
+	.header {
+		padding-top: 10px;
+		height: 65px;
+		flex-direction: row-reverse;
+		justify-content: space-around;
+	}
+
+	.time-display {
+		font-size: 32px;
+		padding-top: 0;
+	}
+}
+</style>

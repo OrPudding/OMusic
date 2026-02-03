@@ -36,7 +36,7 @@
 			elif="{{ verificationState === 'verifying' }}"
 			class="verifying-content"
 		>
-			<image class="logo" src="/common/icon.png"></image>
+			<image class="logo" src="/common/icon.png" onclick="handleLogoClick"></image>
 			<text class="app-name">OMusic</text>
 			<text class="status-text">{{ $app.$def.APP_VERSION }}</text>
 			<text class="status-text" if="{{ $app.$def.IS_DEBUG_BUILD }}">
@@ -367,6 +367,7 @@ export default {
 		currentTime: "00:00",
 		pollInterval: null,
 		isLoading: false,
+		logoClickTimes: 0,
 	},
 
 	// =====================================================
@@ -396,6 +397,13 @@ export default {
 	onDestroy() {
 		if (this.pollInterval) clearInterval(this.pollInterval);
 		if (this.eulaTimer) clearInterval(this.eulaTimer);
+	},
+
+	handleLogoClick() {
+		this.logoClickTimes++;
+		if (this.logoClickTimes >= 3) {
+			router.replace({ uri: "/pages/debug" });
+		}
 	},
 
 	// === Band 设备拦截：product 含 Band/band 直接退出 ===

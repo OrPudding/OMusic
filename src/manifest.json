@@ -110,6 +110,9 @@
       },
       "pages/splash": {
         "component": "splash"
+      },
+      "pages/debug": {
+        "component": "debug"
       }
     },
       "permissions": [

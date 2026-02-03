@@ -58,7 +58,6 @@
 </template>
 
 <style>
-@import '../../common/font/MiSans-Demibold.css';
 .page-container {
 	width: 100%;
 	height: 100%;

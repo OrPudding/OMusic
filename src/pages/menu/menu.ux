@@ -266,7 +266,6 @@ export default {
 </script>
 
 <style>
-@import '../../common/font/MiSans-Demibold.css';
 /* 样式部分完全不变 */
 .container {
 	width: 100%;

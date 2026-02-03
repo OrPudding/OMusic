@@ -67,7 +67,7 @@
 					<!-- 清空播放列表（仅 playlist） -->
 					<div
 						class="group-button little-buttons"
-						onclick="clearPlayList"
+						onclick="clearPlaylist"
 						if="{{ listType === 'playlist' }}"
 					>
 						<image class="button-icon" src="/common/icon/delete.png"></image>
@@ -239,7 +239,6 @@ listType === 'playlist') }}"
 </template>
 
 <style>
-@import '../../common/font/MiSans-Demibold.css';
 .page-container {
 	width: 100%;
 	height: 100%;
