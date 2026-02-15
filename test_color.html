@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monet Color Cards</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 16px;
+      font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Arial;
+    }
+    header { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border: 1px solid #00000022; border-radius: 12px;
+    }
+    .sw { width: 28px; height: 28px; border-radius: 9px; border: 1px solid #00000022; }
+    h2 { margin: 18px 0 10px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .card {
+      border: 1px solid #00000022; border-radius: 14px; overflow: hidden;
+      background: #ffffff80;
+    }
+    .bar { height: 44px; }
+    .meta { padding: 10px 12px; display: flex; justify-content: space-between; gap: 10px; }
+    .name { font-weight: 600; }
+    .hex { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; opacity: .8; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="chip">
+      <div class="sw" style="background:#7FA127;"></div>
+      <div>
+        <div class="name">sourceColor</div>
+        <div class="hex">#FF7FA127</div>
+      </div>
+    </div>
+  </header>
+
+  <h2>LIGHT (SchemeAndroid)</h2>
+  <div class="grid" id="light"></div>
+
+  <h2>DARK (SchemeAndroid)</h2>
+  <div class="grid" id="dark"></div>
+
+  <script>
+    // Note: we drop the alpha (last 2 hex) for CSS (or keep it as #RRGGBBAA if you prefer).
+    const LIGHT = [
+      ["accentSurface", "#EDF4D2FF"],
+      ["colorAccentPrimary", "#CAF06EFF"],
+      ["colorAccentPrimaryVariant", "#4D6700FF"],
+      ["colorAccentSecondary", "#DFE6C5FF"],
+      ["colorAccentSecondaryVariant", "#5A6147FF"],
+      ["colorAccentTertiary", "#BCECE3FF"],
+      ["colorAccentTertiaryVariant", "#39665FFF"],
+      ["colorBackground", "#F2F1E9FF"],
+      ["colorBackgroundFloating", "#FBF9F1FF"],
+      ["colorSurface", "#FBF9F1FF"],
+      ["colorSurfaceHighlight", "#FFFFFFFF"],
+      ["colorSurfaceVariant", "#E4E3DBFF"],
+      ["offState", "#30312CFF"],
+      ["scrim", "#C8C7BFFF"],
+      ["surfaceHeader", "#E4E3DBFF"],
+      ["textColorPrimary", "#1B1C17FF"],
+      ["textColorPrimaryInverse", "#F2F1E9FF"],
+      ["textColorSecondary", "#45483CFF"],
+      ["textColorSecondaryInverse", "#C8C7BFFF"],
+      ["textColorTertiary", "#76786BFF"],
+      ["textColorTertiaryInverse", "#91918AFF"],
+      ["textPrimaryOnAccent", "#1B1C17FF"],
+      ["textSecondaryOnAccent", "#45483CFF"],
+      ["underSurface", "#000000FF"],
+      ["volumeBackground", "#3B3C36FF"],
+    ];
+
+    const DARK = [
+      ["accentSurface", "#EDF4D2FF"],
+      ["colorAccentPrimary", "#CAF06EFF"],
+      ["colorAccentPrimaryVariant", "#94B83CFF"],
+      ["colorAccentSecondary", "#DFE6C5FF"],
+      ["colorAccentSecondaryVariant", "#A7AF90FF"],
+      ["colorAccentTertiary", "#BCECE3FF"],
+      ["colorAccentTertiaryVariant", "#86B4ACFF"],
+      ["colorBackground", "#1B1C17FF"],
+      ["colorBackgroundFloating", "#1B1C17FF"],
+      ["colorSurface", "#30312CFF"],
+      ["colorSurfaceHighlight", "#52534DFF"],
+      ["colorSurfaceVariant", "#474742FF"],
+      ["offState", "#30312CFF"],
+      ["scrim", "#C8C7BFFF"],
+      ["surfaceHeader", "#474742FF"],
+      ["textColorPrimary", "#F2F1E9FF"],
+      ["textColorPrimaryInverse", "#1B1C17FF"],
+      ["textColorSecondary", "#C6C8B8FF"],
+      ["textColorSecondaryInverse", "#474742FF"],
+      ["textColorTertiary", "#909284FF"],
+      ["textColorTertiaryInverse", "#777771FF"],
+      ["textPrimaryOnAccent", "#1B1C17FF"],
+      ["textSecondaryOnAccent", "#45483CFF"],
+      ["underSurface", "#000000FF"],
+      ["volumeBackground", "#3B3C36FF"],
+    ];
+
+    function cssColor(hex8) {
+      // Turn #RRGGBBAA into CSS #RRGGBB (alpha is always FF here anyway)
+      return hex8.slice(0, 7);
+    }
+
+    function render(targetId, items) {
+      const el = document.getElementById(targetId);
+      el.innerHTML = items.map(([name, hex]) => `
+        <div class="card">
+          <div class="bar" style="background:${cssColor(hex)}"></div>
+          <div class="meta">
+            <div class="name">${name}</div>
+            <div class="hex">${hex}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    render("light", LIGHT);
+    render("dark", DARK);
+  </script>
+</body>
+</html>

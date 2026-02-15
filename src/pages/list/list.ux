@@ -424,6 +424,8 @@ listType === 'playlist') }}"
 	font-weight: bold;
 	text-align: center;
 	line-height: 50px;
+	box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+
 }
 .item-value-btn-disabled {
 	background-color: #191821;
