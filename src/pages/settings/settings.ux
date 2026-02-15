@@ -6,7 +6,6 @@
 			<text class="time-display">{{ currentTime }}</text>
 			<text class="title">{{ titleText }}</text>
 		</div>
-
 		<!-- 2. 唯一的、可独立滚动的内容区 -->
 		<scroll
 			id="settings-scroller"
@@ -535,6 +534,10 @@ const GESTURE_ACTION_TEXTS = {
                 router.back();
             }
         },
+		onBackPress(){
+			this.goBack();
+			return true;
+		},
 
         updateTime() { const now = new Date(); this.currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`; },
     // 【修正】统一加载逻辑，与 player.js 保持一致
