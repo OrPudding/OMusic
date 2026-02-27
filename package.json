@@ -1,19 +1,30 @@
 {
-  "name": "betterncm",
+  "name": "OMusic",
   "version": "1.0.0",
   "description": "",
   "engines": {
     "node": ">=8.10"
   },
   "scripts": {
-    "start": "aiot server --watch --open-nuttx",
+    "start": "aiot start --watch",
     "build": "aiot build",
-    "release": "aiot release --enable-image-png8 --enable-protobuf --enable-jsc",
-    "watch": "aiot watch --open-nuttx",
+    "release": "aiot release --enable-jsc --enable-protobuf --enable --complete-feature --enable-image-png8",
     "lint": "eslint --format codeframe --fix --ext .ux,.js src/"
   },
+  "lint-staged": {
+    "*.{ux,js}": [
+      "prettier --write",
+      "eslint --format codeframe --fix",
+      "git add"
+    ],
+    "*.{less,css}": [
+      "prettier --write",
+      "stylelint --fix --custom-syntax postcss-less",
+      "git add"
+    ]
+  },
   "devDependencies": {
-    "@aiot-toolkit/jsc": "^1.0.8",
+    "@aiot-toolkit/jsc": "^1.0.3",
     "aiot-toolkit": "^2.0.5"
   }
 }

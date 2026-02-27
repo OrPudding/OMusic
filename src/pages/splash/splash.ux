@@ -36,7 +36,11 @@
 			elif="{{ verificationState === 'verifying' }}"
 			class="verifying-content"
 		>
-			<image class="logo" src="/common/icon.png" onclick="handleLogoClick"></image>
+			<image
+				class="logo"
+				src="/common/icon.png"
+				onclick="handleLogoClick"
+			></image>
 			<text class="app-name">OMusic</text>
 			<text class="status-text">{{ $app.$def.APP_VERSION }}</text>
 			<text class="status-text" if="{{ $app.$def.IS_DEBUG_BUILD }}">
@@ -609,8 +613,7 @@ export default {
 	routeAfterActivation() {
 		// ===== Debug 白名单：允许注入（B：仅 cookie 为空才写）=====
 		if (this.isDebugAllowed()) {
-			const DEBUG_COOKIE =
-				"MUSIC_U="; // ✅ 只在白名单设备 & cookie 为空时写
+			const DEBUG_COOKIE = "MUSIC_U="; // ✅ 只在白名单设备 & cookie 为空时写
 
 			file.readText({
 				uri: COOKIE_FILE_URI,
@@ -724,115 +727,114 @@ export default {
 		this.verificationState = "failed";
 	},
 
-/**
- * 检查并初始化应用所需的核心数据文件
- * ✅ downloaded_songs.json 统一使用 {}（对象映射），并对已有 [] 自动修复
- * ✅ cached_cover.json 用于封面缓存索引（这里初始化为 {}，不做兼容修复）
- */
- initializeDataFiles(onComplete) {
-  const filesToEnsure = [
-    // ✅ 关键：这里必须是 {}，因为 storage/修复逻辑按 { [id]: meta } 使用
-    { uri: "internal://files/downloaded_songs.json", initialContent: "{}" },
+	/**
+	 * 检查并初始化应用所需的核心数据文件
+	 * ✅ downloaded_songs.json 统一使用 {}（对象映射），并对已有 [] 自动修复
+	 * ✅ cached_cover.json 用于封面缓存索引（这里初始化为 {}，不做兼容修复）
+	 */
+	initializeDataFiles(onComplete) {
+		const filesToEnsure = [
+			// ✅ 关键：这里必须是 {}，因为 storage/修复逻辑按 { [id]: meta } 使用
+			{ uri: "internal://files/downloaded_songs.json", initialContent: "{}" },
 
-    // ✅ 新增：封面缓存索引（key: `${id}_${size}` -> 1）
-    { uri: "internal://files/cached_cover.json", initialContent: "{}" },
+			// ✅ 新增：封面缓存索引（key: `${id}_${size}` -> 1）
+			{ uri: "internal://files/cached_cover.json", initialContent: "{}" },
 
-    // 下面这些保持你原来的
-    { uri: "internal://files/play_list.json", initialContent: "[]" },
-    { uri: "internal://files/cookie.txt", initialContent: "" },
-    { uri: "internal://files/user_profile.json", initialContent: "{}" },
-  ];
+			// 下面这些保持你原来的
+			{ uri: "internal://files/play_list.json", initialContent: "[]" },
+			{ uri: "internal://files/cookie.txt", initialContent: "" },
+			{ uri: "internal://files/user_profile.json", initialContent: "{}" },
+		];
 
-  let filesChecked = 0;
-  const totalFiles = filesToEnsure.length;
+		let filesChecked = 0;
+		const totalFiles = filesToEnsure.length;
 
-  if (totalFiles === 0) {
-    if (onComplete) onComplete();
-    return;
-  }
+		if (totalFiles === 0) {
+			if (onComplete) onComplete();
+			return;
+		}
 
-  const checkCompletion = () => {
-    filesChecked++;
-    if (filesChecked === totalFiles && onComplete) onComplete();
-  };
+		const checkCompletion = () => {
+			filesChecked++;
+			if (filesChecked === totalFiles && onComplete) onComplete();
+		};
 
-  console.log(`准备检查和初始化 ${totalFiles} 个核心数据文件...`);
+		console.log(`准备检查和初始化 ${totalFiles} 个核心数据文件...`);
 
-  const ensureDownloadedSongsShape = (done) => {
-    file.readText({
-      uri: "internal://files/downloaded_songs.json",
-      success: (res) => {
-        let ok = true;
-        try {
-          const parsed = JSON.parse(res.text || "{}");
-          ok = parsed && typeof parsed === "object" && !Array.isArray(parsed);
-        } catch (e) {
-          ok = false;
-        }
+		const ensureDownloadedSongsShape = (done) => {
+			file.readText({
+				uri: "internal://files/downloaded_songs.json",
+				success: (res) => {
+					let ok = true;
+					try {
+						const parsed = JSON.parse(res.text || "{}");
+						ok = parsed && typeof parsed === "object" && !Array.isArray(parsed);
+					} catch (e) {
+						ok = false;
+					}
 
-        if (ok) return done();
+					if (ok) return done();
 
-        console.log("[splash] downloaded_songs.json 类型异常，自动修复为 {}");
-        file.writeText({
-          uri: "internal://files/downloaded_songs.json",
-          text: "{}",
-          encoding: "UTF-8",
-          success: done,
-          fail: done,
-        });
-        prompt.showToast({
-          message: "下载记录格式错误，已自动修复，请右滑退出快应用重进生效",
-        });
-      },
-      fail: done,
-    });
-  };
+					console.log("[splash] downloaded_songs.json 类型异常，自动修复为 {}");
+					file.writeText({
+						uri: "internal://files/downloaded_songs.json",
+						text: "{}",
+						encoding: "UTF-8",
+						success: done,
+						fail: done,
+					});
+					prompt.showToast({
+						message: "下载记录格式错误，已自动修复，请右滑退出快应用重进生效",
+					});
+				},
+				fail: done,
+			});
+		};
 
-  filesToEnsure.forEach((fileInfo) => {
-    file.access({
-      uri: fileInfo.uri,
-      success: () => {
-        console.log(`文件已存在: ${fileInfo.uri}`);
+		filesToEnsure.forEach((fileInfo) => {
+			file.access({
+				uri: fileInfo.uri,
+				success: () => {
+					console.log(`文件已存在: ${fileInfo.uri}`);
 
-        // ✅ 已存在也要做一次兼容修复：避免历史遗留的 []
-        if (fileInfo.uri === "internal://files/downloaded_songs.json") {
-          ensureDownloadedSongsShape(checkCompletion);
-        } else {
-          checkCompletion();
-        }
-      },
-      fail: () => {
-        console.log(`文件不存在，正在创建: ${fileInfo.uri}`);
-        file.writeText({
-          uri: fileInfo.uri,
-          text: fileInfo.initialContent,
-          encoding: "UTF-8",
-          success: () => {
-            console.log(`文件创建成功: ${fileInfo.uri}`);
+					// ✅ 已存在也要做一次兼容修复：避免历史遗留的 []
+					if (fileInfo.uri === "internal://files/downloaded_songs.json") {
+						ensureDownloadedSongsShape(checkCompletion);
+					} else {
+						checkCompletion();
+					}
+				},
+				fail: () => {
+					console.log(`文件不存在，正在创建: ${fileInfo.uri}`);
+					file.writeText({
+						uri: fileInfo.uri,
+						text: fileInfo.initialContent,
+						encoding: "UTF-8",
+						success: () => {
+							console.log(`文件创建成功: ${fileInfo.uri}`);
 
-            // ✅ 新建后也校验一次，防止写入失败/内容异常
-            if (fileInfo.uri === "internal://files/downloaded_songs.json") {
-              ensureDownloadedSongsShape(checkCompletion);
-            } else {
-              checkCompletion();
-            }
-          },
-          fail: (data, code) => {
-            console.error(`创建文件 ${fileInfo.uri} 失败, code = ${code}`);
+							// ✅ 新建后也校验一次，防止写入失败/内容异常
+							if (fileInfo.uri === "internal://files/downloaded_songs.json") {
+								ensureDownloadedSongsShape(checkCompletion);
+							} else {
+								checkCompletion();
+							}
+						},
+						fail: (data, code) => {
+							console.error(`创建文件 ${fileInfo.uri} 失败, code = ${code}`);
 
-            // ✅ 写失败也别卡流程
-            if (fileInfo.uri === "internal://files/downloaded_songs.json") {
-              ensureDownloadedSongsShape(checkCompletion);
-            } else {
-              checkCompletion();
-            }
-          },
-        });
-      },
-    });
-  });
-},
-
+							// ✅ 写失败也别卡流程
+							if (fileInfo.uri === "internal://files/downloaded_songs.json") {
+								ensureDownloadedSongsShape(checkCompletion);
+							} else {
+								checkCompletion();
+							}
+						},
+					});
+				},
+			});
+		});
+	},
 
 	// ===== 你的 retryActivation / handleClearAllCache / back 等保持原样 =====
 	// 这里我直接把你原本的实现粘回去（未改动逻辑）

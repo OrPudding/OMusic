@@ -23,9 +23,10 @@
 					</div>
 				</div>
 			</block>
+		
 			<block else>
 				<div class="guidance-panel" onclick="handleManualRefresh">
-					<text class="guidance-title">等待同步</text>
+					<text class="guidance-title">等待刷新</text>
 					<div class="icon-wrapper">
 						<image
 							class="status-icon"
@@ -33,7 +34,7 @@
 						></image>
 					</div>
 					<text class="guidance-text">用户信息待刷新</text>
-					<text class="guidance-text-small">请下拉或点击此处进行同步</text>
+					<text class="guidance-text-small">请下拉或点击此处进行刷新</text>
 				</div>
 			</block>
 

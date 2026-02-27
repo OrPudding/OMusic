@@ -69,7 +69,6 @@
 import router from "@system.router";
 import prompt from "@system.prompt";
 import app from "@system.app";
-
 export default {
 	private: {
 		currentTime: "",
