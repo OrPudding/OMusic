@@ -6,9 +6,11 @@
 		</div>
 
 		<div class="body">
+			<input type="text" class="search-input" placeholder="搜索"></input>
 			<div class="pill" onclick="optimizeAllLyrics">
 				<text class="pill-text">优化全部歌词</text>
 			</div>
+			
 			<div class="pill" onclick="clearLyricsDir">
 				<text class="pill-text">清空歌词缓存</text>
 			</div>

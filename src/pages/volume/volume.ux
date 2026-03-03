@@ -1,18 +1,21 @@
 <template>
 	<div class="volume">
-		<div class="song">
-			<marquee class="song-name" scrollamount="36" onclick="goBack">
-				{{ currentSong.name || "未知歌曲" }}
+		<div class="song" onclick="searchCurrentArtist">
+			<marquee class="song-name" scrollamount="36">
+				{{ songName || "未知歌曲" }}
 			</marquee>
 			<marquee class="singer-name" scrollamount="36">
-				{{ currentSong.artists || "未知歌手" }}
+				{{ songArtists || "未知歌手" }}
 			</marquee>
 		</div>
-        <div class="time-info-container">
-        <text class="time-hint" show="{{ sleepEnabled }}">
-            定时关闭于{{sleepRemainingMin}}分钟后({{ sleepEndTime }})
-        </text>
-    </div>
+		<div class="time-info-container" onclick="goBack">
+			<text class="time-hint" if="{{ sleepEnabled }}">
+				定时关闭于{{ sleepRemainingMin }}分钟后({{ sleepEndTime }})
+			</text>
+			<text class="time-hint" if="{{ !sleepEnabled }}">
+				{{ currentTime }}
+			</text>
+		</div>
 		<!-- 操作控制 -->
 		<div class="control-container">
 			<!-- 收藏图标 (所有屏幕都显示) -->
@@ -107,7 +110,7 @@ import audio from "@system.audio";
 import file from "@system.file";
 import prompt from "@system.prompt";
 
-// ✅ 不再在页面里 setTimeout / terminate，所以不需要 app 模块了
+// 不再在页面里 setTimeout / terminate，所以不需要 app 模块了
 // import app from "@system.app";
 
 const CONSTANTS = {
@@ -165,7 +168,23 @@ export default {
 	},
 
 	computed: {
-		// ✅ 角标只读“UI状态字段”，由 app.ux 的定时器决定
+		playTick() {
+        return this.$app.$def.player.playerState.playDuration;
+    },
+		songName() {
+			this.playTick;
+
+			const name = this.$app.$def.player.currSong?.name;
+			return name || "暂无播放";
+		},
+
+		songArtists() {
+			this.playTick;
+
+			const artists = this.$app.$def.player.currSong?.artists;
+			return artists || "";
+		},
+		// 角标只读“UI状态字段”，由 app.ux 的定时器决定
 		sleepBadgeIcon() {
 			return this.sleepEnabled ? "/common/icon/waiting_icon.png" : null;
 		},
@@ -190,21 +209,20 @@ export default {
 	},
 
 	protected: {
-        currentTime: "",
-        sleepEndTime: "",
-		currentSong: {},
+		currentTime: "",
+		sleepEndTime: "",
 		screenShape: "circle",
 		playMode: 0,
 		isDownloading: false,
 		isFmMode: false,
 
-		// ✅ 仅用于 UI 展示（真正定时器在 app.ux）
+		// 仅用于 UI 展示（真正定时器在 app.ux）
 		sleepEnabled: false,
 		sleepRemainingMin: 0,
 	},
 
 	async onInit() {
-        this.updateTime();
+		this.updateTime();
 		this.volume = audio.volume * 100;
 
 		this.screenShape = this.screenShape || "circle";
@@ -227,15 +245,15 @@ export default {
 		}
 
 		await this.loadInitialState();
-		this.syncSleepFromApp(); // ✅ 初始化同步一次角标状态
+		this.syncSleepFromApp(); // 初始化同步一次角标状态
 	},
 
 	async onShow() {
 		await this.loadInitialState();
-		this.syncSleepFromApp(); // ✅ 每次回来都同步一次（避免页面重建/切换造成错位）
+		this.syncSleepFromApp(); // 每次回来都同步一次（避免页面重建/切换造成错位）
 	},
 
-    onDestroy() {
+	onDestroy() {
 		if (this.timer) clearInterval(this.timer);
 		this.timer = null;
 	},
@@ -250,36 +268,58 @@ export default {
 		this.currentTime = `${hours}:${minutes}`;
 	},
 
-	// =======================
-	// ✅ app.ux 定时器对接
-	// =======================
-
-    syncSleepFromApp() {
-  const appInst = this.$app.$def;
-  if (!appInst || typeof appInst.getSleepTimerInfo !== "function") {
-    this.sleepEnabled = false;
-    this.sleepRemainingMin = 0;
-    this.sleepEndTime = "";   // ✅ 补上
-    return;
-  }
-
-  const info = appInst.getSleepTimerInfo();
-  const remainingMs = info && info.remainingMs ? info.remainingMs : 0;
-
-  const enabled = !!(info && info.enabled && remainingMs > 0);
-  this.sleepEnabled = enabled; 
-  this.sleepRemainingMin = remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
-
-  // ✅ 关键：算出结束时刻，写到 sleepEndTime，让小字能显示正确时间
-  if (enabled) {
-    const end = new Date(Date.now() + remainingMs);
-    const hh = String(end.getHours()).padStart(2, "0");
-    const mm = String(end.getMinutes()).padStart(2, "0");
-    this.sleepEndTime = `${hh}:${mm}`;
-  } else {
-    this.sleepEndTime = "";
-  }
+	searchCurrentArtist() {
+    prompt.showDialog({
+        title: "搜索歌手",
+        message: `确定要搜索“${this.currentSong.artists}”的相关作品吗？`,
+        success: () => {
+            // 用户点击勾，执行跳转
+            prompt.showToast({ message: "正在搜索..." });
+            router.push({
+                uri: "pages/search",
+                params: {
+                    textValue: this.currentSong.artists,
+                },
+            });
+        },
+        cancel: () => {
+            // 用户点击叉，给出提示（可选）
+            prompt.showToast({ message: "已取消" });
+        }
+    });
 },
+
+	// =======================
+	// app.ux 定时器对接
+	// =======================
+
+	syncSleepFromApp() {
+		const appInst = this.$app.$def;
+		if (!appInst || typeof appInst.getSleepTimerInfo !== "function") {
+			this.sleepEnabled = false;
+			this.sleepRemainingMin = 0;
+			this.sleepEndTime = ""; // 补上
+			return;
+		}
+
+		const info = appInst.getSleepTimerInfo();
+		const remainingMs = info && info.remainingMs ? info.remainingMs : 0;
+
+		const enabled = !!(info && info.enabled && remainingMs > 0);
+		this.sleepEnabled = enabled;
+		this.sleepRemainingMin =
+			remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
+
+		// 关键：算出结束时刻，写到 sleepEndTime，让小字能显示正确时间
+		if (enabled) {
+			const end = new Date(Date.now() + remainingMs);
+			const hh = String(end.getHours()).padStart(2, "0");
+			const mm = String(end.getMinutes()).padStart(2, "0");
+			this.sleepEndTime = `${hh}:${mm}`;
+		} else {
+			this.sleepEndTime = "";
+		}
+	},
 
 	_setSleepInApp(minutes) {
 		const appInst = this.$app.$def;
@@ -309,13 +349,13 @@ export default {
 	// =======================
 
 	handleSleepTimerClick() {
-		// ✅ 已经设置：点一下直接取消（更符合直觉）
+		// 已经设置：点一下直接取消（更符合直觉）
 		this.syncSleepFromApp();
 		if (this.sleepEnabled) {
 			this._cancelSleepInApp(true);
 			return;
 		}
-		// ✅ 未设置：打开键盘输入
+		// 未设置：打开键盘输入
 		this.openSleepKeypad();
 	},
 
@@ -355,7 +395,7 @@ export default {
 		const minutes = Math.max(1, Math.min(9999, p));
 		this.closeSleepKeypad();
 
-		// ✅ 真正的 setTimeout 在 app.ux
+		// 真正的 setTimeout 在 app.ux
 		const ok = this._setSleepInApp(minutes);
 
 		if (ok) {
@@ -487,11 +527,11 @@ export default {
 }
 .time-info-container {
 	width: 100%;
-    margin-top: 8px;
+	margin-top: 8px;
 	height: 42px;
 	justify-content: center;
 	align-items: center;
-    flex-direction: column;
+	flex-direction: column;
 }
 .time-hint {
 	font-size: 26px;

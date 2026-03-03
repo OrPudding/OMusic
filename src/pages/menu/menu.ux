@@ -7,12 +7,20 @@
 		</div>
 		<!-- 2. 独立滚动的内容区域 -->
 		<scroll class="scroll-wrapper" scroll-y="true">
-			<div class="search-box" onclick="goToSearch">
+			<div class="search-box" onclick="goToSearch"> 
 				<div class="box-icon-wrapper">
 					<image class="box-item-icon" src="/common/icon/search.png"></image>
 				</div>
 				<text class="box-item-text">搜索</text>
 			</div>
+			<div class="downloading-box" onclick="goToDownloadingList">
+				<div class="box-icon-wrapper">
+					<image class="box-item-icon" src="/common/icon/downloaded.png"></image>
+				</div>
+
+				<text class="box-item-text">{{ downloadingSongName || "暂无下载任务" }}</text>
+			</div>
+
 			<div class="music-card" onclick="back">
 				<!-- a. 左侧封面 -->
 				<image class="card-cover" src="{{ songCoverUrl }}"></image>
@@ -114,32 +122,29 @@ export default {
 			},
 			{ text: "个人中心", handler: "goToUser", icon: "/common/icon/user.png" },
 		],
-		pressedKey: "",
-		pressedAnimKey: "",
-		pressedAnim: "",
-		scrollLock: false, // 语义：true = 最近滚动过/正在滚动，禁止跳转
-		_scrollUnlockTimer: null, // 300ms 解锁用
-		_scrollThrottleTimer: null, // 32ms 节流用
 	},
 
 	computed: {
+		playTick() {
+        return this.$app.$def.player.playerState.playDuration;
+    },
 		songCoverUrl() {
-			// 🔥 强制依赖一个一定会变化的值（你这边进度能刷，说明它能触发重算）
-			const _tick = this.$app.$def.player.playerState.playDuration;
+			//  强制依赖一个一定会变化的值（它能触发重算）
+			this.playTick;
 
 			const coverUrl = this.$app.$def.player.currSong?.coverUrl;
 			return coverUrl || "/common/icon/more_light.png";
 		},
 
 		songName() {
-			const _tick = this.$app.$def.player.playerState.playDuration;
+			this.playTick;
 
 			const name = this.$app.$def.player.currSong?.name;
 			return name || "暂无播放";
 		},
 
 		songArtists() {
-			const _tick = this.$app.$def.player.playerState.playDuration;
+			this.playTick;
 
 			const artists = this.$app.$def.player.currSong?.artists;
 			return artists || "点击前往播放器页";
@@ -311,6 +316,17 @@ export default {
 	align-items: center;
 	justify-content: space-between;
 }
+.downloading-box {
+    width: 370px;  /* 与 music-card 宽度一致 */
+    height: 64px;
+    padding: 12px 12px;
+    border-radius: 32px;
+    margin-bottom: 10px;
+    background-color: #2e323c;
+    flex-direction: row;
+    align-items: center;
+	justify-content: space-between;
+}
 .box-icon-wrapper {
 	padding: 4px 5px 6px 5px;
 	border-radius: 30px;
@@ -321,6 +337,7 @@ export default {
 	height: 32px;
 }
 .box-item-text {
+	text-align: center;
 	padding-right: 22px;
 	font-size: 26px;
 	font-weight: bold;

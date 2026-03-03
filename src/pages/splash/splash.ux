@@ -406,7 +406,22 @@ export default {
 	handleLogoClick() {
 		this.logoClickTimes++;
 		if (this.logoClickTimes >= 3) {
-			router.replace({ uri: "/pages/debug" });
+			// 重置点击次数，避免重复触发
+			this.logoClickTimes = 0;
+
+			// 弹出确认对话框
+			prompt.showDialog({
+				title: "调试模式",
+				message: "确定要进入调试页面吗？",
+				success: () => {
+					prompt.showToast({ message: "正在进入调试页面..." });
+					router.replace({ uri: "/pages/debug" });
+				},
+				cancel: () => {
+					// 用户取消时给个提示（可选）
+					prompt.showToast({ message: "已取消" });
+				},
+			});
 		}
 	},
 
@@ -569,7 +584,7 @@ export default {
 		if (this.hasScrolledToEnd && this.agreeButtonCountdown === 0) {
 			if (this.eulaTimer) clearInterval(this.eulaTimer);
 			this.isAgreeButtonActive = true;
-			this.agreeButtonText = "同意并继续"; // ✅ 保底
+			this.agreeButtonText = "同意并继续"; // 保底
 			console.log("同意按钮已激活。");
 		}
 	},
@@ -613,7 +628,7 @@ export default {
 	routeAfterActivation() {
 		// ===== Debug 白名单：允许注入（B：仅 cookie 为空才写）=====
 		if (this.isDebugAllowed()) {
-			const DEBUG_COOKIE = "MUSIC_U="; // ✅ 只在白名单设备 & cookie 为空时写
+			const DEBUG_COOKIE = "MUSIC_U="; // 只在白名单设备 & cookie 为空时写
 
 			file.readText({
 				uri: COOKIE_FILE_URI,
@@ -634,7 +649,7 @@ export default {
 						}
 
 						if (needInject) {
-							// ✅ 写 pending，让 user.ux 走“等待同步/下拉刷新”流程
+							// 写 pending，让 user.ux 走“等待同步/下拉刷新”流程
 							file.writeText({
 								uri: PROFILE_FILE_URI,
 								text: JSON.stringify({ status: "pending_verification" }),
@@ -729,15 +744,15 @@ export default {
 
 	/**
 	 * 检查并初始化应用所需的核心数据文件
-	 * ✅ downloaded_songs.json 统一使用 {}（对象映射），并对已有 [] 自动修复
-	 * ✅ cached_cover.json 用于封面缓存索引（这里初始化为 {}，不做兼容修复）
+	 * downloaded_songs.json 统一使用 {}（对象映射），并对已有 [] 自动修复
+	 * cached_cover.json 用于封面缓存索引（这里初始化为 {}，不做兼容修复）
 	 */
 	initializeDataFiles(onComplete) {
 		const filesToEnsure = [
-			// ✅ 关键：这里必须是 {}，因为 storage/修复逻辑按 { [id]: meta } 使用
+			// 关键：这里必须是 {}，因为 storage/修复逻辑按 { [id]: meta } 使用
 			{ uri: "internal://files/downloaded_songs.json", initialContent: "{}" },
 
-			// ✅ 新增：封面缓存索引（key: `${id}_${size}` -> 1）
+			// 新增：封面缓存索引（key: `${id}_${size}` -> 1）
 			{ uri: "internal://files/cached_cover.json", initialContent: "{}" },
 
 			// 下面这些保持你原来的
@@ -797,7 +812,7 @@ export default {
 				success: () => {
 					console.log(`文件已存在: ${fileInfo.uri}`);
 
-					// ✅ 已存在也要做一次兼容修复：避免历史遗留的 []
+					// 已存在也要做一次兼容修复：避免历史遗留的 []
 					if (fileInfo.uri === "internal://files/downloaded_songs.json") {
 						ensureDownloadedSongsShape(checkCompletion);
 					} else {
@@ -813,7 +828,7 @@ export default {
 						success: () => {
 							console.log(`文件创建成功: ${fileInfo.uri}`);
 
-							// ✅ 新建后也校验一次，防止写入失败/内容异常
+							// 新建后也校验一次，防止写入失败/内容异常
 							if (fileInfo.uri === "internal://files/downloaded_songs.json") {
 								ensureDownloadedSongsShape(checkCompletion);
 							} else {
@@ -823,7 +838,7 @@ export default {
 						fail: (data, code) => {
 							console.error(`创建文件 ${fileInfo.uri} 失败, code = ${code}`);
 
-							// ✅ 写失败也别卡流程
+							// 写失败也别卡流程
 							if (fileInfo.uri === "internal://files/downloaded_songs.json") {
 								ensureDownloadedSongsShape(checkCompletion);
 							} else {

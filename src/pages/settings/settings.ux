@@ -12,6 +12,7 @@
 			class="scroll-wrapper"
 			scroll-y="true"
 			bounces="true"
+			
 		>
 			<!-- ==================== 主菜单 (根页面)，已替换为用户页的 item 样式 ==================== -->
 			<div class="menu-list" if="{{ currentView === 'main' }}">
@@ -54,7 +55,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					全屏更轻量更流畅，但单句歌词过长会被截断；完整为完整滚动歌词，支持双击跳转进度，性能开销较大。
+					全屏更轻量更流畅，但单句歌词过长会被截断；完整为完整滚动歌词，支持双击跳转进度，性能开销较大
 				</text>
 				<div id="lyrics-item-3" class="setting-item">
 					<text class="item-label">歌词提前</text>
@@ -63,7 +64,7 @@
 					</text>
 				</div>
 				<text id="lyrics-desc-3" class="item-desc">
-					适当调高可改善歌词滚动延迟，但过高可能导致歌词与歌曲不同步。
+					适当调整以改善歌词滚动延迟
 				</text>
 
 				<div class="setting-item">
@@ -73,7 +74,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语。
+					适用于同时提供罗马音和翻译的歌曲，也包括粤语、韩语
 				</text>
 				<div class="setting-item">
 					<text class="item-label">粤语歌词</text>
@@ -81,7 +82,7 @@
 						{{ cantoneseLyricModeText }}
 					</text>
 				</div>
-				<text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲。</text>
+				<text class="item-desc">适用于仅提供原文和罗马音(粤拼)的歌曲</text>
 				<div class="setting-item">
 					<text class="item-label">英文歌词</text>
 					<text class="item-value-btn" onclick="toggleEnglishLyricMode">
@@ -89,7 +90,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					适用于仅提供原文和翻译的歌曲，也包括法语、俄语等。
+					适用于仅提供原文和翻译的歌曲，也包括法语、俄语等
 				</text>
 			</div>
 
@@ -102,7 +103,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在播放器控制页，从屏幕中间向左滑动时触发的操作。
+					在播放器控制页，从屏幕中间向左滑动时触发的操作
 				</text>
 				<div class="setting-item">
 					<text class="item-label">播放页右滑</text>
@@ -111,7 +112,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在播放器控制页，从屏幕中间向右滑动时触发的操作。
+					在播放器控制页，从屏幕中间向右滑动时触发的操作
 				</text>
 
 				<div class="setting-item">
@@ -121,7 +122,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在播放器控制页，从屏幕中间向上滑动时触发的操作。
+					在播放器控制页，从屏幕中间向上滑动时触发的操作
 				</text>
 
 				<div class="setting-item">
@@ -131,7 +132,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在播放器控制页，从屏幕中间向下滑动时触发的操作。
+					在播放器控制页，从屏幕中间向下滑动时触发的操作
 				</text>
 			</div>
 
@@ -144,7 +145,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在线播放时请求的码率。较低码率可节省流量，在蓝牙网络下加载更快。
+					在线播放时请求的码率，较低码率可节省流量，在蓝牙网络下加载更快
 				</text>
 				<div class="setting-item">
 					<text class="item-label">下载音质</text>
@@ -153,7 +154,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					下载歌曲时请求的码率。较高码率文件体积更大，但音质更好。
+					下载歌曲时请求的码率，较高码率文件体积更大，但音质更好
 				</text>
 			</div>
 
@@ -166,7 +167,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					影响滚动平滑度。XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值。
+					影响滚动平滑度，XRING设备可设为更高值以获得流畅体验，其他设备建议使用较小值
 				</text>
 				<div class="setting-item">
 					<text class="item-label">列表加载步长</text>
@@ -176,7 +177,7 @@
 				</div>
 				<text class="item-desc">
 					(已弃用)
-					每次滚动加载的项目数。较大值可减少滚动次数，但会增加单次加载开销。
+					每次滚动加载的项目数，较大值可减少滚动次数，但会增加单次加载开销
 				</text>
 			</div>
 
@@ -189,7 +190,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					在线歌单的歌曲加载上限。蓝牙网络环境下建议使用较小值，以加快响应速度。
+					在线歌单的歌曲加载上限，蓝牙网络环境下建议使用较小值，以加快响应速度
 				</text>
 				<div class="setting-item">
 					<text class="item-label">网络请求分页</text>
@@ -198,12 +199,27 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					每次网络请求获取的条目数。eSIM网络环境下可设为更高值以减少请求次数。
+					每次网络请求获取的条目数，eSIM网络环境下可设为更高值以减少请求次数
 				</text>
 			</div>
 
 			<!-- ==================== 搜索设置 (子页面) ==================== -->
 			<div class="settings-list" if="{{ currentView === 'search' }}">
+				<div class="setting-item">
+					<text class="item-label">键盘振动</text>
+					<text class="item-value-btn" onclick="toggleVibrateMode">
+						{{ vibrateModeText }}
+					</text>
+				</div>
+				<text class="item-desc">输入法按键时的振动反馈</text>
+
+				<div class="setting-item">
+					<text class="item-label">键盘布局</text>
+					<text class="item-value-btn" onclick="toggleKeyboardType">
+						{{ keyboardTypeText }}
+					</text>
+				</div>
+				<text class="item-desc">搜索时弹出输入法的键盘布局</text>
 				<div class="setting-item">
 					<text class="item-label">最大搜索结果</text>
 					<text class="item-value-btn" onclick="toggleSearchTotalLimit">
@@ -211,7 +227,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					单次搜索获取的总结果上限。较大值结果更全，但会增加等待时间。
+					单次搜索获取的总结果上限，较大值结果更全，但会增加等待时间
 				</text>
 				<div class="setting-item">
 					<text class="item-label">搜索请求分页</text>
@@ -220,7 +236,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					每次网络请求获取的搜索结果数。蓝牙网络环境下建议使用较小值。
+					每次网络请求获取的搜索结果数，蓝牙网络环境下建议使用较小值
 				</text>
 			</div>
 
@@ -233,7 +249,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词。
+					清除应用缓存，包括图片、歌单列表等，不包括已下载的音乐和歌词
 				</text>
 				<div class="setting-item">
 					<text class="item-label">退出当前登录</text>
@@ -242,7 +258,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态。
+					仅清除您的登录凭据和个人信息缓存，不会影响应用激活状态
 				</text>
 				<div class="setting-item">
 					<text class="item-label">清除设备授权</text>
@@ -251,7 +267,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权。
+					清除本地激活许可证，应用将需要重新联网验证，用于调试或更换授权
 				</text>
 				<div class="setting-item">
 					<text class="item-label">清空全部数据</text>
@@ -260,7 +276,7 @@
 					</text>
 				</div>
 				<text class="item-desc">
-					将应用恢复到初始安装状态，清除所有本地数据。
+					将应用恢复到初始安装状态，清除所有本地数据
 				</text>
 			</div>
 		</scroll>
@@ -460,7 +476,12 @@ const PRESETS = {
 	},
 	performance: { windowSize: [10, 20, 40], pageSize: [10, 15, 20] },
 	network: { totalLimit: [50, 200, 500], apiPageSize: [10, 20, 50] },
-	search: { totalLimit: [10, 25, 50], apiPageSize: [5, 10, 25] },
+	search: {
+		totalLimit: [10, 25, 50],
+		apiPageSize: [5, 10, 25],
+		vibratemode: ["", "short", "long"],
+		keyboardtype: ["QWERTY", "T9"],
+	},
 };
 // 在 PRESETS 同级位置定义手势常量
 const GESTURE_ACTIONS = [
@@ -509,7 +530,12 @@ export default {
 			audioQuality: { online: 64, download: 128 },
 			performance: { windowSize: 10, pageSize: 10 },
 			network: { totalLimit: 1000, apiPageSize: 20 },
-			search: { totalLimit: 25, apiPageSize: 10 },
+			search: {
+				totalLimit: 25,
+				apiPageSize: 10,
+				vibratemode: "short",
+				keyboardtype: "QWERTY",
+			},
 			gestures: {
 				left: "lyrics", // 左滑默认切换到歌词页
 				right: "playlist", // 右滑默认打开播放列表
@@ -542,6 +568,22 @@ export default {
 		englishLyricModeText() {
 			const map = { translation: "显示翻译", original: "仅显示原文" };
 			return map[this.settings.lyrics.englishMode] || "未知";
+		},
+		vibrateModeText() {
+			const map = {
+				"": "关闭",
+				short: "短振动",
+				long: "长振动",
+			};
+			return map[this.settings.search.vibratemode] || "未知";
+		},
+
+		keyboardTypeText() {
+			const map = {
+				QWERTY: "全键盘",
+				T9: "九宫格",
+			};
+			return map[this.settings.search.keyboardtype] || "未知";
 		},
 		// 新增计算属性，用于显示手势中文文本
 		gestureLeftText() {
@@ -749,6 +791,13 @@ export default {
 	toggleApiPageSize() {
 		this._toggleSetting("network", "apiPageSize", PRESETS.network.apiPageSize);
 	},
+	toggleVibrateMode() {
+		this._toggleSetting("search", "vibratemode", PRESETS.search.vibratemode);
+	},
+
+	toggleKeyboardType() {
+		this._toggleSetting("search", "keyboardtype", PRESETS.search.keyboardtype);
+	},
 	toggleSearchTotalLimit() {
 		this._toggleSetting("search", "totalLimit", PRESETS.search.totalLimit);
 	},
@@ -759,7 +808,7 @@ export default {
 		prompt.showDialog({
 			title: "清除缓存",
 			message:
-				"您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像。",
+				"您确定要清除所有本地缓存吗？这不会影响您的设置、登录状态和授权信息，仅会刷新歌单缓存和用户头像",
 			buttons: [{ text: "取消" }, { text: "确定", color: "#007AFF" }],
 			success: () => {
 				prompt.showToast({ message: "正在清除缓存..." });
@@ -809,7 +858,7 @@ export default {
 	handleLogout() {
 		prompt.showDialog({
 			title: "退出登录",
-			message: "您确定要退出登录吗？这将清除您的本地用户数据。",
+			message: "您确定要退出登录吗？这将清除您的本地用户数据",
 			buttons: [{ text: "取消" }, { text: "确定", color: "#FF453A" }],
 			success: async () => {
 				try {
@@ -848,7 +897,7 @@ export default {
 	handleClearActivation() {
 		prompt.showDialog({
 			title: "清除授权",
-			message: "您确定要清除本地授权信息吗？清除后需要重新联网激活应用。",
+			message: "您确定要清除本地授权信息吗？清除后需要重新联网激活应用",
 			buttons: [{ text: "取消" }, { text: "确定", color: "#FF9500" }],
 			success: () => {
 				prompt.showToast({ message: "正在清除授权..." });
@@ -871,8 +920,7 @@ export default {
 	handleClearAllData() {
 		prompt.showDialog({
 			title: "清空所有数据",
-			message:
-				"【极度危险】此操作将删除所有本地缓存和设置，包括登录信息和授权状态。您确定要继续吗？",
+			message: "【极度危险】此操作将删除所有本地缓存和设置，您确定要继续吗？",
 			buttons: [{ text: "取消" }, { text: "确定清空", color: "#FF453A" }],
 			success: () => {
 				prompt.showToast({ message: "正在清空所有数据..." });
@@ -920,7 +968,7 @@ export default {
 				const failOnce = (errData, errCode, itemUri) => {
 					if (!hasFailed) {
 						hasFailed = true;
-						console.error(`删除 ${itemUri} 失败, code=${errCode}。`);
+						console.error(`删除 ${itemUri} 失败, code=${errCode}`);
 						if (fail) fail(errData, errCode);
 						if (complete) complete();
 					}

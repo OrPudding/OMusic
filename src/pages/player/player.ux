@@ -87,34 +87,33 @@
 			src="{{ downloadIcon }}"
 			if="{{ downloadIcon && swiperCurrentIndex === 0 }}"
 		></image>
-<!-- 视图 1: 歌词页 -->
- <!-- fullscreen：固定容器，不可手动滚动 -->
- <div
- if="{{ swiperCurrentIndex === 1 && settings.lyricRenderMode === 'fullscreen' }}"
- class="fullscreen-lyrics"
- onswipe="handleSwipe"
->
- <div
-   for="{{(i, line) in fullscreenLines}}"
-   class="fs-line lyric-line-wrapper
+		<!-- 视图 1: 歌词页 -->
+		<!-- fullscreen：固定容器，不可手动滚动 -->
+		<div
+			if="{{ swiperCurrentIndex === 1 && settings.lyricRenderMode === 'fullscreen' }}"
+			class="fullscreen-lyrics"
+			onswipe="handleSwipe"
+		>
+			<div
+				for="{{ (i, line) in fullscreenLines }}"
+				class="fs-line lyric-line-wrapper
 		  {{ line.isCurrent ? 'is-current-wrapper' : '' }}
 		  {{ line.isSelected ? 'is-selected-wrapper' : '' }}"
- >
-   <text class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}">
-	 {{ line.original }}
-   </text>
+			>
+				<text
+					class="lyric-line {{ line.isCurrent ? 'current-lyric' : 'secondary-lyric' }}"
+				>
+					{{ line.original }}
+				</text>
 
-   <text
-	 if="{{ line.extra }}"
-	 class="lyric-line extra-lyric {{ line.isCurrent ? 'extra-current' : 'extra-secondary' }}"
-   >
-	 {{ line.extra }}
-   </text>
- </div>
-</div>
-
-
-
+				<text
+					if="{{ line.extra }}"
+					class="lyric-line extra-lyric {{ line.isCurrent ? 'extra-current' : 'extra-secondary' }}"
+				>
+					{{ line.extra }}
+				</text>
+			</div>
+		</div>
 <!-- all：保留你原来的 scroll + 64 管道 -->
 <scroll
     show="{{ swiperCurrentIndex === 1 && settings.lyricRenderMode === 'all' }}"
@@ -555,7 +554,7 @@
 }
 .fullscreen-lyrics {
 	width: 100%;
-	height: 376px;      /* 同原 lyrics-scroll-view */
+	height: 376px; /* 同原 lyrics-scroll-view */
 	padding: 0 3px;
 	flex-direction: column;
 	justify-content: center;
@@ -608,10 +607,10 @@
 }
 /* 非当前行 */
 .secondary-lyric {
-  font-size: 24px;        /* 明显小一档 */
-  font-weight: 500;
-  font-weight: bold;
-  color: #888888;
+	font-size: 24px; /* 明显小一档 */
+	font-weight: 500;
+	font-weight: bold;
+	color: #888888;
 }
 .extra-lyric {
 	font-size: 22px;
@@ -662,7 +661,7 @@
 	animation-duration: 80ms;
 	animation-timing-function: ease-out;
 	animation-iteration-count: 1;
-	animation-fill-mode: forwards; /* ✅ 改这里：保持最终态 */
+	animation-fill-mode: forwards; /* 改这里：保持最终态 */
 }
 
 /* 抬起回弹：保留你最初觉得“最好”的曲线 */
@@ -726,7 +725,9 @@
 	.lyrics-scroll-view {
 		height: 424px;
 	}
-	.fullscreen-lyrics { height: 424px; }
+	.fullscreen-lyrics {
+		height: 424px;
+	}
 	.is-current-wrapper {
 		/* 【修改】使用固定颜色代替透明度 */
 		background-color: #1a1a1a;
@@ -784,6 +785,7 @@ const CONSTANTS = {
 	SETTINGS_FILE_URI: "internal://files/settings.json",
 	COOKIE_FILE_URI: "internal://files/cookie.txt",
 	FILE_PLAYER_STATE: "internal://files/player_state.json",
+	FILE_SHUFFLED_PLAYLIST: "internal://files/shuffled_playlist.json",
 	MAX_PLAYBACK_RETRIES: 3,
 	PLAY_TIMEOUT: 25000,
 };
@@ -818,7 +820,7 @@ const fileService = {
     await this._promisify(file.writeText, { uri, text: JSON.stringify(data) });
     return true;
   } catch (e) {
-    throw e; // ✅ 让 .catch 生效
+    throw e; // 让 .catch 生效
   }
 }
 
@@ -1060,17 +1062,19 @@ export default {
 			await this.loadDownloadedSongs();
 			this.getDeviceInfo();
 			await this.onRestoreState();
+			    // 清理过期的随机歌单
+				this.cleanupExpiredShuffledPlaylist();
 		});
 	},
-
 	onShow() {
 		console.log("Player onShow: 页面显示，标记需要刷新。");
 		this.needsRefresh = true;
 
-		// 【优化】如果当前在歌词页，保持屏幕常亮
+		// 如果当前在歌词页，保持屏幕常亮
 		if (this.swiperCurrentIndex === 1) {
 			brightness.setKeepScreenOn({ keepScreenOn: true });
 		}
+		global.runGC()
 	},
 
 	async onRefresh(query) {
@@ -1120,7 +1124,7 @@ export default {
 	onDestroy() {
 		console.log("Player onDestroy: 页面被销毁。");
 		audio.stop();
-		// 【优化】确保即使在下载中退出，也能尝试保存状态
+		// 确保即使在下载中退出，也能尝试保存状态
 		this.onSaveState();
 		// 清理所有定时器
 		if (this.playTimeoutId) clearTimeout(this.playTimeoutId);
@@ -1189,62 +1193,89 @@ export default {
 	},
 
 	async onRestoreState() {
-		if (this.songId) return false;
+    if (this.songId) return false;
 
-		const savedState = await fileService.readJson(CONSTANTS.FILE_PLAYER_STATE);
-		const isStateExpired = savedState?.timestamp
-			? new Date().getTime() - savedState.timestamp > 12 * 3600 * 1000
-			: true;
+    // 1. 加载主状态
+    const savedState = await fileService.readJson(CONSTANTS.FILE_PLAYER_STATE);
+    const isStateExpired = savedState?.timestamp
+        ? new Date().getTime() - savedState.timestamp > 12 * 3600 * 1000
+        : true;
 
-		if (
-			savedState &&
-			savedState.lastSongId &&
-			savedState.duration &&
-			!isStateExpired
-		) {
-			await this.loadListFromFile();
-			const lastIndex = this.playList.findIndex(
-				(song) => song && song.id === savedState.lastSongId
-			);
+    if (
+        savedState &&
+        savedState.lastSongId &&
+        savedState.duration &&
+        !isStateExpired
+    ) {
+        await this.loadListFromFile();
 
-			if (lastIndex > -1) {
-				console.log(
-					`onRestoreState: 恢复歌曲: ${this.playList[lastIndex].name}`
-				);
-				this.songId = savedState.lastSongId;
-				this.currentIndex = lastIndex;
-				this.playMode = savedState.playMode || 0;
+        // 恢复基础状态
+        if (savedState.playMode !== undefined) {
+            this.playMode = savedState.playMode;
+        }
 
-				const id = String(savedState.lastSongId);
-				const cachedCover = this.downloadedSongs?.[id]?.coverUrl || "";
-				const stateCover = savedState.coverUrl
-					? String(savedState.coverUrl)
-					: "";
-				const coverUrl = cachedCover || stateCover || "";
+        if (savedState.isFmMode !== undefined) {
+            this.isFmMode = savedState.isFmMode;
+        }
 
-				this.currSong = {
-					...this.playList[this.currentIndex],
-					duration: savedState.duration,
-					coverUrl,
-				};
+        // 2. 如果是随机模式，尝试加载随机歌单
+        if (this.playMode === 1) {
+            const loaded = await this.loadShuffledPlaylist();
+            if (!loaded) {
+                // 如果加载失败，重新生成
+                console.log("重新生成随机歌单");
+                this.generateShuffledList(false);
+            }
+        }
 
-				const t = Number(savedState.lastPlayDuration) || 0;
-				this.resumeTime = t > 0 ? t : -1;
-				this.playerState.playDuration =
-					this.resumeTime > 0 ? this.resumeTime : 0;
-				this._pendingRestoreTime = this.resumeTime;
+        // 查找当前歌曲
+        const lastIndex = this.playList.findIndex(
+            (song) => song && song.id === savedState.lastSongId
+        );
 
-				this.fetchLyric(this.songId);
+        if (lastIndex > -1) {
+            console.log(
+                `onRestoreState: 恢复歌曲: ${this.playList[lastIndex].name}`
+            );
+            this.songId = savedState.lastSongId;
+            this.currentIndex = lastIndex;
 
-				// ✅ 同步给全局
-				this.syncToGlobalPlayer();
+            // 如果是随机模式，根据随机列表调整 shuffledIndex
+            if (this.playMode === 1 && this.shuffledPlayList.length > 0) {
+                const shuffledPos = this.shuffledPlayList.indexOf(lastIndex);
+                if (shuffledPos !== -1) {
+                    this.shuffledIndex = shuffledPos;
+                }
+            }
 
-				prompt.showToast({ message: "播放状态已恢复" });
-				return true;
-			}
-		}
-		return false;
-	},
+            const id = String(savedState.lastSongId);
+            const cachedCover = this.downloadedSongs?.[id]?.coverUrl || "";
+            const stateCover = savedState.coverUrl
+                ? String(savedState.coverUrl)
+                : "";
+            const coverUrl = cachedCover || stateCover || "";
+
+            this.currSong = {
+                ...this.playList[this.currentIndex],
+                duration: savedState.duration,
+                coverUrl,
+            };
+
+            const t = Number(savedState.lastPlayDuration) || 0;
+            this.resumeTime = t > 0 ? t : -1;
+            this.playerState.playDuration =
+                this.resumeTime > 0 ? this.resumeTime : 0;
+            this._pendingRestoreTime = this.resumeTime;
+
+            this.fetchLyric(this.songId);
+            this.syncToGlobalPlayer();
+
+            prompt.showToast({ message: "播放状态已恢复" });
+            return true;
+        }
+    }
+    return false;
+},
 
 	// --- 交互与UI方法 ---
 	handleHeaderSwipe(e) {
@@ -1804,22 +1835,31 @@ if (newIndex >= 0) {
 		});
 	},
 	async onSaveState() {
-		if (!this.currSong || !this.currSong.duration) return;
+    if (!this.currSong || !this.currSong.duration) return;
 
-		const stateToSave = {
-			lastSongId: this.currSong.id,
-			lastPlayDuration: this.playerState.playDuration,
-			playMode: this.playMode,
-			duration: this.currSong.duration,
+    // 主状态文件只保存轻量信息
+    const stateToSave = {
+        lastSongId: this.currSong.id,
+        lastPlayDuration: this.playerState.playDuration,
+        playMode: this.playMode,
+        duration: this.currSong.duration,
+        coverUrl: this.currSong.coverUrl ? String(this.currSong.coverUrl) : "",
+        timestamp: new Date().getTime(),
 
-			// ✅ 新增：封面缓存后的本地/远程URL（你现在用的是 currSong.coverUrl）
-			coverUrl: this.currSong.coverUrl ? String(this.currSong.coverUrl) : "",
+        // 只保存模式标记，不保存列表数据
+        isFmMode: this.isFmMode,
+        hasShuffledList: this.shuffledPlayList.length > 0, // 标记是否有随机列表
+    };
 
-			timestamp: new Date().getTime(),
-		};
+    await fileService.writeJson(CONSTANTS.FILE_PLAYER_STATE, stateToSave);
 
-		await fileService.writeJson(CONSTANTS.FILE_PLAYER_STATE, stateToSave);
-	},
+    // 如果是随机模式，单独保存随机列表
+    if (this.playMode === 1 && this.shuffledPlayList.length > 0) {
+        await this.saveShuffledPlaylist();
+    }
+
+    console.log("播放状态已保存（主状态轻量化）");
+},
 
 	playOrPause() {
 		if (!this.currSong) {
@@ -2105,7 +2145,7 @@ if (newIndex >= 0) {
 		if (this.pendingSongId === songToPlay.id) return;
 		this.pendingSongId = songToPlay.id;
 
-		// ✅ 只有“切到新歌”才更新 UI / 重建歌词
+		// 只有“切到新歌”才更新 UI / 重建歌词
 		const shouldRefreshUi =
 			!this.currSong || this.currSong.id !== songToPlay.id;
 		if (shouldRefreshUi) {
@@ -2121,7 +2161,7 @@ if (newIndex >= 0) {
 				await this.playLocal(songToPlay, downloadedInfo);
 			else await this.playOnline(songToPlay);
 
-			// ✅ 只有成功后才消费 FM 队列
+			// 只有成功后才消费 FM 队列
 			if (this.isFmMode) this.fmQueue.shift();
 		} catch (error) {
 			this.handlePlaybackError(error.message || "播放准备失败");
@@ -2396,26 +2436,104 @@ if (newIndex >= 0) {
 	},
 
 	generateShuffledList(locateCurrent = true) {
-		console.log("生成新的随机播放列表...");
-		this.shuffledPlayList = Array.from(this.playList.keys());
+    console.log("生成新的随机播放列表...");
+    this.shuffledPlayList = Array.from(this.playList.keys());
 
-		for (let i = this.shuffledPlayList.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[this.shuffledPlayList[i], this.shuffledPlayList[j]] = [
-				this.shuffledPlayList[j],
-				this.shuffledPlayList[i],
-			];
-		}
+    for (let i = this.shuffledPlayList.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.shuffledPlayList[i], this.shuffledPlayList[j]] = [
+            this.shuffledPlayList[j],
+            this.shuffledPlayList[i],
+        ];
+    }
 
-		if (locateCurrent) {
-			const currentShuffledIndex = this.shuffledPlayList.indexOf(
-				this.currentIndex
-			);
-			this.shuffledIndex =
-				currentShuffledIndex !== -1 ? currentShuffledIndex : 0;
-		}
-		console.log("随机列表已生成, 当前随机索引:", this.shuffledIndex);
-	},
+    if (locateCurrent) {
+        const currentShuffledIndex = this.shuffledPlayList.indexOf(
+            this.currentIndex
+        );
+        this.shuffledIndex =
+            currentShuffledIndex !== -1 ? currentShuffledIndex : 0;
+    }
+
+    console.log("随机列表已生成, 当前随机索引:", this.shuffledIndex);
+
+    // 生成后保存到单独文件
+    this.saveShuffledPlaylist();
+},
+// 清理过期的随机歌单文件
+async cleanupExpiredShuffledPlaylist() {
+    try {
+        const shuffledData = await fileService.readJson(CONSTANTS.FILE_SHUFFLED_PLAYLIST);
+
+        if (shuffledData?.timestamp) {
+            const isExpired = new Date().getTime() - shuffledData.timestamp > 24 * 3600 * 1000;
+            if (isExpired) {
+                // 删除过期文件
+                await new Promise((resolve) => {
+                    file.delete({
+                        uri: CONSTANTS.FILE_SHUFFLED_PLAYLIST,
+                        success: resolve,
+                        fail: resolve,
+                    });
+                });
+                console.log("已清理过期的随机歌单文件");
+            }
+        }
+    } catch (e) {
+        // 文件不存在或其他错误，忽略
+    }
+},
+	// 单独保存随机歌单
+async saveShuffledPlaylist() {
+    if (this.playMode !== 1 || this.shuffledPlayList.length === 0) return;
+
+    const shuffledData = {
+        shuffledPlayList: this.shuffledPlayList,
+        shuffledIndex: this.shuffledIndex,
+        // 保存原始歌曲的元数据，用于恢复时重建播放列表
+        songs: this.playList.map(song => ({
+            id: song.id,
+            name: song.name,
+            artists: song.artists,
+            duration: song.duration,
+            // 只保存必要字段，避免过大
+        })),
+        timestamp: new Date().getTime(),
+    };
+
+    await fileService.writeJson(CONSTANTS.FILE_SHUFFLED_PLAYLIST, shuffledData);
+    console.log("随机歌单已保存");
+},
+// 单独加载随机歌单
+async loadShuffledPlaylist() {
+    try {
+        const shuffledData = await fileService.readJson(CONSTANTS.FILE_SHUFFLED_PLAYLIST);
+
+        // 检查是否过期（比如24小时）
+        const isExpired = shuffledData?.timestamp
+            ? new Date().getTime() - shuffledData.timestamp > 24 * 3600 * 1000
+            : true;
+
+        if (shuffledData && !isExpired && shuffledData.shuffledPlayList) {
+            // 恢复随机列表
+            this.shuffledPlayList = shuffledData.shuffledPlayList;
+            this.shuffledIndex = shuffledData.shuffledIndex || 0;
+
+            // 如果有保存的歌曲列表，可以用来验证
+            if (shuffledData.songs && shuffledData.songs.length > 0) {
+                console.log(`加载随机歌单成功，共 ${shuffledData.songs.length} 首歌`);
+                // 这里可以比对当前 playList 和保存的 songs
+                // 如果不一样，可能需要重新生成
+            }
+
+            return true;
+        }
+    } catch (e) {
+        console.log("加载随机歌单失败，将重新生成");
+    }
+
+    return false;
+},
 
 	// --- FM 模式逻辑 (已重构) ---
 	async dostartFmMode(initialSongId = null, initialSongInfo = null) {
@@ -2473,11 +2591,11 @@ if (newIndex >= 0) {
 	},
 // 【【【进阶优化：更可靠的缓存检查 + cooked格式迁移】】】
 fetchLyric(songId) {
-	// ✅ 每次请求生成 token；任何旧回调只要 token 不一致，直接作废
+	// 每次请求生成 token；任何旧回调只要 token 不一致，直接作废
 	const reqId = (this._lyricReqId = (this._lyricReqId || 0) + 1);
 	const songIdStr = String(songId);
 
-	// ✅ 只在这里 reset，别在 updateUiForNewSong 再 reset 一遍
+	// 只在这里 reset，别在 updateUiForNewSong 再 reset 一遍
 	this.resetLyrics();
 
 	const lyricFilePath = `${CONSTANTS.DIR_LYRICS}${songId}.json`;
@@ -2487,7 +2605,7 @@ fetchLyric(songId) {
 	file.access({
 		uri: finalLyricPath,
 		success: () => {
-			// ✅ gate：只允许最新请求 + 当前歌
+			// gate：只允许最新请求 + 当前歌
 			if (reqId !== this._lyricReqId) return;
 			if (!this._isCurrentSong(songIdStr)) return;
 
@@ -2510,20 +2628,20 @@ loadLyricFromFile(uri, songId, reqId = this._lyricReqId) {
 	file.readText({
 		uri,
 		success: (data) => {
-			// ✅ gate：只允许最新请求 + 当前歌
+			// gate：只允许最新请求 + 当前歌
 			if (reqId !== this._lyricReqId) return;
 			if (!this._isCurrentSong(songIdStr)) return;
 
 			try {
 				const obj = JSON.parse(data.text);
 
-				// ✅ 1) cooked 直接用
+				// 1) cooked 直接用
 				if (isCookedLyricFormat(obj)) {
 					this.applyCookedLyrics(obj);
 					return;
 				}
 
-				// ✅ 2) raw → cooked
+				// 2) raw → cooked
 				const cooked = cookLyricsFromRaw(obj, songId);
 
 				// 覆写升级（不阻塞；写失败不影响本次使用）
@@ -2562,11 +2680,11 @@ async fetchLyricOnline(songId, reqId = this._lyricReqId) {
 	try {
 		const raw = await apiService.getLyricData(songId, this.cookie);
 
-		// ✅ gate：网络回来后再判断是否还是当前歌 + 最新请求
+		// gate：网络回来后再判断是否还是当前歌 + 最新请求
 		if (reqId !== this._lyricReqId) return;
 		if (!this._isCurrentSong(songIdStr)) return;
 
-		// ✅ raw 校验：失败明确显示“加载失败”，不要混成“暂无歌词”
+		// raw 校验：失败明确显示“加载失败”，不要混成“暂无歌词”
 		if (!raw || typeof raw !== "object" || (raw.code != null && raw.code !== 200)) {
 			const cookedFail = makeFallbackCooked(songId, "歌词加载失败");
 			this.applyCookedLyrics(cookedFail);
@@ -2576,7 +2694,7 @@ async fetchLyricOnline(songId, reqId = this._lyricReqId) {
 		// raw → cooked
 		const cooked = cookLyricsFromRaw(raw, songId);
 
-		// ✅ 异步写入 cooked（失败不影响本次渲染）
+		// 异步写入 cooked（失败不影响本次渲染）
 		fileService
 			.writeJson(lyricFilePath, cooked)
 			.then(() => console.log(`歌词 cooked 缓存成功: ${songId}.json`))
@@ -2595,7 +2713,7 @@ async fetchLyricOnline(songId, reqId = this._lyricReqId) {
 },
 
 
-// ✅ cooked → 内存运行态（仍走现有的 this.lyrics 结构以保持后续逻辑不变）
+// cooked → 内存运行态（仍走现有的 this.lyrics 结构以保持后续逻辑不变）
 applyCookedLyrics(cooked) {
 	// 1) 设置 type（给 getExtraLyricText 使用）
 	if (cooked && cooked.type) {
@@ -2612,7 +2730,7 @@ applyCookedLyrics(cooked) {
 		romaji: it.ro || null,
 	}));
 
-	// ✅ fallback：统一结构，永远用 original 字段
+	// fallback：统一结构，永远用 original 字段
 	if (!this.lyrics.length) {
 		this.lyrics = [{ time: 0, original: "暂无歌词", translation: null, romaji: null }];
 	}
@@ -2670,7 +2788,7 @@ parseLyric(lrcString) {
 		// 2) 去掉该行所有时间戳后的“正文”
 		const text = raw.replace(timeRe, "").trim();
 
-		// ✅ 关键：如果正文为空，说明这行只是时间点标记，直接跳过
+		// 关键：如果正文为空，说明这行只是时间点标记，直接跳过
 		if (!text) continue;
 
 		// 3) 一行多个时间戳：同一句在多个时间点出现，都入结果
@@ -2833,6 +2951,7 @@ getExtraLyricText(lineData) {
 			this.syncToGlobalPlayer();
 		};
 
+		
 		// 暂停事件：只做状态同步，不要再 audio.pause()
 		audio.onpause = () => {
 			this.playerState.isPlaying = false;
@@ -2993,7 +3112,7 @@ getExtraLyricText(lineData) {
 	this.isChangingSong = false;
 	this.retryCount = 0;
 
-	// ✅ 让所有旧歌词回调失效
+	// 让所有旧歌词回调失效
 	this._lyricReqId = (this._lyricReqId || 0) + 1;
 
 	this.resetLyrics();

@@ -425,7 +425,6 @@ listType === 'playlist') }}"
 	text-align: center;
 	line-height: 50px;
 	box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
-
 }
 .item-value-btn-disabled {
 	background-color: #191821;
@@ -1104,7 +1103,7 @@ export default {
 					artists: (s.ar || s.artists || []).map((a) => a.name).join(" / "),
 					// cover 如果不是必须建议先别存，带宽/内存都会下降
 				});
-				songs[i] = null; // ✅ 释放大对象
+				songs[i] = null; // 释放大对象
 			}
 
 			// 断开引用，帮助 GC

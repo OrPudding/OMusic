@@ -1,179 +1,261 @@
 <template>
-    <div class="container">
-      <!-- 1. 固定的顶部栏 -->
-      <div class="header" onclick="goBack">
-        <text class="time-display">{{ currentTime }}</text>
-        <text class="title">‹关于软件</text>
-      </div>
-  
-      <!-- 2. 独立滚动的内容列表 -->
-      <list class="content-list" bounces="true">
-        <!-- 软件信息块 -->
-        <list-item type="infoCapsule" class="info-capsule-item" onclick="handleInfoClick">
-          <div class="info-capsule">
-            <image class="app-icon" src="/common/icon.png"></image>
-            <div class="app-details">
-              <text class="app-name">OMusic</text>
-              <text class="app-version">{{ $app.$def.APP_VERSION }}</text>
-            </div>
-          </div>
-        </list-item>
-  
-        <!-- 列表项 -->
-        <list-item for="{{ listItems }}" type="contentItem" class="content-item" onclick="handleItemClick($item)">
-          <text class="item-label">{{ $item.label }}</text>
-          <text class="item-value {{ $item.small ? 'small' : '' }}" if="{{ $item.value }}">{{ $item.value }}</text>
-          <text class="item-arrow" else>›</text>
-        </list-item>
-      </list>
-    </div>
-  </template>
-  
-  <style>
-    /* 最终规范样式 */
-    .container {
-      width: 100%;
-      height: 100%;
-      flex-direction: column;
-      align-items: center;
-      background-color: black;
-    }
-  
-    .header {
-      width: 100%;
-      height: 90px;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    .time-display {
-      font-size: 28px;
-      font-weight: bold;
-      color: #ffffff;
-      padding-top: 5px;
-      text-align: center;
-    }
-    .title {
-      font-size: 32px;
-      padding: 5px;
-      text-align: center;
-      font-weight: bold;
-      color: #fff;
-    }
-  
-    /* --- list 样式 (遵循 <list> 组件法则) --- */
-    .content-list {
-      flex-grow: 1;
-      width: 360px;
-      /* FIX: 移除多余的 margin-top */
-      padding-bottom: 80px; 
-    }
-  
-    /* --- 列表项样式 (保持不变) --- */
-    .info-capsule-item { width: 100%; height: 130px; margin: 5px 0; background-color: transparent; }
-    .info-capsule { width: 100%; height: 100%; padding: 0 32px; background-color: #2e323c; border-radius: 45px; align-items: center; justify-content: space-between;}
-    .app-icon { width: 80px; height: 80px; }
-    .app-details { flex-grow: 1; flex-direction: column; justify-content: center; margin-left: 40px; }
-    .app-name { font-size: 36px; font-weight: bold; color: #ffffff; }
-    .app-version { font-size: 24px; color: rgba(255, 255, 255, 0.6); font-weight: bold; margin-top: 5px; }
-    .content-item { width: 100%; height: 80px; background-color: #2e323c; margin: 5px 0; border-radius: 36px; align-items: center; padding: 0 30px; justify-content: space-between; }
-    .item-label { font-size: 28px; font-weight: bold; color: #ffffff; }
-    .item-value.small { font-size: 22px; }
-    .item-value { font-size: 28px; font-weight: bold; color: rgba(255, 255, 255, 0.7); }
-    .item-arrow { font-size: 36px; font-weight: bold; color: rgba(255, 255, 255, 0.5); margin-bottom: 8px; }
-  
-    /* 媒体查询 (应用最终确定的规范) */
-    @media screen and (shape: rect) {
-      .header {
-        padding-top: 10px;
-        height: 65px;
-        flex-direction: row-reverse;
-        justify-content: space-around;
-      }
-      .time-display {
-        font-size: 32px;
-        padding-top: 0px;
-      }
-      .content-list {
-        /* FIX: 应用最终规范的 padding-bottom */
-        padding-bottom: 10px;
-      }
-    }
-  </style>
-  
-  <script>
-    import router from '@system.router';
-  
-    export default {
-      private: {
-        currentTime: '00:00',
-        timer: null,
-        infoClickTimes: 0,
-        listItems: [
-          { label: '参与开发', value: 'OrPudding' },
-          { label: '参与设计', value: 'VanguardHello_',small: true },
-          { label: '协助测试', value: 'xinghengCN' },
-          // 将 handler 作为一个数据属性，而不是直接的函数名
-          { label: '编译信息', handler: 'goToCompileInfo' },
-          { label: '开放源代码许可', handler: 'goToLicense' }
-        ]
-      },
-  
-      onInit() {
-        this.updateTime();
-        this.timer = setInterval(this.updateTime, 1000);
-      },
-  
-      onDestroy() {
-        if (this.timer) {
-          clearInterval(this.timer);
-        }
-      },
+	<div class="container">
+		<!-- 1. 固定的顶部栏 -->
+		<div class="header" onclick="goBack">
+			<text class="time-display">{{ currentTime }}</text>
+			<text class="title">‹关于软件</text>
+		</div>
 
-      handleInfoClick() {
-        this.infoClickTimes++;
-        if (this.infoClickTimes >= 5) {
-          router.push({ uri: '/pages/debug' });
-        }
-      },
+		<!-- 2. 独立滚动的内容列表 -->
+		<list class="content-list" bounces="true">
+			<!-- 软件信息块 -->
+			<list-item
+				type="infoCapsule"
+				class="info-capsule-item"
+				onclick="handleInfoClick"
+			>
+				<div class="info-capsule">
+					<image class="app-icon" src="/common/icon.png"></image>
+					<div class="app-details">
+						<text class="app-name">OMusic</text>
+						<text class="app-version">{{ $app.$def.APP_VERSION }}</text>
+					</div>
+				</div>
+			</list-item>
 
-      /**
-       * 统一的列表项点击处理函数
-       * @param {object} item - 被点击的列表项的数据对象
-       */
-      handleItemClick(item) {
-        // 如果 item 没有 handler 属性，则不执行任何操作
-        if (!item.handler) {
-          return;
-        }
-  
-        // 根据 item.handler 的值来调用对应的函数
-        if (typeof this[item.handler] === 'function') {
-          this[item.handler]();
-        } else {
-          console.log(`未找到名为 ${item.handler} 的处理函数。`);
-        }
-      },
-  
-      updateTime() {
-        const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        this.currentTime = `${hours}:${minutes}`;
-      },
-  
-      goToCompileInfo() {
-        router.push({ uri: '/pages/compileInfo' });
-      },
-  
-      goToLicense() {
-        router.push({ uri: '/pages/license' });
-      },
-  
-      goBack() {
-        router.back();
-      }
-    };
-  </script>
-  
+			<!-- 列表项 -->
+			<list-item
+				for="{{ listItems }}"
+				type="contentItem"
+				class="content-item"
+				onclick="handleItemClick($item)"
+			>
+				<text class="item-label">{{ $item.label }}</text>
+				<text
+					class="item-value {{ $item.small ? 'small' : '' }}"
+					if="{{ $item.value }}"
+				>
+					{{ $item.value }}
+				</text>
+				<text class="item-arrow" else>›</text>
+			</list-item>
+		</list>
+	</div>
+</template>
+
+<style>
+/* 最终规范样式 */
+.container {
+	width: 100%;
+	height: 100%;
+	flex-direction: column;
+	align-items: center;
+	background-color: black;
+}
+
+.header {
+	width: 100%;
+	height: 90px;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	flex-shrink: 0;
+}
+.time-display {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+	padding-top: 5px;
+	text-align: center;
+}
+.title {
+	font-size: 32px;
+	padding: 5px;
+	text-align: center;
+	font-weight: bold;
+	color: #fff;
+}
+
+/* --- list 样式 (遵循 <list> 组件法则) --- */
+.content-list {
+	flex-grow: 1;
+	width: 360px;
+	/* FIX: 移除多余的 margin-top */
+	padding-bottom: 80px;
+}
+
+/* --- 列表项样式 (保持不变) --- */
+.info-capsule-item {
+	width: 100%;
+	height: 130px;
+	margin: 5px 0;
+	background-color: transparent;
+}
+.info-capsule {
+	width: 100%;
+	height: 100%;
+	padding: 0 32px;
+	background-color: #2e323c;
+	border-radius: 45px;
+	align-items: center;
+	justify-content: space-between;
+}
+.app-icon {
+	width: 80px;
+	height: 80px;
+}
+.app-details {
+	flex-grow: 1;
+	flex-direction: column;
+	justify-content: center;
+	margin-left: 40px;
+}
+.app-name {
+	font-size: 36px;
+	font-weight: bold;
+	color: #ffffff;
+}
+.app-version {
+	font-size: 24px;
+	color: rgba(255, 255, 255, 0.6);
+	font-weight: bold;
+	margin-top: 5px;
+}
+.content-item {
+	width: 100%;
+	height: 80px;
+	background-color: #2e323c;
+	margin: 5px 0;
+	border-radius: 36px;
+	align-items: center;
+	padding: 0 30px;
+	justify-content: space-between;
+}
+.item-label {
+	font-size: 28px;
+	font-weight: bold;
+	color: #ffffff;
+}
+.item-value.small {
+	font-size: 22px;
+}
+.item-value {
+	font-size: 28px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.7);
+}
+.item-arrow {
+	font-size: 36px;
+	font-weight: bold;
+	color: rgba(255, 255, 255, 0.5);
+	margin-bottom: 8px;
+}
+
+/* 媒体查询 (应用最终确定的规范) */
+@media screen and (shape: rect) {
+	.header {
+		padding-top: 10px;
+		height: 65px;
+		flex-direction: row-reverse;
+		justify-content: space-around;
+	}
+	.time-display {
+		font-size: 32px;
+		padding-top: 0px;
+	}
+	.content-list {
+		/* FIX: 应用最终规范的 padding-bottom */
+		padding-bottom: 10px;
+	}
+}
+</style>
+
+<script>
+import router from "@system.router";
+import prompt from "@system.prompt";
+export default {
+	private: {
+		currentTime: "00:00",
+		timer: null,
+		infoClickTimes: 0,
+		listItems: [
+			{ label: "参与开发", value: "OrPudding" },
+			{ label: "参与设计", value: "VanguardHello_", small: true },
+			{ label: "协助测试", value: "xinghengCN" },
+			// 将 handler 作为一个数据属性，而不是直接的函数名
+			{ label: "编译信息", handler: "goToCompileInfo" },
+			{ label: "开放源代码许可", handler: "goToLicense" },
+		],
+	},
+
+	onInit() {
+		this.updateTime();
+		this.timer = setInterval(this.updateTime, 1000);
+	},
+
+	onDestroy() {
+		if (this.timer) {
+			clearInterval(this.timer);
+		}
+	},
+
+	handleInfoClick() {
+		this.infoClickTimes++;
+		if (this.infoClickTimes >= 5) {
+			// 重置点击次数，避免重复触发
+			this.infoClickTimes = 0;
+
+			// 弹出确认对话框
+			prompt.showDialog({
+				title: "调试模式",
+				message: "确定要进入调试页面吗？",
+				success: () => {
+					prompt.showToast({ message: "正在进入调试页面..." });
+					router.push({ uri: "/pages/debug" });
+				},
+				cancel: () => {
+					// 用户取消时给个提示（可选）
+					prompt.showToast({ message: "已取消" });
+				},
+			});
+		}
+	},
+
+	/**
+	 * 统一的列表项点击处理函数
+	 * @param {object} item - 被点击的列表项的数据对象
+	 */
+	handleItemClick(item) {
+		// 如果 item 没有 handler 属性，则不执行任何操作
+		if (!item.handler) {
+			return;
+		}
+
+		// 根据 item.handler 的值来调用对应的函数
+		if (typeof this[item.handler] === "function") {
+			this[item.handler]();
+		} else {
+			console.log(`未找到名为 ${item.handler} 的处理函数。`);
+		}
+	},
+
+	updateTime() {
+		const now = new Date();
+		const hours = now.getHours().toString().padStart(2, "0");
+		const minutes = now.getMinutes().toString().padStart(2, "0");
+		this.currentTime = `${hours}:${minutes}`;
+	},
+
+	goToCompileInfo() {
+		router.push({ uri: "/pages/compileInfo" });
+	},
+
+	goToLicense() {
+		router.push({ uri: "/pages/license" });
+	},
+
+	goBack() {
+		router.back();
+	},
+};
+</script>

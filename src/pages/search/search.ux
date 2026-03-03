@@ -43,9 +43,7 @@
 				<div class="status-container">
 					<!-- 加载中 -->
 					<div if="{{ isLoading }}" class="loading-wrapper">
-						<text class="loading-tip">
-							搜索中...
-						</text>
+						<text class="loading-tip">搜索中...</text>
 					</div>
 
 					<!-- 加载失败 -->
@@ -530,8 +528,6 @@ const fileService = {
 
 export default {
 	private: {
-		textValue: "",
-
 		fullResultList: [],
 		displayResultList: [],
 
@@ -568,8 +564,14 @@ export default {
 		showPageKeypad: false,
 		pageInput: "",
 	},
+	protected: {
+		textValue: "",
+	},
 
 	async onInit() {
+		if (this.textValue) {
+			this.handleSearch();
+		}
 		device.getInfo({
 			success: (data) => {
 				if (data.screenShape) this.screentype = data.screenShape;
@@ -598,9 +600,26 @@ export default {
 					this.TOTAL_LIMIT = settings.search.totalLimit || this.TOTAL_LIMIT;
 					this.API_PAGE_SIZE =
 						settings.search.apiPageSize || this.API_PAGE_SIZE;
+
+					// 从 settings.search 读取 vibratemode 和 keyboardtype
+					if (settings.search.vibratemode !== undefined) {
+						// 验证振动模式值是否有效
+						const validModes = ["", "long", "short"];
+						if (validModes.includes(settings.search.vibratemode)) {
+							this.vibratemode = settings.search.vibratemode;
+						}
+					}
+
+					if (settings.search.keyboardtype !== undefined) {
+						// 验证键盘类型值是否有效
+						const validTypes = ["QWERTY", "T9"];
+						if (validTypes.includes(settings.search.keyboardtype)) {
+							this.keyboardtype = settings.search.keyboardtype;
+						}
+					}
 				}
+
 				if (settings.performance) {
-					// ✅ 搜索页现在用分页：pageSize 表示每页条数
 					this.PAGE_SIZE = settings.performance.pageSize || this.PAGE_SIZE;
 				}
 			}
@@ -696,7 +715,7 @@ export default {
 				keywords,
 				this.TOTAL_LIMIT,
 				this.API_PAGE_SIZE,
-                this.cookie
+				this.cookie
 			);
 			this.totalPages = Math.max(
 				1,
@@ -731,7 +750,7 @@ export default {
 		this.currentPage = pageNumber;
 
 		this.$nextTick(() => {
-			// ✅ 和示例一样：翻页后回到顶部（top:1 防止某些机型 0 不触发）
+			// 和示例一样：翻页后回到顶部（top:1 防止某些机型 0 不触发）
 			this.$element("searchScroll").scrollTo({ top: 1, behavior: "instant" });
 		});
 	},
