@@ -62,7 +62,16 @@
 						class="qrcode-component-small"
 					></qrcode>
 					<text class="capsule-tip">
-						请用手机扫码，打开爱发电页面，设备ID已自动填入备注
+						请用手机扫码，打开爱发电页面购买
+					</text>
+					<text class="capsule-tip">
+						设备ID已自动填入备注
+					</text>
+					<text class="capsule-tip">
+						遇到购买问题请联系
+					</text>
+					<text class="capsule-tip">
+						QQ:3164473115
 					</text>
 				</div>
 				<text class="post-purchase-button" onclick="retryActivation">
@@ -73,7 +82,6 @@
 				</text>
 			</scroll>
 		</div>
-
 		<!-- ===================================================================
  新增状态四：Debug 测试版白名单拦截（遵循现有激活页规范）
  =================================================================== -->

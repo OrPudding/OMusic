@@ -972,6 +972,10 @@ export default {
 
 		// 封面异步回写防串歌
 		_coverFetchToken: 0,
+
+		shuffledPlayList: [],
+shuffledIndex: 0,
+		_pendingRestoreTime: null,
 	},
 
 	protected: {
@@ -1062,8 +1066,6 @@ export default {
 			await this.loadDownloadedSongs();
 			this.getDeviceInfo();
 			await this.onRestoreState();
-			    // 清理过期的随机歌单
-				this.cleanupExpiredShuffledPlaylist();
 		});
 	},
 	onShow() {
@@ -1129,13 +1131,13 @@ export default {
 		// 清理所有定时器
 		if (this.playTimeoutId) clearTimeout(this.playTimeoutId);
 		// 如果有其他定时器也在这里清理
-		brightness.setKeepScreenOn({ keepScreenOn: false }); // 关闭屏幕常亮
+		prompt.showToast({ message: "player被系统销毁，避免打开过多页面" });
 		console.log("播放器已销毁，状态已保存，资源已释放。");
 	},
 
 	onBackPress() {
 		if (this.isDownloadingLocked) {
-			prompt.showToast({ message: "正在下载，请勿退出" });
+			
 			return true;
 		}
 		this.onSaveState();
@@ -1219,7 +1221,7 @@ export default {
         }
 
         // 2. 如果是随机模式，尝试加载随机歌单
-        if (this.playMode === 1) {
+        if (this.playMode === 2) {
             const loaded = await this.loadShuffledPlaylist();
             if (!loaded) {
                 // 如果加载失败，重新生成
@@ -1241,7 +1243,7 @@ export default {
             this.currentIndex = lastIndex;
 
             // 如果是随机模式，根据随机列表调整 shuffledIndex
-            if (this.playMode === 1 && this.shuffledPlayList.length > 0) {
+            if (this.playMode === 2 && this.shuffledPlayList.length > 0) {
                 const shuffledPos = this.shuffledPlayList.indexOf(lastIndex);
                 if (shuffledPos !== -1) {
                     this.shuffledIndex = shuffledPos;
@@ -1854,11 +1856,11 @@ if (newIndex >= 0) {
     await fileService.writeJson(CONSTANTS.FILE_PLAYER_STATE, stateToSave);
 
     // 如果是随机模式，单独保存随机列表
-    if (this.playMode === 1 && this.shuffledPlayList.length > 0) {
+    if (this.playMode === 2 && this.shuffledPlayList.length > 0) {
         await this.saveShuffledPlaylist();
     }
 
-    console.log("播放状态已保存（主状态轻量化）");
+    console.log("播放状态已保存");
 },
 
 	playOrPause() {
@@ -2460,32 +2462,9 @@ if (newIndex >= 0) {
     // 生成后保存到单独文件
     this.saveShuffledPlaylist();
 },
-// 清理过期的随机歌单文件
-async cleanupExpiredShuffledPlaylist() {
-    try {
-        const shuffledData = await fileService.readJson(CONSTANTS.FILE_SHUFFLED_PLAYLIST);
-
-        if (shuffledData?.timestamp) {
-            const isExpired = new Date().getTime() - shuffledData.timestamp > 24 * 3600 * 1000;
-            if (isExpired) {
-                // 删除过期文件
-                await new Promise((resolve) => {
-                    file.delete({
-                        uri: CONSTANTS.FILE_SHUFFLED_PLAYLIST,
-                        success: resolve,
-                        fail: resolve,
-                    });
-                });
-                console.log("已清理过期的随机歌单文件");
-            }
-        }
-    } catch (e) {
-        // 文件不存在或其他错误，忽略
-    }
-},
 	// 单独保存随机歌单
 async saveShuffledPlaylist() {
-    if (this.playMode !== 1 || this.shuffledPlayList.length === 0) return;
+    if (this.playMode !== 2 || this.shuffledPlayList.length === 0) return;
 
     const shuffledData = {
         shuffledPlayList: this.shuffledPlayList,
@@ -2986,6 +2965,36 @@ getExtraLyricText(lineData) {
 		};
 
 		// 系统/耳机控制：这些是“外部请求”，由我们执行动作
+		// 系统/耳机控制：播放
+audio.onctrlplay = () => {
+	console.log("[ctrl] play");
+
+	if (this.pendingSongId) return;
+
+	// 如果当前没有歌曲
+	if (!this.currSong) {
+		if (this.playList && this.playList.length > 0) {
+			this.currentIndex = 0;
+			this.playCurrent();
+		}
+		return;
+	}
+
+	if (!this.playerState.isPlaying) {
+		audio.play();
+	}
+};
+
+// 系统/耳机控制：暂停
+audio.onctrlpause = () => {
+	console.log("[ctrl] pause");
+
+	if (this.pendingSongId) return;
+
+	if (this.playerState.isPlaying) {
+		audio.pause();
+	}
+};
 		audio.onctrlplayprev = () => {
 			prompt.showToast({ message: "上一首" });
 			this.change(-1);

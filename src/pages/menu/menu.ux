@@ -13,13 +13,13 @@
 				</div>
 				<text class="box-item-text">搜索</text>
 			</div>
-			<div class="downloading-box" onclick="goToDownloadingList">
+			<!-- <div class="downloading-box" onclick="goToDownloadingList">
 				<div class="box-icon-wrapper">
 					<image class="box-item-icon" src="/common/icon/downloaded.png"></image>
 				</div>
 
 				<text class="box-item-text">{{ downloadingSongName || "暂无下载任务" }}</text>
-			</div>
+			</div>-->
 
 			<div class="music-card" onclick="back">
 				<!-- a. 左侧封面 -->

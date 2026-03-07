@@ -23,7 +23,7 @@
 					</div>
 				</div>
 			</block>
-		
+	
 			<block else>
 				<div class="guidance-panel" onclick="handleManualRefresh">
 					<text class="guidance-title">等待刷新</text>
@@ -365,7 +365,7 @@ export default {
 				// ✅ 退出时就别 onComplete 了（避免 finishPullToRefresh 触发异常）
 				setTimeout(() => {
 					app.terminate();
-				}, 500);
+				}, 2000);
 
 				return;
 			}
