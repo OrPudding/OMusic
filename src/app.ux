@@ -39,7 +39,7 @@ export default {
 	IS_DEBUG_BUILD: false,
 
 	// 1. 全局 interconnect 实例 (保持不变)
-	connectInstance: interconnect.instance(),
+	//connectInstance: interconnect.instance(),
 
 	downloadService: downloadService,
 
@@ -57,6 +57,7 @@ uEknhKNaBOc0r2sDFSyAGBz4aVkF3X95dGmfWQ6aoTMZpmoEi0zMfQXUUIxl7lN1
 ZdRbYWIH1E0/S7dmIq6tC8+69Pyt8Jc8VfhClV97mF/LLrnN0T358bR5b2OTuuk1
 6QIDAQAB
 -----END PUBLIC KEY-----`,
+
 
 	// !! 替换为你的爱发电购买链接
 	AFDIAN_PURCHASE_URL:
